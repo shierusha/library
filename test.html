@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <title>Discord Webhook 測試</title>
+  <style>
+    body { font-family: 'Noto Sans TC', sans-serif; background: #f7faff; display:flex; flex-direction:column; align-items:center; padding-top: 80px;}
+    input, button { font-size:1.1em; padding: 6px 16px; border-radius:8px; border:1px solid #ccc;}
+    button { background:#1767a0; color:#fff; border:none; margin-left:6px;}
+  </style>
+</head>
+<body>
+  <h2>DC Webhook 直接測試</h2>
+  <input id="msg" placeholder="要說什麼？" value="喵">
+  <button onclick="send()">送出到 Discord 頻道</button>
+  <div id="hint" style="margin-top:16px;color:#888;"></div>
+<script>
+const webhook = "https://discordapp.com/api/webhooks/1407262533475106837/JwKDBTshuyAuy91vueteolPqMp5avaY-I3cgUg2uUpqlPyf035MkrOn_r-FDKilbNYoh";
+function send(){
+  const msg = document.getElementById("msg").value;
+  fetch(webhook, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content: msg })
+  }).then(r => {
+    document.getElementById("hint").textContent = "已送出！快去頻道看看吧～";
+    setTimeout(()=>{ document.getElementById("hint").textContent = ""; }, 3000);
+  });
+}
+</script>
+</body>
+</html>
