@@ -1,26 +1,269 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-  <meta charset="UTF-8">
-  <title>圖書館｜多專案寫書測試</title>
+  <meta charset="UTF-8" />
+  <title>開發中｜暫替頁面</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Supabase SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- 字體 -->
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&family=Noto+Sans+TC:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
-    body { font-family: 'Noto Sans TC', sans-serif; background: #f4f7fa; padding: 2rem;}
-    .main { max-width: 600px; margin: 2em auto; background: #fff; border-radius: 1.2em; box-shadow: 0 2px 16px #0001; padding: 2em;}
-    .btn { background: #1767a0; color: #fff; border: none; border-radius: .5em; padding: .5em 1.2em; margin: 1em 0;}
-    .book-list { margin-top: 2em; }
-    .book-item { padding: .9em 0; border-bottom: 1px solid #eee; }
+    :root{
+      --ink:#0c1a2a; --muted:#5b6a7f; --surface:#fff; --line:#e8eef5; --primary:#1767a0;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; font-family:'Noto Sans TC',system-ui,-apple-system,Segoe UI,sans-serif; color:var(--ink);
+      background:
+        linear-gradient(180deg, rgba(11,18,36,.25), rgba(16,25,54,.55)),
+        url('https://shierusha.github.io/school-battle/teachers/img/8.webp') center top / cover no-repeat fixed;
+      padding: 2rem 1rem;
+    }
+    .shell{max-width:960px;margin:0 auto}
+    .card{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:0 10px 28px #0002;padding:18px}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    h1{margin:.2rem 0 1rem;font-size:1.6rem;color:#0b2440}
+    .muted{color:var(--muted)}
+    .btn{background:var(--primary);color:#fff;border:none;border-radius:10px;padding:.55rem .9rem;cursor:pointer}
+    .btn.ghost{background:#f3f7fb;color:#0b2440;border:1px solid var(--line)}
+    .btn:disabled{opacity:.6;cursor:not-allowed}
+    select, input[type="text"]{padding:.5rem .6rem;border:1px solid #cfd9e6;border-radius:10px;background:#fff}
+    .pad{height:12px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+    .book{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px}
+    .book h3{margin:.2rem 0 .4rem;font-size:1.05rem}
+    .book .sub{font-size:.9rem;color:#6c7c90}
+    .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .toolbar .right{margin-left:auto;display:flex;gap:8px;align-items:center}
+    .hr{height:1px;background:var(--line);margin:12px 0}
+    /* appbar 遮右上角字：70% 不透明 */
+    .appbar{position:sticky;top:0;z-index:5;margin:-2rem -1rem 1rem;padding:10px 14px;
+      background:rgba(15,27,51,.7);backdrop-filter:saturate(1.1) blur(6px);color:#e6ebff;border-bottom:1px solid rgba(34,48,87,.7)}
+    .appbar .brand{display:flex;gap:.6rem;align-items:center;font-weight:700}
+    .appbar .brand .dot{width:10px;height:10px;border-radius:999px;background:linear-gradient(135deg,#5aa7ff,#6ee7b7)}
   </style>
 </head>
 <body>
-  <div class="main" id="main"><div>載入中…</div></div>
+  <div class="appbar">
+    <div class="shell row" style="justify-content:space-between">
+      <div class="brand"><span class="dot"></span><span>謝爾夏｜玩家休息室</span></div>
+      <div class="muted" id="who"></div>
+    </div>
+  </div>
 
+  <div class="shell">
+    <div class="card">
+      <h1>書架</h1>
 
+      <!-- 控制列：角色下拉 / 書籍數 / 新增 -->
+      <div class="toolbar">
+        <label class="row" style="gap:8px">
+          <span class="muted">選擇角色</span>
+          <select id="selCharacter"></select>
+        </label>
+        <div class="muted" id="countLabel"></div>
+        <div class="right">
+          <button class="btn" id="btnNew" disabled>＋ 新增書籍</button>
+          <button class="btn ghost" id="btnRefresh">重新整理</button>
+        </div>
+      </div>
 
+      <div class="hr"></div>
 
-  <button onclick="notifyDiscord()">通知 Discord</button>
-  <div id="result"></div>
+      <!-- 書籍清單 -->
+      <div id="booksGrid" class="grid"></div>
+    </div>
+
+    <div class="pad"></div>
+
+    <!-- 你原本的 Discord 通知（保留） -->
+    <div class="card">
+      <h3 style="margin:.2rem 0 .6rem">通知 Discord（測試）</h3>
+      <button class="btn ghost" onclick="notifyDiscord()">通知 Discord</button>
+      <pre id="result" class="muted" style="white-space:pre-wrap"></pre>
+    </div>
+  </div>
+
   <script>
+    // ---------- 你的兩個專案 ----------
+    // A 專案：玩家/學生（用它的 auth 當登入來源）
+    const A = window.supabase.createClient(
+      'https://wfhwhvodgikpducrhgda.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmaHdodm9kZ2lrcGR1Y3JoZ2RhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgwMTAwNjEsImV4cCI6MjA2MzU4NjA2MX0.P6P-x4SxjiR4VdWH6VFgY_ktgMac_OzuI4Bl7HWskz8'
+    );
+    // B 專案：圖書館（books/pages/chapters）
+    const B = window.supabase.createClient(
+      'https://ogzpfrkwnqqaitytncla.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nenBmcmt3bnFxYWl0eXRuY2xhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxODQzNzEsImV4cCI6MjA3MDc2MDM3MX0.Ls83xOXcKIW7FUcavr8_sOs37I18VGFWYNW3sNFRS24'
+    );
+
+    // ---------- 可調常數 ----------
+    const TEACHER_WHITELIST = [
+      // 允許看到「老師」分類的玩家 user.id
+      // '00000000-0000-0000-0000-000000000000'
+    ];
+    const EDITOR_URL = 'https://your-editor-page.example.com/editor.html'; // 之後換成你的編輯器頁
+    const READER_URL = 'https://your-reader-page.example.com/reader.html'; // 之後換成你的閱讀頁
+
+    // ---------- DOM ----------
+    const who = document.getElementById('who');
+    const sel = document.getElementById('selCharacter');
+    const grid = document.getElementById('booksGrid');
+    const countLabel = document.getElementById('countLabel');
+    const btnNew = document.getElementById('btnNew');
+    const btnRefresh = document.getElementById('btnRefresh');
+
+    // ---------- 工具 ----------
+    const fmtDate = ts => new Date(ts).toLocaleDateString();
+
+    // ---------- 1) 取得登入者（A 專案） ----------
+    let me = null;
+    async function getMe(){
+      const { data:{ user } } = await A.auth.getUser();
+      me = user || null;
+      who.textContent = me ? (me.email || me.id) : '未登入（請先於入口登入）';
+      return me;
+    }
+
+    // ---------- 2) 取持有角色清單（A 專案 students） ----------
+    async function fetchMyStudents(){
+      if(!me) return [];
+      const { data, error } = await A
+        .from('students')
+        .select('student_id, name')
+        .eq('player_id', me.id)
+        .order('name', { ascending: true });
+      if(error){ console.warn(error); return []; }
+      return data || [];
+    }
+
+    // ---------- 3) 依選擇載入書籍（B 專案 books） ----------
+    async function fetchBooksBySelection(selection){
+      // selection: { kind:'student'|'teacher', id?:student_id }
+      let q = B.from('books').select('id, title, updated_at, owner_id, student_id').order('updated_at', { ascending:false });
+      if(selection.kind === 'student'){ q = q.eq('student_id', selection.id); }
+      else { q = q.is('student_id', null); }
+      const { data, error } = await q;
+      if(error){ console.warn(error); return []; }
+      return data || [];
+    }
+
+    // ---------- 4) 渲染下拉 + 書架 ----------
+    let currentSelection = null; // {kind:'student'|'teacher', id?}
+    function canEditSelection(){
+      if(!me || !currentSelection) return false;
+      if(currentSelection.kind === 'teacher') return TEACHER_WHITELIST.includes(me.id);
+      // student：只有持有者可編輯（因為選單本來就只列持有者的，但保守再判）
+      return true;
+    }
+
+    async function renderSelector(){
+      const students = await fetchMyStudents();
+      const options = [];
+      // 老師（僅白名單）
+      if(me && TEACHER_WHITELIST.includes(me.id)){
+        options.push({ value:'teacher', label:'老師（共同書架）' });
+      }
+      // 我的學生
+      for(const s of students){
+        options.push({ value:`s:${s.student_id}`, label:`學生｜${s.name}` });
+      }
+      // 設定下拉
+      sel.innerHTML = options.map(o=>`<option value="${o.value}">${o.label}</option>`).join('') || `<option value="" disabled>尚未擁有角色</option>`;
+      // 決定預設 selection
+      const last = localStorage.getItem('xer_last_sel');
+      let toValue = options.length ? (options.find(x=>x.value===last)?.value || options[0].value) : '';
+      if(!toValue){ currentSelection=null; btnNew.disabled=true; grid.innerHTML='<div class="muted">沒有可選角色。</div>'; return; }
+      sel.value = toValue;
+      currentSelection = toValue==='teacher' ? {kind:'teacher'} : {kind:'student', id: toValue.slice(2)};
+      btnNew.disabled = !canEditSelection();
+    }
+
+    async function renderBooks(){
+      if(!currentSelection){ grid.innerHTML=''; countLabel.textContent=''; return; }
+      const books = await fetchBooksBySelection(currentSelection);
+      countLabel.textContent = `共有 ${books.length} 本書`;
+      if(!books.length){
+        grid.innerHTML = `<div class="muted">目前沒有書籍。</div>`;
+        return;
+      }
+      grid.innerHTML = books.map(b=>`
+        <div class="book">
+          <h3>${escapeHtml(b.title || '未命名書籍')}</h3>
+          <div class="sub">更新：${fmtDate(b.updated_at||Date.now())}</div>
+          <div class="row" style="margin-top:8px;gap:8px">
+            <button class="btn ghost" data-act="read" data-id="${b.id}">閱讀</button>
+            ${ (me && b.owner_id === me.id) ? `<button class="btn" data-act="edit" data-id="${b.id}">編輯</button>` : '' }
+          </div>
+        </div>
+      `).join('');
+
+      // 綁定
+      grid.querySelectorAll('[data-act="read"]').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          const bookId = btn.dataset.id;
+          // TODO: 你的閱讀頁
+          const u = new URL(READER_URL);
+          u.searchParams.set('book_id', bookId);
+          window.location.href = u.toString();
+        });
+      });
+      grid.querySelectorAll('[data-act="edit"]').forEach(btn=>{
+        btn.addEventListener('click', async ()=>{
+          const bookId = btn.dataset.id;
+          // 帶著目前選擇的 student/teacher
+          const u = new URL(EDITOR_URL);
+          u.searchParams.set('book_id', bookId);
+          if(currentSelection.kind==='student') u.searchParams.set('student_id', currentSelection.id);
+          // 如果你需要把 A 的 access_token 一起帶去（同網域或 hash）：
+          const { data:{ session } } = await A.auth.getSession();
+          if(session?.access_token){
+            u.hash = `access_token=${encodeURIComponent(session.access_token)}&refresh_token=${encodeURIComponent(session.refresh_token||'')}`;
+          }
+          window.location.href = u.toString();
+        });
+      });
+    }
+
+    // 變更選擇
+    sel.addEventListener('change', async ()=>{
+      const v = sel.value;
+      currentSelection = (v==='teacher') ? {kind:'teacher'} : {kind:'student', id:v.slice(2)};
+      localStorage.setItem('xer_last_sel', v);
+      btnNew.disabled = !canEditSelection();
+      await renderBooks();
+    });
+
+    // 新增書籍（只有持有者/白名單才能按）
+    btnNew.addEventListener('click', async ()=>{
+      if(!canEditSelection()) return;
+      const title = prompt('請輸入書名：', '我的故事書'); if(!title) return;
+      const payload = {
+        owner_id: me.id,
+        title,
+        student_id: (currentSelection.kind==='student') ? currentSelection.id : null
+      };
+      const { error } = await B.from('books').insert([payload]);
+      if(error){ alert('新增失敗：' + error.message); return; }
+      await renderBooks();
+    });
+
+    btnRefresh.addEventListener('click', async ()=>{
+      await renderSelector();
+      await renderBooks();
+    });
+
+    // ---------- 5) 啟動 ----------
+    (async function boot(){
+      await getMe();
+      if(!me){ document.querySelector('.shell').insertAdjacentHTML('afterbegin','<div class="card" style="margin-bottom:12px"><div class="muted">⚠️ 未登入：請從入口頁登入後再回到本頁。</div></div>'); }
+      await renderSelector();
+      await renderBooks();
+    })();
+
+    // ---------- 你原本的 Discord 通知 ----------
     async function notifyDiscord() {
       const url = "https://ogzpfrkwnqqaitytncla.supabase.co/functions/v1/notify-discord";
       const data = {
@@ -28,91 +271,19 @@
         title: "謝謝各位的犧牲與奉獻",
         book_url: "https://shierusha.github.io/create-student/thanks/thanks"
       };
-      document.getElementById('result').textContent = "送出中...";
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data)
-      });
-      const json = await res.json();
-      document.getElementById('result').textContent = JSON.stringify(json, null, 2);
+      const resEl = document.getElementById('result');
+      resEl.textContent = "送出中...";
+      try{
+        const res = await fetch(url, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(data) });
+        const json = await res.json();
+        resEl.textContent = JSON.stringify(json, null, 2);
+      }catch(err){
+        resEl.textContent = '錯誤：' + err.message;
+      }
     }
+
+    // 小工具：轉義
+    function escapeHtml(s){ return (s||'').replace(/[&<>"']/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
   </script>
-
-
-
-
-<script>
-// === A 專案（角色/玩家資訊）===
-const A = window.supabase.createClient(
-  'https://wfhwhvodgikpducrhgda.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmaHdodm9kZ2lrcGR1Y3JoZ2RhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgwMTAwNjEsImV4cCI6MjA2MzU4NjA2MX0.P6P-x4SxjiR4VdWH6VFgY_ktgMac_OzuI4Bl7HWskz8'
-);
-// === B 專案（圖書館書籍寫入）===
-const B = window.supabase.createClient(
-  'https://ogzpfrkwnqqaitytncla.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nenBmcmt3bnFxYWl0eXRuY2xhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxODQzNzEsImV4cCI6MjA3MDc2MDM3MX0.Ls83xOXcKIW7FUcavr8_sOs37I18VGFWYNW3sNFRS24'
-);
-
-(async function() {
-  const main = document.getElementById('main');
-  // 1. 取得目前登入者
-  const { data: { user } } = await A.auth.getUser();
-  if (!user) {
-    main.innerHTML = "<div>請先登入帳號</div>";
-    return;
-  }
-  // 2. 取得 URL 參數
-  const params = new URLSearchParams(window.location.search);
-  const student_id = params.get('student_id');
-  const student_name = params.get('student_name');
-  if(!student_id){
-    main.innerHTML = "<div>缺少角色資訊！請從學生證頁進入。</div>";
-    return;
-  }
-
-  // 3. 查角色資訊（判斷持有權）
-  let { data: student } = await A
-    .from('students')
-    .select('player_id, name')
-    .eq('student_id', student_id)
-    .single();
-
-  // 4. 查圖書館的這個角色所有書本
-  let { data: books } = await B
-    .from('books')
-    .select('id, title, updated_at, owner_id')
-    .eq('student_id', student_id)
-    .order('updated_at', { ascending: false });
-
-  // 5. 權限判斷
-  let canEdit = (student && student.player_id === user.id);
-
-  // 6. 顯示頁面
-  main.innerHTML = `
-    <h2>【${student_name || student?.name || "未知角色"}】的故事集</h2>
-    <div style="color:#888;">${canEdit ? "你可以為此角色創作新書" : "你只能閱讀，無法創建新書"}</div>
-    ${canEdit ? '<button class="btn" id="btnNewBook">＋新增書籍</button>' : ''}
-    <div class="book-list">${books && books.length ? books.map(b=>`
-      <div class="book-item">📗 <b>${b.title}</b> <span style="color:#aaa;font-size:.95em;">(${b.updated_at?.slice(0,10)||""})</span></div>
-    `).join('') : '<div style="color:#aaa;">目前沒有書籍。</div>'}</div>
-  `;
-
-  // 7. 新增書本功能
-  if(canEdit){
-    document.getElementById('btnNewBook').onclick = async ()=>{
-      const title = prompt("請輸入書名：", "我的故事書");
-      if(!title) return;
-      let { error } = await B.from('books').insert([{
-        owner_id: user.id,
-        student_id,
-        title,
-      }]);
-      if(error) return alert('新增失敗: ' + error.message);
-      location.reload();
-    }
-  }
-})();
-</script>
 </body>
 </html>
