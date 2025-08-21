@@ -301,8 +301,61 @@
     $('#dlgRename').close();
     renameTargetId=null; await renderLibrary();
   });
+// ========= X) 一次性提示 & 通用關閉綁定（★ NEW） =========
+function showTipOnce() {
+  const KEY = 'xer_book_tip_v1';
+  if (sessionStorage.getItem(KEY)) return;
+  sessionStorage.setItem(KEY, '1');
+  alert(
+    [
+      '小提示：',
+      '• 點「書名右上角」的 ✎ 可更改書名',
+      '• 點書卡「左上 ← / 右下 →」可調整排序'
+    ].join('\n')
+  );
+}
 
-  // ========= 8) 啟動：依 session 選 Store 然後渲染 =========
-  async function boot(){ await pickStore(); await renderLibrary(); }
-  boot();
+// 統一綁定所有 <dialog> 的關閉按鈕（具 data-close 屬性）（★ NEW）
+function bindDialogCloseButtons() {
+  document.querySelectorAll('dialog').forEach(dlg => {
+    dlg.addEventListener('click', (e) => {
+      const t = e.target;
+      if (t && t.closest('[data-close]')) {
+        dlg.close();                 // 關閉 dialog
+        const form = dlg.querySelector('form');
+        if (form) form.reset?.();    // 有表單就順手 reset
+      }
+    });
+  });
+}
+
+// 特別保險：如果你有「新增書籍」取消按鈕但沒 data-close，這裡也幫你綁上（★ NEW）
+function bindLegacyCancelIds() {
+  const dlgNew = document.getElementById('dlgNew');
+  const btns = [
+    '#btnNewCancel',
+    '#btnCreateCancel',
+    '#btnCancel',       // 常見命名
+  ];
+  btns.forEach(sel => {
+    const el = document.querySelector(sel);
+    if (el && dlgNew) el.addEventListener('click', () => dlgNew.close());
+  });
+
+  // 也順便處理改名視窗的取消（如果存在）
+  const dlgRename = document.getElementById('dlgRename');
+  const renameCancel = document.getElementById('btnRenameCancel');
+  if (dlgRename && renameCancel) {
+    renameCancel.addEventListener('click', () => dlgRename.close());
+  }
+}
+// ========= 8) 啟動：依 session 選 Store 然後渲染 =========
+async function boot(){
+  await pickStore();
+  await renderLibrary();
+  bindDialogCloseButtons(); // ★ NEW
+  bindLegacyCancelIds();    // ★ NEW
+  showTipOnce();            // ★ NEW
+}
+boot();
 })();
