@@ -28,41 +28,48 @@ const B = window.supabase.createClient(
 
 (async function() {
   const main = document.getElementById('main');
-  // 1. 取得目前登入者
-  const { data: { user } } = await A.auth.getUser();
-  if (!user) {
-    main.innerHTML = "<div>請先登入帳號</div>";
-    return;
+  // 1. 取得登入者（遊客也可進入，不強制）
+  let loginUser = null;
+  try {
+    const { data: { user } } = await A.auth.getUser();
+    loginUser = user || null;
+  } catch (e) {
+    loginUser = null;
   }
+
   // 2. 取得 URL 參數
   const params = new URLSearchParams(window.location.search);
-  const student_id = params.get('student_id');
   const student_name = params.get('student_name');
-  if(!student_id){
+  if(!student_name){
     main.innerHTML = "<div>缺少角色資訊！請從學生證頁進入。</div>";
     return;
   }
 
-  // 3. 查角色資訊（判斷持有權）
+  // 3. 查角色資訊（用 student_name，查不到就直接顯示找不到）
   let { data: student } = await A
     .from('students')
-    .select('player_id, name')
-    .eq('student_id', student_id)
+    .select('student_id, player_id, name')
+    .eq('name', student_name)
     .single();
+
+  if(!student){
+    main.innerHTML = `<div>查無角色【${student_name}】</div>`;
+    return;
+  }
 
   // 4. 查圖書館的這個角色所有書本
   let { data: books } = await B
     .from('books')
     .select('id, title, updated_at, owner_id')
-    .eq('student_id', student_id)
+    .eq('student_id', student.student_id)
     .order('updated_at', { ascending: false });
 
-  // 5. 權限判斷
-  let canEdit = (student && student.player_id === user.id);
+  // 5. 權限判斷：只有登入者且本人才能創作，其他只能看
+  let canEdit = !!loginUser && student.player_id === loginUser.id;
 
   // 6. 顯示頁面
   main.innerHTML = `
-    <h2>【${student_name || student?.name || "未知角色"}】的故事集</h2>
+    <h2>【${student.name || "未知角色"}】的故事集</h2>
     <div style="color:#888;">${canEdit ? "你可以為此角色創作新書" : "你只能閱讀，無法創建新書"}</div>
     ${canEdit ? '<button class="btn" id="btnNewBook">＋新增書籍</button>' : ''}
     <div class="book-list">${books && books.length ? books.map(b=>`
@@ -76,8 +83,8 @@ const B = window.supabase.createClient(
       const title = prompt("請輸入書名：", "我的故事書");
       if(!title) return;
       let { error } = await B.from('books').insert([{
-        owner_id: user.id,
-        student_id,
+        owner_id: loginUser.id,
+        student_id: student.student_id,
         title,
       }]);
       if(error) return alert('新增失敗: ' + error.message);
