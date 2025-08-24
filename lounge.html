@@ -1,97 +1,257 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-  <meta charset="UTF-8">
-  <title>圖書館｜多專案寫書測試</title>
+  <meta charset="UTF-8" />
+  <title>角色休息室 Lounge</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    body { font-family: 'Noto Sans TC', sans-serif; background: #f4f7fa; padding: 2rem;}
-    .main { max-width: 600px; margin: 2em auto; background: #fff; border-radius: 1.2em; box-shadow: 0 2px 16px #0001; padding: 2em;}
-    .btn { background: #1767a0; color: #fff; border: none; border-radius: .5em; padding: .5em 1.2em; margin: 1em 0;}
-    .book-list { margin-top: 2em; }
-    .book-item { padding: .9em 0; border-bottom: 1px solid #eee; }
+    :root{
+      --w:1080px; --h:725px;
+      --ink:#2b2b2b; --muted:#888; --brand:#1767a0; --accent:#ffcf66;
+    }
+    html,body{margin:0;background:#1e2126;font-family:'Noto Sans TC',system-ui,-apple-system,Segoe UI,sans-serif;color:#fff}
+    .room{position:relative;width:var(--w);height:var(--h);margin:28px auto;border-radius:16px;overflow:hidden;box-shadow:0 18px 60px #000a;background:#000}
+    .room img{width:100%;height:100%;object-fit:cover;display:block}
+    /* 書櫃可點區（依這張圖定位） */
+    .hotspot{position:absolute;left:54px;top:86px;width:268px;height:540px;background:transparent;border:none;cursor:pointer}
+    .hotspot:hover{outline:3px solid rgba(255,207,102,.9);border-radius:18px}
+
+    /* 書本疊在書櫃上（顯示數量用） */
+    .shelf-books{position:absolute;left:76px;top:112px;pointer-events:none}
+    .book-on-shelf{
+      position:absolute;width:48px;height:68px;border-radius:5px;
+      background:#f6d3a3;border:2px solid #b7894e;box-shadow:0 2px 8px #0006
+    }
+
+    /* Modal */
+    .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:center;justify-content:center;z-index:50}
+    .modal{background:#0f1420;border:1px solid #2b3550;color:#e9efff;border-radius:14px;box-shadow:0 16px 60px #000b;
+      width:min(720px,94vw);max-height:88vh;overflow:auto;padding:18px 18px 16px}
+    .modal h2{margin:0 0 10px;font-size:1.2rem}
+    .row{display:flex;gap:10px;align-items:center;margin-bottom:10px}
+    select{background:#0b1120;color:#e9efff;border:1px solid #35446f;border-radius:10px;padding:.5rem .7rem}
+    .btn{background:#1767a0;border:1px solid #1767a0;color:#fff;border-radius:10px;padding:.55rem .9rem;cursor:pointer}
+    .btn:disabled{opacity:.55;cursor:not-allowed}
+    .book-list{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+    .book-item{display:flex;align-items:center;gap:10px;background:#0b1327;border:1px solid #263257;border-radius:10px;padding:10px}
+    .book-item .title{color:#e9efff}
+    .book-item .date{color:#98a3c7;font-size:.9rem;margin-left:auto}
+    .icon{width:28px;height:28px;flex:0 0 28px;filter:drop-shadow(0 1px 2px #0006)}
+    .muted{color:#98a3c7}
+    .foot{display:flex;gap:10px;justify-content:flex-end;margin-top:12px}
   </style>
 </head>
 <body>
-  <div class="main" id="main"><div>載入中…</div></div>
+  <div class="room" id="room">
+    <img src="https://shierusha.github.io/library/img/ROOM.webp" alt="room" />
+    <button class="hotspot" title="打開書櫃" onclick="openShelf()"></button>
+    <div id="shelfBooks" class="shelf-books"></div>
+  </div>
+
+  <!-- 書櫃 Modal -->
+  <div class="modal-bg" id="modalBg">
+    <div class="modal">
+      <h2 id="modalTitle">書櫃清單</h2>
+      <div class="row">
+        <div class="muted">切換角色：</div>
+        <select id="selChar" onchange="onCharChange()"></select>
+        <div class="muted" style="margin-left:auto" id="ownerInfo"></div>
+      </div>
+
+      <div id="bookList" class="book-list"></div>
+
+      <div class="foot">
+        <button id="btnWrite" class="btn" onclick="goWrite()" style="display:none">＋ 撰寫故事</button>
+        <button class="btn" onclick="closeShelf()">關閉</button>
+      </div>
+    </div>
+  </div>
+
 <script>
-// === A 專案（角色/玩家資訊）===
+/* ---------- 連線設定 ---------- */
+// A：登入/學生資料
 const A = window.supabase.createClient(
   'https://wfhwhvodgikpducrhgda.supabase.co',
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmaHdodm9kZ2lrcGR1Y3JoZ2RhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgwMTAwNjEsImV4cCI6MjA2MzU4NjA2MX0.P6P-x4SxjiR4VdWH6VFgY_ktgMac_OzuI4Bl7HWskz8'
 );
-// === B 專案（圖書館書籍寫入）===
+// B：圖書館
 const B = window.supabase.createClient(
   'https://ogzpfrkwnqqaitytncla.supabase.co',
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nenBmcmt3bnFxYWl0eXRuY2xhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxODQzNzEsImV4cCI6MjA3MDc2MDM3MX0.Ls83xOXcKIW7FUcavr8_sOs37I18VGFWYNW3sNFRS24'
 );
 
-(async function() {
-  const main = document.getElementById('main');
-  // 1. 取得登入者（遊客也可進入，不強制）
-  let loginUser = null;
-  try {
-    const { data: { user } } = await A.auth.getUser();
-    loginUser = user || null;
-  } catch (e) {
-    loginUser = null;
-  }
+/* ---------- 狀態 ---------- */
+let viewer = null;          // 目前登入者（可能為 null）
+let ownerId = null;         // 房間主人的 player_id
+let ownerRole = 'player';   // 房間主人角色（teacher/player）
+let students = [];          // 房主的角色清單 [{student_id,name},...]
+let selected = null;        // 目前下拉選的目標 {type:'student'|'teacher', id?, name?}
+let defaultStudentName = null;
 
-  // 2. 取得 URL 參數
-  const params = new URLSearchParams(window.location.search);
-  const student_name = params.get('student_name');
-  if(!student_name){
-    main.innerHTML = "<div>缺少角色資訊！請從學生證頁進入。</div>";
+/* ---------- 初始化 ---------- */
+(async function init(){
+  const { data:{ user } } = await A.auth.getUser().catch(()=>({data:{user:null}}));
+  viewer = user || null;
+
+  const p = new URLSearchParams(location.search);
+  defaultStudentName = p.get('student_name') || null;
+  ownerId = p.get('owner_id') || (viewer ? viewer.id : null);
+
+  if(!ownerId){
+    document.getElementById('room').insertAdjacentHTML('afterend',
+      `<div style="max-width:960px;margin:16px auto;padding:12px 14px;background:#0f1420;border:1px solid #2b3550;border-radius:12px">
+         請登入或在網址加上 <code>?owner_id=玩家ID</code> 以檢視房間。
+       </div>`);
     return;
   }
 
-  // 3. 查角色資訊（用 student_name，查不到就直接顯示找不到）
-  let { data: student } = await A
-    .from('students')
-    .select('student_id, player_id, name')
-    .eq('name', student_name)
-    .single();
+  // 取房主資訊（判斷是否 teacher）
+  const { data: ownerRow } = await A.from('players')
+    .select('player_id, username, role')
+    .eq('player_id', ownerId).single();
 
-  if(!student){
-    main.innerHTML = `<div>查無角色【${student_name}】</div>`;
-    return;
+  ownerRole = (ownerRow?.role || 'player');
+
+  // 取房主名下所有學生
+  const { data: stuRows } = await A.from('students')
+    .select('student_id, name')
+    .eq('player_id', ownerId)
+    .order('name', {ascending:true});
+
+  students = (stuRows || []);
+
+  // 預設選擇
+  if (defaultStudentName) {
+    const m = students.find(s => s.name === defaultStudentName);
+    if (m) selected = { type:'student', id:m.student_id, name:m.name };
   }
-
-  // 4. 查圖書館的這個角色所有書本
-  let { data: books } = await B
-    .from('books')
-    .select('id, title, updated_at, owner_id')
-    .eq('student_id', student.student_id)
-    .order('updated_at', { ascending: false });
-
-  // 5. 權限判斷：只有登入者且本人才能創作，其他只能看
-  let canEdit = !!loginUser && student.player_id === loginUser.id;
-
-  // 6. 顯示頁面
-  main.innerHTML = `
-    <h2>【${student.name || "未知角色"}】的故事集</h2>
-    <div style="color:#888;">${canEdit ? "你可以為此角色創作新書" : "你只能閱讀，無法創建新書"}</div>
-    ${canEdit ? '<button class="btn" id="btnNewBook">＋新增書籍</button>' : ''}
-    <div class="book-list">${books && books.length ? books.map(b=>`
-      <div class="book-item">📗 <b>${b.title}</b> <span style="color:#aaa;font-size:.95em;">(${b.updated_at?.slice(0,10)||""})</span></div>
-    `).join('') : '<div style="color:#aaa;">目前沒有書籍。</div>'}</div>
-  `;
-
-  // 7. 新增書本功能
-  if(canEdit){
-    document.getElementById('btnNewBook').onclick = async ()=>{
-      const title = prompt("請輸入書名：", "我的故事書");
-      if(!title) return;
-      let { error } = await B.from('books').insert([{
-        owner_id: loginUser.id,
-        student_id: student.student_id,
-        title,
-      }]);
-      if(error) return alert('新增失敗: ' + error.message);
-      location.reload();
+  if (!selected) {
+    if (students.length) {
+      selected = { type:'student', id:students[0].student_id, name:students[0].name };
+    } else if (ownerRole === 'teacher') {
+      selected = { type:'teacher', name:'老師' };
     }
   }
+
+  // 一開始把書本數量疊到書櫃（顯示目前選擇的書本數）
+  await renderShelfOverlay();
 })();
+
+/* ---------- 書櫃彈窗 ---------- */
+function openShelf(){
+  if(!ownerId){ return; }
+  document.getElementById('modalBg').style.display = 'flex';
+  fillSelect();
+  refreshModal();
+}
+function closeShelf(){
+  document.getElementById('modalBg').style.display = 'none';
+}
+function fillSelect(){
+  const sel = document.getElementById('selChar');
+  const opts = [];
+  if (ownerRole === 'teacher') {
+    opts.push(`<option value="teacher" ${selected?.type==='teacher'?'selected':''}>老師</option>`);
+  }
+  for (const s of students) {
+    const isSel = selected?.type==='student' && selected?.id===s.student_id;
+    opts.push(`<option value="${s.student_id}" ${isSel?'selected':''}>${s.name}</option>`);
+  }
+  sel.innerHTML = opts.join('') || '<option>（沒有角色）</option>';
+
+  const isOwnerViewing = viewer && viewer.id === ownerId;
+  document.getElementById('btnWrite').style.display = isOwnerViewing ? '' : 'none';
+  document.getElementById('ownerInfo').textContent =
+    `房主：${ownerId.slice(0,8)}…　身份：${ownerRole}`;
+  document.getElementById('modalTitle').textContent =
+    `書櫃清單（${selected?.type==='teacher'?'老師':selected?.name||'—'}）`;
+}
+function onCharChange(){
+  const sel = document.getElementById('selChar');
+  const v = sel.value;
+  if (v === 'teacher') selected = { type:'teacher', name:'老師' };
+  else {
+    const s = students.find(x=>x.student_id===v);
+    selected = { type:'student', id:s.student_id, name:s.name };
+  }
+  refreshModal();
+  renderShelfOverlay(); // 同步更新書櫃上顯示
+}
+
+/* ---------- 讀書／寫書 ---------- */
+function goWrite(){
+  if (!selected) return;
+  // 只有自己才會看到這顆按鈕，所以不再檢查 viewer
+  if (selected.type === 'teacher') {
+    // 老師書（student_id 為 null），帶 owner_id 過去；你也可以選擇帶 teacher=1
+    location.href = `https://shierusha.github.io/library/library?owner_id=${encodeURIComponent(ownerId)}&teacher=1`;
+  } else {
+    // 用名字比較漂亮：避免外流 id
+    location.href = `https://shierusha.github.io/library/library?student_name=${encodeURIComponent(selected.name)}`;
+  }
+}
+
+/* ---------- 查書本並渲染 ---------- */
+async function refreshModal(){
+  if (!selected) {
+    document.getElementById('bookList').innerHTML = '<div class="muted">沒有可顯示的目標</div>';
+    return;
+  }
+  // 查 B 專案的 books
+  let q = B.from('books').select('id, title, updated_at').eq('owner_id', ownerId);
+  if (selected.type === 'teacher') {
+    q = q.is('student_id', null);
+  } else {
+    q = q.eq('student_id', selected.id);
+  }
+  const { data: books } = await q.order('updated_at', {ascending:false});
+
+  const icon = 'https://shierusha.github.io/school-battle/images/book.png';
+  const list = (books||[]).map(b => `
+    <div class="book-item" onclick="window.open('https://shierusha.github.io/library/reader.html?book_id=${encodeURIComponent(b.id)}','_blank')">
+      <img class="icon" src="${icon}" alt="book">
+      <div class="title">${escapeHtml(b.title||'未命名')}</div>
+      <div class="date">${(b.updated_at||'').slice(0,10)}</div>
+    </div>
+  `).join('') || '<div class="muted">目前沒有書籍</div>';
+
+  document.getElementById('bookList').innerHTML = list;
+  fillSelect(); // 更新標題顯示目前選擇
+}
+
+/* ---------- 書櫃上的數量展示 ---------- */
+async function renderShelfOverlay(){
+  const box = document.getElementById('shelfBooks');
+  box.innerHTML = '';
+  if (!selected) return;
+
+  let q = B.from('books').select('id').eq('owner_id', ownerId);
+  if (selected.type === 'teacher') {
+    q = q.is('student_id', null);
+  } else {
+    q = q.eq('student_id', selected.id);
+  }
+  const { data: books } = await q;
+  const count = (books||[]).length;
+
+  // 在四層書櫃依序擺放（每層最多 4 本）
+  const perRow = 4, gapX = 60, baseX = 90, baseY = 115, gapY = 110;
+  for (let i=0; i<Math.min(count, 16); i++){
+    const row = Math.floor(i/perRow);
+    const col = i%perRow;
+    const left = baseX + col*gapX;
+    const top  = baseY + row*gapY;
+    const div = document.createElement('div');
+    div.className = 'book-on-shelf';
+    div.style.left = left+'px';
+    div.style.top  = top+'px';
+    box.appendChild(div);
+  }
+}
+
+/* ---------- 小工具 ---------- */
+function escapeHtml(s){return (s||'').replace(/[&<>"']/g,c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]))}
 </script>
 </body>
 </html>
