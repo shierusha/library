@@ -115,16 +115,19 @@ let defaultStudentName = null; // URL 的 student_name
 
   // 2) 房主 username + 白名單
   const { data: ownerRow } = await A
-    .from('players')
-    .select('username')
     .eq('player_id', ownerId).single();
   ownerName = ownerRow?.username || '—';
   isOwnerWhitelisted = WHITELIST.includes(ownerId);
+  // 依 ownerId 取 username（只回傳文字）
+const { data: uname, error: uerr } = await A.rpc('get_player_username', { p_id: ownerId });
+const ownerName = (uname && String(uname).trim()) ? uname : '玩家';
+if (uerr) console.warn('get_player_username error:', uerr);
 
-  document.title = `@${ownerName} 的休息室`;
-  const badge = document.getElementById('ownerBadge');
-  badge.textContent = `@${ownerName} 的休息室`;
-  badge.style.display = '';
+// 顯示在左上角
+document.title = `${ownerName} 的休息室`;
+const badge = document.getElementById('ownerBadge');
+badge.textContent = `${ownerName} 的休息室`;
+badge.style.display = '';
 
   // 3) 取房主名下所有學生，過濾「審核通過」
   const { data: allStu } = await A
