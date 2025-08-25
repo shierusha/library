@@ -33,6 +33,21 @@
   </style>
 </head>
 <body>
+  <!--
+  A 專案（角色庫）先建這支 RPC（SQL Editor 跑一次）：
+  create or replace function public.get_player_username(p_id uuid)
+  returns text
+  language sql
+  stable
+  security definer
+  set search_path = public
+  as $$
+    select username from public.players where player_id = p_id
+  $$;
+  revoke all on function public.get_player_username(uuid) from public;
+  grant execute on function public.get_player_username(uuid) to anon, authenticated;
+  -->
+
   <div class="room" id="room">
     <img src="https://shierusha.github.io/library/img/ROOM.webp" alt="room" />
     <div id="ownerBadge" class="owner-badge" style="display:none;">房主：—</div>
@@ -79,7 +94,7 @@ const WHITELIST = [
 const BOOK_ICON = 'https://shierusha.github.io/school-battle/images/book.png';
 let viewer = null;             // 目前登入者（可為 null）
 let ownerId = null;            // 房主 player_id
-let ownerName = '—';           // players.username
+let ownerName = '—';           // players.username（RPC 取得）
 let isOwnerWhitelisted = false;
 let students = [];             // 房主名下「審核通過」的學生
 let selected = null;           // {type:'student'|'teacher', id?, name?}
@@ -113,21 +128,17 @@ let defaultStudentName = null; // URL 的 student_name
   ownerId = stu.player_id;
   selected = { type:'student', id: stu.student_id, name: stu.name };
 
-  // 2) 房主 username + 白名單
-  const { data: ownerRow } = await A
-    .eq('player_id', ownerId).single();
-  ownerName = ownerRow?.username || '—';
+  // 2) 房主 username（用 RPC，避開 RLS） + 白名單
   isOwnerWhitelisted = WHITELIST.includes(ownerId);
-  // 依 ownerId 取 username（只回傳文字）
-const { data: uname, error: uerr } = await A.rpc('get_player_username', { p_id: ownerId });
-const ownerName = (uname && String(uname).trim()) ? uname : '玩家';
-if (uerr) console.warn('get_player_username error:', uerr);
+  const { data: uname, error: uerr } = await A.rpc('get_player_username', { p_id: ownerId });
+  ownerName = (uname && String(uname).trim()) ? uname : '玩家';
+  if (uerr) console.warn('get_player_username error:', uerr);
 
-// 顯示在左上角
-document.title = `${ownerName} 的休息室`;
-const badge = document.getElementById('ownerBadge');
-badge.textContent = `${ownerName} 的休息室`;
-badge.style.display = '';
+  // 顯示在左上角與標題
+  document.title = `${ownerName} 的休息室`;
+  const badge = document.getElementById('ownerBadge');
+  badge.textContent = `${ownerName} 的休息室`;
+  badge.style.display = '';
 
   // 3) 取房主名下所有學生，過濾「審核通過」
   const { data: allStu } = await A
@@ -200,7 +211,6 @@ function onCharChange(){
 function goWrite(){
   if (!selected) return;
   if (selected.type === 'teacher') {
-    // 老師的故事：student_id = null
     location.href = `https://shierusha.github.io/library/library?owner_id=${encodeURIComponent(ownerId)}&teacher=1`;
   } else {
     location.href = `https://shierusha.github.io/library/library?student_name=${encodeURIComponent(selected.name)}`;
@@ -219,7 +229,7 @@ async function refreshModal(){
   else q = q.eq('student_id', selected.id);
   const { data: books } = await q.order('updated_at', {ascending:false});
 
-  const icon = 'https://shierusha.github.io/school-battle/images/book.png';
+  const icon = BOOK_ICON;
   listEl.innerHTML = (books||[]).length
     ? books.map(b=>`
       <div class="book-item" onclick="window.open('https://shierusha.github.io/library/reader.html?book_id=${encodeURIComponent(b.id)}','_blank')">
