@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8" />
-  <title>角色休息室 Lounge</title>
+  <title>休息室</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
@@ -10,35 +10,24 @@
     html,body{margin:0;background:#1e2126;font-family:'Noto Sans TC',system-ui,-apple-system,Segoe UI,sans-serif;color:var(--ink)}
     .room{position:relative;width:var(--w);height:var(--h);margin:28px auto;border-radius:16px;overflow:hidden;box-shadow:0 18px 60px #000a;background:#000}
     .room img{width:100%;height:100%;object-fit:cover;display:block}
-    /* 房主名稱浮標 */
     .owner-badge{
-      position:absolute; left:16px; top:16px; z-index:5;
-      background:rgba(15,20,32,.85); border:1px solid #2b3550; color:#e9efff;
-      padding:.45rem .75rem; border-radius:12px; box-shadow:0 6px 24px #0008;
-      font-weight:700; letter-spacing:.02em;
+      position:absolute;left:16px;top:16px;z-index:5;
+      background:rgba(15,20,32,.85);border:1px solid #2b3550;color:#e9efff;
+      padding:.45rem .75rem;border-radius:12px;box-shadow:0 6px 24px #0008;font-weight:700
     }
-    /* 書櫃點擊區（依你的圖定位） */
     .hot{position:absolute;left:54px;top:86px;width:268px;height:540px;background:transparent;border:none;cursor:pointer}
     .hot:hover{outline:3px solid rgba(255,207,102,.9);border-radius:18px}
-
-    /* 書本疊在書櫃上（裝飾用） */
     .shelf-books{position:absolute;left:76px;top:112px;pointer-events:none}
     .book-on-shelf{position:absolute;width:48px;height:68px;border-radius:5px;background:#f6d3a3;border:2px solid #b7894e;box-shadow:0 2px 8px #0006}
-
-    /* Modal */
     .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:center;justify-content:center;z-index:50}
-    .modal{background:#0f1420;border:1px solid #2b3550;color:#e9efff;border-radius:14px;box-shadow:0 16px 60px #000b;width:min(720px,94vw);max-height:88vh;overflow:auto;padding:18px 18px 16px}
-    .modal h2{margin:0 0 10px;font-size:1.2rem}
+    .modal{background:#0f1420;border:1px solid #2b3550;color:#e9efff;border-radius:14px;box-shadow:0 16px 60px #000b;width:min(720px,94vw);max-height:88vh;overflow:auto;padding:18px}
     .row{display:flex;gap:10px;align-items:center;margin-bottom:10px}
     select{background:#0b1120;color:#e9efff;border:1px solid #35446f;border-radius:10px;padding:.5rem .7rem}
     .btn{background:#1767a0;border:1px solid #1767a0;color:#fff;border-radius:10px;padding:.55rem .9rem;cursor:pointer}
-    .btn:disabled{opacity:.55;cursor:not-allowed}
     .book-list{display:flex;flex-direction:column;gap:8px;margin-top:8px}
     .book-item{display:flex;align-items:center;gap:10px;background:#0b1327;border:1px solid #263257;border-radius:10px;padding:10px;cursor:pointer}
-    .book-item .title{color:#e9efff}
     .book-item .date{color:#98a3c7;font-size:.9rem;margin-left:auto}
     .icon{width:28px;height:28px;flex:0 0 28px;filter:drop-shadow(0 1px 2px #0006)}
-    .muted{color:#98a3c7}
     .foot{display:flex;gap:10px;justify-content:flex-end;margin-top:12px}
     .note{max-width:960px;margin:14px auto;padding:12px 14px;background:#0f1420;border:1px solid #2b3550;border-radius:12px}
   </style>
@@ -51,14 +40,13 @@
     <div id="shelfBooks" class="shelf-books"></div>
   </div>
 
-  <!-- 書櫃 Modal -->
   <div class="modal-bg" id="modalBg">
     <div class="modal">
       <h2 id="modalTitle">書櫃清單</h2>
       <div class="row">
-        <div class="muted">切換：</div>
+        <div>切換：</div>
         <select id="selChar" onchange="onCharChange()"></select>
-        <div class="muted" style="margin-left:auto" id="ownerInfo"></div>
+        <div style="margin-left:auto" id="ownerInfo"></div>
       </div>
       <div id="bookList" class="book-list"></div>
       <div class="foot">
@@ -69,126 +57,113 @@
   </div>
 
 <script>
-/* ====== 你的專案連線 ====== */
-// A：登入/學生資料（角色庫）
+/* ====== Supabase 連線 ====== */
+// A：登入/角色庫
 const A = window.supabase.createClient(
   'https://wfhwhvodgikpducrhgda.supabase.co',
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmaHdodm9kZ2lrcGR1Y3JoZ2RhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgwMTAwNjEsImV4cCI6MjA2MzU4NjA2MX0.P6P-x4SxjiR4VdWH6VFgY_ktgMac_OzuI4Bl7HWskz8'
 );
-// B：圖書館（書本）
+// B：圖書館
 const B = window.supabase.createClient(
   'https://ogzpfrkwnqqaitytncla.supabase.co',
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nenBmcmt3bnFxYWl0eXRuY2xhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxODQzNzEsImV4cCI6MjA3MDc2MDM3MX0.Ls83xOXcKIW7FUcavr8_sOs37I18VGFWYNW3sNFRS24'
 );
 
 /* ====== 白名單（玩家ID）====== */
-/* 有在這個清單裡的 owner，彈窗下拉會多一個「老師」選項 */
 const WHITELIST = [
-  // '00000000-0000-0000-0000-000000000000', // 範例：把房主 player_id 貼這裡
+  '32d2c681-43f4-4f24-8014-44cdbe80411d',
+  '9eee80cf-baf2-4297-b163-59699bad4ed4',
 ];
 
-/* ====== 常數 / 狀態 ====== */
+/* ====== 狀態 ====== */
 const BOOK_ICON = 'https://shierusha.github.io/school-battle/images/book.png';
-
-let viewer = null;          // 目前登入者（可能為 null）
-let ownerId = null;         // 房主 player_id
-let ownerName = '—';        // 房主玩家名稱（players.username）
-let students = [];          // 房主名下且「審核通過」的學生 [{student_id,name}]
-let selected = null;        // {type:'student'|'teacher', id?, name?}
-let defaultStudentName = null; // URL帶來的 student_name
+let viewer = null;             // 目前登入者（可為 null）
+let ownerId = null;            // 房主 player_id
+let ownerName = '—';           // players.username
 let isOwnerWhitelisted = false;
+let students = [];             // 房主名下「審核通過」的學生
+let selected = null;           // {type:'student'|'teacher', id?, name?}
+let defaultStudentName = null; // URL 的 student_name
 
+/* ====== 初始化：用 student_name 反查 owner，顯示 username、白名單、過濾通過 ====== */
 (async function init(){
   const { data:{ user } } = await A.auth.getUser().catch(()=>({data:{user:null}}));
   viewer = user || null;
 
   const p = new URLSearchParams(location.search);
-  defaultStudentName = p.get('student_name') || null;
-  const urlOwner = p.get('owner_id');
-  if (urlOwner) ownerId = urlOwner;
+  defaultStudentName = p.get('student_name');
 
-  // 若沒給 owner_id 但有 student_name → 依角色名反查 owner
-  if (!ownerId && defaultStudentName) {
-    const { data: stu } = await A
-      .from('students')
-      .select('student_id, player_id, name')
-      .eq('name', defaultStudentName)
-      .single();
-    if (stu) {
-      ownerId = stu.player_id;
-      selected = { type:'student', id:stu.student_id, name:stu.name };
-    }
-  }
-  // 再不行就看自己（需登入）
-  if (!ownerId && viewer) ownerId = viewer.id;
-
-  if (!ownerId) {
+  if (!defaultStudentName) {
     document.body.insertAdjacentHTML('beforeend',
-      `<div class="note">請提供 <b>?student_name=角色名</b> 或 <b>?owner_id=玩家ID</b>，或先登入以檢視自己的房間。</div>`);
+      `<div class="note">請在網址加上 <b>?student_name=角色名</b>。</div>`);
     return;
   }
 
-  // 房主資訊（顯示名字 + 浮標）
+  // 1) 角色名 -> ownerId + student_id
+  const { data: stu, error: e1 } = await A
+    .from('students')
+    .select('student_id, player_id, name')
+    .eq('name', defaultStudentName)
+    .single();
+  if (e1 || !stu) {
+    document.body.insertAdjacentHTML('beforeend',
+      `<div class="note">查無角色：${escapeHtml(defaultStudentName)}</div>`);
+    return;
+  }
+  ownerId = stu.player_id;
+  selected = { type:'student', id: stu.student_id, name: stu.name };
+
+  // 2) 房主 username + 白名單
   const { data: ownerRow } = await A
     .from('players')
-    .select('player_id, username')
+    .select('username')
     .eq('player_id', ownerId).single();
   ownerName = ownerRow?.username || '—';
   isOwnerWhitelisted = WHITELIST.includes(ownerId);
 
+  document.title = `@${ownerName} 的休息室`;
   const badge = document.getElementById('ownerBadge');
   badge.textContent = `房主：${ownerName}`;
   badge.style.display = '';
 
-  // 取得房主名下所有學生
+  // 3) 取房主名下所有學生，過濾「審核通過」
   const { data: allStu } = await A
     .from('students')
     .select('student_id, name')
     .eq('player_id', ownerId);
+  const ids = (allStu||[]).map(s=>s.student_id);
 
-  // 取通過名單（student_reviews.status = 'PASS'）
-  const stuIds = (allStu||[]).map(s=>s.student_id);
   let passSet = new Set();
-  if (stuIds.length){
+  if (ids.length){
     const { data: reviews } = await A
       .from('student_reviews')
-      .select('student_id, status')
-      .in('student_id', stuIds)
+      .select('student_id,status')
+      .in('student_id', ids)
       .eq('status', 'PASS');
     (reviews||[]).forEach(r=> passSet.add(r.student_id));
   }
-
-  // 過濾：只保留通過的學生
   students = (allStu||[]).filter(s=> passSet.has(s.student_id))
                          .sort((a,b)=> a.name.localeCompare(b.name,'zh-Hant'));
 
-  // 預設選擇
-  if (!selected) {
-    if (defaultStudentName) {
-      const m = students.find(s => s.name === defaultStudentName);
-      if (m) selected = { type:'student', id:m.student_id, name:m.name };
-    }
-  }
-  if (!selected) {
+  // 若預設學生不在通過名單：改選第一位；如果白名單且沒有通過學生，預設選「老師」
+  if (!students.find(s => s.student_id === selected.id)) {
     if (students.length) selected = { type:'student', id:students[0].student_id, name:students[0].name };
     else if (isOwnerWhitelisted) selected = { type:'teacher', name:'老師' };
+    else selected = null;
   }
 
-  await renderShelfOverlay(); // 書櫃上的數量展示
+  await renderShelfOverlay(); // 書櫃疊書（顯示數量）
 })();
 
-/* ---------- 彈窗 ---------- */
+/* ====== 彈窗 ====== */
 function openShelf(){
-  if(!ownerId) return;
+  if (!ownerId) return;
   document.getElementById('modalBg').style.display = 'flex';
   fillSelect();
   refreshModal();
 }
-function closeShelf(){
-  document.getElementById('modalBg').style.display = 'none';
-}
+function closeShelf(){ document.getElementById('modalBg').style.display = 'none'; }
 
-/* ---------- 下拉內容（白名單才有老師） ---------- */
 function fillSelect(){
   const sel = document.getElementById('selChar');
   const opts = [];
@@ -197,7 +172,7 @@ function fillSelect(){
   }
   for (const s of students) {
     const isSel = selected?.type==='student' && selected?.id===s.student_id;
-    opts.push(`<option value="${s.student_id}" ${isSel?'selected':''}>${s.name}</option>`);
+    opts.push(`<option value="${s.student_id}" ${isSel?'selected':''}>${escapeHtml(s.name)}</option>`);
   }
   sel.innerHTML = opts.join('') || '<option>（無可顯示角色）</option>';
 
@@ -205,55 +180,56 @@ function fillSelect(){
   document.getElementById('btnWrite').style.display = isOwnerViewing ? '' : 'none';
   document.getElementById('ownerInfo').textContent = `房主：${ownerName}`;
   document.getElementById('modalTitle').textContent =
-    `書櫃清單（${selected?.type==='teacher'?'老師':selected?.name||'—'}）`;
+    `書櫃清單（${selected ? (selected.type==='teacher'?'老師':selected.name) : '—'}）`;
 }
 function onCharChange(){
   const sel = document.getElementById('selChar');
-  const v = sel.value;
-  if (v === 'teacher') selected = { type:'teacher', name:'老師' };
-  else {
-    const s = students.find(x=>x.student_id===v);
-    selected = { type:'student', id:s.student_id, name:s.name };
+  if (sel.value === 'teacher') {
+    selected = { type:'teacher', name:'老師' };
+  } else {
+    const s = students.find(x=>x.student_id===sel.value);
+    selected = s ? { type:'student', id:s.student_id, name:s.name } : null;
   }
-  refreshModal();
-  renderShelfOverlay();
+  refreshModal(); renderShelfOverlay();
 }
 
-/* ---------- 撰寫故事（只有房主本人會看到按鈕） ---------- */
+/* ====== 撰寫故事（只有房主本人可見） ====== */
 function goWrite(){
   if (!selected) return;
   if (selected.type === 'teacher') {
+    // 老師的故事：student_id = null
     location.href = `https://shierusha.github.io/library/library?owner_id=${encodeURIComponent(ownerId)}&teacher=1`;
   } else {
     location.href = `https://shierusha.github.io/library/library?student_name=${encodeURIComponent(selected.name)}`;
   }
 }
 
-/* ---------- 抓書並渲染 ---------- */
+/* ====== 抓書並渲染 ====== */
 async function refreshModal(){
-  if (!selected) {
-    document.getElementById('bookList').innerHTML = '<div class="muted">沒有可顯示的目標</div>';
+  const listEl = document.getElementById('bookList');
+  if (!selected){
+    listEl.innerHTML = '<div class="muted">沒有可顯示的目標</div>';
     return;
   }
   let q = B.from('books').select('id, title, updated_at').eq('owner_id', ownerId);
   if (selected.type === 'teacher') q = q.is('student_id', null);
   else q = q.eq('student_id', selected.id);
-
   const { data: books } = await q.order('updated_at', {ascending:false});
 
-  const list = (books||[]).map(b => `
-    <div class="book-item" onclick="window.open('https://shierusha.github.io/library/reader.html?book_id=${encodeURIComponent(b.id)}','_blank')">
-      <img class="icon" src="${BOOK_ICON}" alt="book">
-      <div class="title">${escapeHtml(b.title||'未命名書籍')}</div>
-      <div class="date">${(b.updated_at||'').slice(0,10)}</div>
-    </div>
-  `).join('') || '<div class="muted">目前沒有書籍</div>';
+  const icon = 'https://shierusha.github.io/school-battle/images/book.png';
+  listEl.innerHTML = (books||[]).length
+    ? books.map(b=>`
+      <div class="book-item" onclick="window.open('https://shierusha.github.io/library/reader.html?book_id=${encodeURIComponent(b.id)}','_blank')">
+        <img class="icon" src="${icon}" alt="book">
+        <div>${escapeHtml(b.title||'未命名書籍')}</div>
+        <div class="date">${(b.updated_at||'').slice(0,10)}</div>
+      </div>`).join('')
+    : '<div class="muted">目前沒有書籍</div>';
 
-  document.getElementById('bookList').innerHTML = list;
-  fillSelect(); // 更新抬頭
+  fillSelect();
 }
 
-/* ---------- 書櫃上的數量展示（四層×每層4本，最多16本） ---------- */
+/* ====== 書櫃上的書數量展示（裝飾） ====== */
 async function renderShelfOverlay(){
   const box = document.getElementById('shelfBooks');
   box.innerHTML = '';
@@ -266,20 +242,17 @@ async function renderShelfOverlay(){
   const count = (books||[]).length;
 
   const perRow = 4, gapX = 60, baseX = 90, baseY = 115, gapY = 110;
-  for (let i=0; i<Math.min(count, 16); i++){
-    const row = Math.floor(i/perRow);
-    const col = i%perRow;
-    const left = baseX + col*gapX;
-    const top  = baseY + row*gapY;
+  for (let i=0; i<Math.min(count,16); i++){
+    const row = Math.floor(i/perRow), col = i%perRow;
     const div = document.createElement('div');
     div.className = 'book-on-shelf';
-    div.style.left = left+'px';
-    div.style.top  = top+'px';
+    div.style.left = (baseX + col*gapX) + 'px';
+    div.style.top  = (baseY + row*gapY) + 'px';
     box.appendChild(div);
   }
 }
 
-/* ---------- 小工具 ---------- */
+/* ====== 小工具 ====== */
 function escapeHtml(s){return (s||'').replace(/[&<>"']/g,c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]))}
 </script>
 </body>
