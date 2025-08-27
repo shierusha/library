@@ -386,347 +386,298 @@ function decodeJWT(t){
   const [,p]=t.split('.');
   try{ return JSON.parse(atob(pad(p).replace(/-/g,'+').replace(/_/g,'/'))) }catch{ return null }
 }
-
 /* ==============================
-   Supabase（B 專案）
+   Supabase（圖書館 B 專案）
 ============================== */
 const B_URL  = 'https://ogzpfrkwnqqaitytncla.supabase.co';
 const B_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nenBmcmt3bnFxYWl0eXRuY2xhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxODQzNzEsImV4cCI6MjA3MDc2MDM3MX0.Ls83xOXcKIW7FUcavr8_sOs37I18VGFWYNW3sNFRS24';
-const B_TOKEN = localStorage.getItem('gacha_b_jwt');
-const B_TOKEN_EXP = +(localStorage.getItem('gacha_b_jwt_exp') || 0);
-const PLAYER_CENTER = 'https://shierusha.github.io/create-student/player';
+const B_TOKEN = localStorage.getItem('gacha_b_jwt') || '';
+const B_TOKEN_EXP = Number(localStorage.getItem('gacha_b_jwt_exp') || 0);
+const PLAYER_NAME = localStorage.getItem('gacha_player_name') || '我的';
+const REDIRECT_PLAYER = 'https://shierusha.github.io/create-student/player';
 
-let sb, user = null;
-if (B_TOKEN) {
-  const decoded = decodeJWT(B_TOKEN);
-  user = decoded ? { id: decoded.sub } : null;
-
-  sb = window.supabase.createClient(B_URL, B_ANON, {
-    global: {
-      headers: {
-        apikey: B_ANON,                         // PostgREST 需要
-        Authorization: `Bearer ${B_TOKEN}`,     // RLS 需要（auth.uid()）
-      }
-    }
-  });
-  try { sb.realtime.setAuth(B_TOKEN); } catch(_) {}
-} else {
-  // 未登入：只能公開讀
-  sb = window.supabase.createClient(B_URL, B_ANON);
-  user = null;
+function decodeJWT(t){
+  if(!t) return null;
+  const pad = s => s + '='.repeat((4 - s.length % 4) % 4);
+  const payload = t.split('.')[1];
+  try { return JSON.parse(atob(pad(payload).replace(/-/g,'+').replace(/_/g,'/'))); }
+  catch { return null; }
 }
 
-// gacha schema 快捷
-const G = (table) => sb.schema('gacha').from(table);
+let sb = window.supabase.createClient(B_URL, B_ANON, {
+  global: { headers: B_TOKEN ? { Authorization: `Bearer ${B_TOKEN}` } : {} }
+});
+if (B_TOKEN) sb.realtime.setAuth(B_TOKEN);
+
+const user = B_TOKEN ? { id: (decodeJWT(B_TOKEN)||{}).sub } : null;
+const DEFAULT_EVENT = '常駐';
 
 /* ==============================
    DOM 快取
 ============================== */
-const gachaBtns        = document.querySelector(".gacha-buttons");
-const btnSingle        = document.getElementById("btn-single");
-const btnTen           = document.getElementById("btn-ten");
-const resultsContainer = document.getElementById("gacha-results");
-const infoModal        = document.getElementById("info-modal");
-const infoTitle        = document.getElementById("info-modal-title");
-const infoBody         = document.getElementById("info-modal-body");
-const drawCounterEl    = document.getElementById("draw-count");
+const resultsContainer = document.getElementById('gacha-results');
+const btnSingle  = document.getElementById('btn-single');
+const btnTen     = document.getElementById('btn-ten');
+const btnBag     = document.getElementById('btn-backpack');
+const gachaBtns  = document.querySelector('.gacha-buttons');
+const infoModal  = document.getElementById('info-modal');
+const infoTitle  = document.getElementById('info-modal-title');
+const infoBody   = document.getElementById('info-modal-body');
+const drawCounterEl = document.getElementById('draw-count');
 
 /* ==============================
-   文字自適應（原樣）
+   強制橫向（不可手動關閉）
 ============================== */
-function resizeAllTexts() {
-  document.querySelectorAll('.gacha-btn').forEach(btn => btn.style.fontSize = (btn.offsetHeight * 0.40) + "px");
-  document.querySelectorAll('.orb-inner').forEach(inner => inner.style.fontSize = (inner.offsetHeight * 0.35) + "px");
-  document.querySelectorAll('.counter-box').forEach(box => box.style.fontSize = (box.offsetHeight * 0.50) + "px");
-  document.querySelectorAll('.backpack-box').forEach(box => box.style.fontSize = (box.offsetHeight * 0.50) + "px");
-  document.querySelectorAll('.backpack-items span').forEach(span => { const h = (span.offsetHeight || 20); span.style.fontSize = (h * 0.80) + "px"; });
+const orientationModal = document.getElementById('orientation-modal');
+const interElems = [btnSingle, btnTen, btnBag];
+function isPortrait(){
+  return window.matchMedia('(orientation: portrait)').matches || window.innerHeight > window.innerWidth;
 }
-resizeAllTexts();
-window.addEventListener("resize", resizeAllTexts);
+function enforceLandscape(){
+  const portrait = isPortrait();
+  orientationModal.style.display = portrait ? 'flex' : 'none';
+  document.body.style.overflow = portrait ? 'hidden' : '';
+  interElems.forEach(el => el && (el.disabled = portrait || el._forceDisabled === true));
+}
+enforceLandscape();
+window.addEventListener('resize', enforceLandscape);
+window.addEventListener('orientationchange', enforceLandscape);
+orientationModal.addEventListener('click', e => e.stopPropagation()); // 不能關
 
 /* ==============================
-   Token 過期保護
+   會話 / 逾期保護
 ============================== */
-function redirectIfExpired() {
-  // 提前 30 秒判定過期
-  if (B_TOKEN && B_TOKEN_EXP && (Date.now()/1000 > B_TOKEN_EXP - 30)) {
-    alert('登入過期，已返回玩家中心。');
-    location.href = PLAYER_CENTER;
-    return true;
+function ensureAuthOrRedirect(){
+  const now = Math.floor(Date.now()/1000);
+  if (!user || !B_TOKEN || (B_TOKEN_EXP && now >= B_TOKEN_EXP)){
+    alert('登入逾期，將返回玩家中心。');
+    location.href = REDIRECT_PLAYER;
+    return false;
   }
-  return false;
+  return true;
 }
-function checkApiError(error){
-  if (error && (error.code === '401' || String(error.message||'').includes('JWT'))) {
-    alert('登入過期或未授權，請重新登入。');
-    location.href = PLAYER_CENTER;
-    return true;
-  }
-  return false;
-}
+setInterval(ensureAuthOrRedirect, 60*1000); // 每分鐘檢查
+ensureAuthOrRedirect();
 
 /* ==============================
-   狀態
+   工具 & 狀態
 ============================== */
-let canDraw = true;                 // 是否允許點擊抽卡
+const G = (t) => sb.from(`gacha.${t}`);
+const escapeHtml = s => (s||'').replace(/[&<>"']/g,c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pick = arr => arr[Math.floor(Math.random()*arr.length)];
 let pools = { normal: [], hidden: [], limited: [] };
-let remainingDraws = Infinity;      // 剩餘抽數（由 refreshCounter() 更新）
+
+let canDraw = true;                 // 要翻完才會開
+let unlockAt = 0;                   // 抽完後 0.5 秒節流
+function lockButtons(force=true){ [btnSingle,btnTen].forEach(b=>{ if(!b) return; b._forceDisabled = force; enforceLandscape(); }); }
+function unlockButtons(){ [btnSingle,btnTen].forEach(b=>{ if(!b) return; b._forceDisabled = false; enforceLandscape(); }); }
 
 /* ==============================
-   啟動流程
+   初始化
 ============================== */
 (async function boot(){
-  if (redirectIfExpired()) return;
+  // 未登入只允許看背包空畫面
+  if (!ensureAuthOrRedirect()) return;
 
-  await preloadPools();
+  // 載池
+  const [n, h, l] = await Promise.all([
+    G('normal_characters').select('*').order('id',{ascending:true}),
+    G('hidden_characters').select('*').order('id',{ascending:true}),
+    G('limited_characters').select('*').order('id',{ascending:true}),
+  ]);
+  pools.normal  = n.data || [];
+  pools.hidden  = h.data || [];
+  pools.limited = l.data || [];
 
-  if (!user) {
-    // 沒登入：禁用抽卡，但可以看背包（會提示需登入）
-    btnSingle.disabled = true;
-    btnTen.disabled    = true;
-  } else {
-    await ensureCounter();     // 沒有就建 { total_draws:0, next_pity:50, max_draws:1000 }
-    await refreshCounter();    // 抓 total/max，更新剩餘與按鈕狀態
-  }
+  // 建立/讀取保底
+  await ensureCounter();
+  await refreshUIFromCounter();
 
+  // 綁定
   bindUI();
 })();
 
 /* ==============================
-   讀取三個池
-============================== */
-async function preloadPools(){
-  const [{ data: n, error: e1 }, { data: h, error: e2 }, { data: l, error: e3 }] = await Promise.all([
-    G('normal_characters').select('*').order('id', {ascending:true}),
-    G('hidden_characters').select('*').order('id', {ascending:true}),
-    G('limited_characters').select('*').order('id', {ascending:true}),
-  ]);
-  if (e1||e2||e3) console.warn('load pools error', e1||e2||e3);
-  pools.normal = n || [];
-  pools.hidden = h || [];
-  pools.limited= l || [];
-}
-
-/* ==============================
-   保底計數 & 上限
+   Counter
 ============================== */
 async function ensureCounter(){
-  const { data, error } = await G('counters').select('player_id').eq('player_id', user.id).limit(1);
-  if (checkApiError(error)) return;
-  if (!data || !data.length) {
-    const { error: insErr } = await G('counters').insert({ player_id: user.id, total_draws: 0, next_pity: 50, max_draws: 1000 });
-    if (checkApiError(insErr)) return;
+  const { data, error } = await G('counters').select('*').eq('player_id', user.id).single();
+  if (!data){
+    await G('counters').insert({ player_id: user.id, total_draws: 0, next_pity: 50, max_draws: 1000 });
   }
 }
-
-async function refreshCounter(){
-  const { data: row, error } = await G('counters')
-    .select('total_draws, max_draws')
-    .eq('player_id', user.id)
-    .single();
-  if (checkApiError(error)) return;
-  const total = row?.total_draws ?? 0;
-  const max   = row?.max_draws ?? 1000;
-  remainingDraws = Math.max(0, max - total);
-
-  drawCounterEl.textContent = total;
-
-  // 依剩餘抽數控管按鈕
-  btnSingle.disabled = remainingDraws < 1;
-  btnTen.disabled    = remainingDraws < 10;
+async function getCounter(){
+  const { data } = await G('counters').select('total_draws,next_pity,max_draws').eq('player_id', user.id).single();
+  return data || { total_draws: 0, next_pity: 50, max_draws: 1000 };
+}
+async function setCounter(total_draws, next_pity){
+  await G('counters').upsert({ player_id: user.id, total_draws, next_pity }, { onConflict: 'player_id' });
+}
+async function refreshUIFromCounter(){
+  const c = await getCounter();
+  drawCounterEl.textContent = c.total_draws;
+  const remain = Math.max(0, (c.max_draws ?? 1000) - c.total_draws);
+  btnTen.disabled   = remain < 10 || btnTen._forceDisabled === true || isPortrait();
+  btnSingle.disabled= remain < 1  || btnSingle._forceDisabled === true || isPortrait();
 }
 
 /* ==============================
-   增加持有（Upsert）
+   Own 增量（穩定 upsert）
 ============================== */
-async function addOwned(rarity, event_name, character_id){
+async function addOwned(rarity, character_id, event_name){
+  // 查現值
   let q = G('owned_characters')
     .select('count')
     .eq('player_id', user.id)
     .eq('rarity', rarity)
-    .eq('character_id', character_id);
-  event_name == null ? q = q.is('event_name', null) : q = q.eq('event_name', event_name);
+    .eq('character_id', character_id)
+    .eq('event_name', event_name)
+    .maybeSingle?.() ?? G('owned_characters').select('count').limit(1); // 兼容舊版
+  const { data: row } = await q;
+  const prev = row?.count || 0;
 
-  const { data: rows, error: qErr } = await q.limit(1);
-  if (checkApiError(qErr)) throw qErr;
-  const prev = rows?.[0]?.count || 0;
-
-  const { error: upErr } = await G('owned_characters').upsert({
+  await G('owned_characters').upsert({
     player_id: user.id,
     rarity,
     event_name,
     character_id,
     count: prev + 1
   }, { onConflict: 'player_id,rarity,event_name,character_id' });
-  if (checkApiError(upErr)) throw upErr;
 }
 
 /* ==============================
-   單抽（100 顆：1=銀、100=金，其餘白；每 50 抽保底）
+   抽卡核心
 ============================== */
 async function drawOnce(){
-  if (redirectIfExpired()) throw new Error('TOKEN_EXPIRED');
-  if (remainingDraws < 1) throw new Error('NO_QUOTA');
+  const c = await getCounter();
+  if (c.total_draws >= (c.max_draws ?? 1000)) {
+    alert('已達抽卡上限'); await refreshUIFromCounter(); return null;
+  }
 
-  const { data: cntRows, error: cErr } = await G('counters')
-    .select('*')
-    .eq('player_id', user.id)
-    .limit(1);
-  if (checkApiError(cErr)) throw cErr;
+  let totalNext = c.total_draws + 1;
+  let nextPity  = c.next_pity;
 
-  const counter  = cntRows?.[0] || { total_draws: 0, next_pity: 50, max_draws: 1000 };
-  const nextCount= counter.total_draws + 1;
-  const maxDraws = counter.max_draws ?? 1000;
+  let rarity, chosen, event_name = DEFAULT_EVENT;
 
-  if (nextCount > maxDraws) throw new Error('OVER_LIMIT');
-
-  let rarity, chosen, event_name = null;
-
-  if (nextCount === counter.next_pity) {
-    // 保底：金
+  if (totalNext === nextPity) {
     rarity = 'limited';
     chosen = pick(pools.limited);
-    event_name = chosen.event_name;
+    event_name = chosen?.event_name || '活動';
+    nextPity += 50;
   } else {
-    // 1~100：1 銀、100 金、其餘白
-    const r = Math.floor(Math.random() * 100) + 1;
-    if (r === 1) {
-      rarity = 'hidden';  chosen = pick(pools.hidden);
-    } else if (r === 100) {
-      rarity = 'limited'; chosen = pick(pools.limited); event_name = chosen.event_name;
-    } else {
-      rarity = 'normal';  chosen = pick(pools.normal);
+    const r = Math.floor(Math.random()*100) + 1; // 1..100
+    if (r === 1) { // 銀
+      rarity = 'hidden'; chosen = pick(pools.hidden); event_name = DEFAULT_EVENT;
+    } else if (r === 100) { // 金
+      rarity = 'limited'; chosen = pick(pools.limited); event_name = chosen?.event_name || '活動';
+    } else { // 白
+      rarity = 'normal'; chosen = pick(pools.normal); event_name = DEFAULT_EVENT;
     }
   }
+  if (!chosen) return null;
 
-  // 背包 +1
-  await addOwned(rarity, event_name, chosen.id);
-
-  // 更新保底 / 抽數（DB 端若有 trigger 會在此擋住超抽）
-  const { error: upErr } = await G('counters').upsert({
-    player_id: user.id,
-    total_draws: nextCount,
-    next_pity:  (nextCount === counter.next_pity) ? counter.next_pity + 50 : counter.next_pity,
-    max_draws:  maxDraws
-  });
-  if (upErr) {
-    if (checkApiError(upErr)) throw upErr;
-    alert('抽卡失敗，請稍後再試');
-    throw upErr;
-  }
-
-  // 同步前端剩餘
-  remainingDraws = Math.max(0, maxDraws - nextCount);
-
-  return { rarity, name: chosen.name, id: chosen.id, event_name, totalAfter: nextCount };
+  await addOwned(rarity, chosen.id, event_name);
+  await setCounter(totalNext, nextPity);
+  return { rarity, name: chosen.name, id: chosen.id, event_name, totalAfter: totalNext };
 }
 
-/* ==============================
-   十連（連抽 10 次）
-============================== */
 async function drawTenTimes(){
+  const c = await getCounter();
+  const remain = Math.max(0, (c.max_draws ?? 1000) - c.total_draws);
+  if (remain < 10) { alert('剩餘抽數不足 10 抽'); return null; }
+
   const results = [];
-  for (let i=0; i<10; i++) {
+  for (let i=0;i<10;i++){
     const r = await drawOnce();
+    if (!r) break;
     results.push({ rarity: r.rarity, name: r.name });
   }
-  await refreshCounter();
   return results;
 }
 
 /* ==============================
-   UI：球 & 顯示（含 0.5s 解鎖）
+   UI：建立球 / 翻牌與節流
 ============================== */
-function allRevealed(){
-  const orbs = resultsContainer.querySelectorAll(".gacha-orb");
-  return [...orbs].every(o => o.classList.contains("revealed"));
+function resizeAllTexts() {
+  document.querySelectorAll('.gacha-btn').forEach(btn => btn.style.fontSize = (btn.offsetHeight * 0.40) + "px");
+  document.querySelectorAll('.orb-inner').forEach(inner => inner.style.fontSize = (inner.offsetHeight * 0.35) + "px");
+  document.querySelectorAll('.counter-box').forEach(box => box.style.fontSize = (box.offsetHeight * 0.50) + "px");
+  document.querySelectorAll('.backpack-box').forEach(box => box.style.fontSize = (box.offsetHeight * 0.50) + "px");
+  document.querySelectorAll('.backpack-items span').forEach(span => {
+    const h = (span.offsetHeight || 20); span.style.fontSize = (h * 0.80) + "px";
+  });
 }
-function tryUnlockAfterDelay(){
-  if (allRevealed()) {
-    setTimeout(() => {
-      canDraw = true;                     // 0.5 秒後才允許下一次抽
-      // 依剩餘抽數再控管按鈕狀態
-      btnSingle.disabled = remainingDraws < 1;
-      btnTen.disabled    = remainingDraws < 10;
-    }, 500);
-  }
-}
-function createOrb(res, options = {}) {
-  const { autoReveal = false, revealDelay = 0, big = false } = options;
-  const orb = document.createElement("div");
-  orb.classList.add("gacha-orb", `orb-${res.rarity}`);
-  if (big) orb.classList.add("big");
+window.addEventListener('resize', resizeAllTexts);
+resizeAllTexts();
 
-  const inner = document.createElement("div");
-  inner.classList.add("orb-inner");
-  inner.textContent = "";
+function createOrb(res, { autoReveal=false, revealDelay=0, big=false } = {}){
+  const orb = document.createElement('div');
+  orb.className = `gacha-orb orb-${res.rarity}` + (big?' big':'');
+  const inner = document.createElement('div');
+  inner.className = 'orb-inner';
+  inner.textContent = '';
 
-  if (autoReveal) {
-    setTimeout(() => {
-      inner.textContent = res.name;
-      orb.classList.add("revealed");
-      resizeAllTexts();
-      tryUnlockAfterDelay();
-    }, revealDelay);
-  } else {
-    orb.addEventListener("click", () => {
-      if (!orb.classList.contains("revealed")) {
-        inner.textContent = res.name;
-        orb.classList.add("revealed");
-        resizeAllTexts();
-        tryUnlockAfterDelay();
-      }
-    });
-  }
+  const reveal = () => {
+    if (orb.classList.contains('revealed')) return;
+    inner.textContent = res.name;
+    orb.classList.add('revealed');
+    resizeAllTexts();
+    checkAllRevealed();
+  };
+
+  if (autoReveal) setTimeout(reveal, revealDelay);
+  else orb.addEventListener('click', reveal);
+
   orb.appendChild(inner);
   return orb;
 }
-function showResultsTen(results) {
-  canDraw = false;
-  resultsContainer.classList.remove("single");
-  resultsContainer.innerHTML = "";
 
-  for (let row = 0; row < 2; row++) {
-    const rowDiv = document.createElement("div");
-    rowDiv.classList.add("gacha-row");
+function checkAllRevealed(){
+  const orbs = resultsContainer.querySelectorAll('.gacha-orb');
+  if (orbs.length === 0) return;
+  const all = [...orbs].every(o => o.classList.contains('revealed'));
+  if (all) {
+    // 抽完開放操作，但額外 0.5 秒節流
+    unlockAt = Date.now() + 500;
+    setTimeout(()=>{ canDraw = true; unlockButtons(); }, 500);
+  }
+}
 
-    results.slice(row * 5, row * 5 + 5).forEach((res, idx) => {
-      const isWhite = res.rarity === "normal";
-      const index = row * 5 + idx;
-      const orb = createOrb(res, { autoReveal: isWhite, revealDelay: index * 200 });
+function showResultsTen(results){
+  canDraw = false; lockButtons(true);
+  resultsContainer.classList.remove('single');
+  resultsContainer.innerHTML = '';
+  for (let row=0; row<2; row++){
+    const rowDiv = document.createElement('div');
+    rowDiv.className = 'gacha-row';
+    results.slice(row*5, row*5+5).forEach((res, idx)=>{
+      const index = row*5 + idx;
+      const isWhite = res.rarity === 'normal';
+      const orb = createOrb(res, { autoReveal:isWhite, revealDelay:index*200 });
       rowDiv.appendChild(orb);
     });
     resultsContainer.appendChild(rowDiv);
   }
   resizeAllTexts();
-
-  // 預防萬一：最後再補一次延遲檢查解鎖
-  setTimeout(tryUnlockAfterDelay, 500);
 }
-function showResultSingle(res) {
-  canDraw = false;
-  resultsContainer.innerHTML = "";
-  resultsContainer.classList.add("single");
 
-  const isWhite = res.rarity === "normal";
-  const orb = createOrb(res, { autoReveal: isWhite, revealDelay: 0, big: true });
-
-  const rowDiv = document.createElement("div");
-  rowDiv.classList.add("gacha-row");
-  rowDiv.style.justifyContent = "center";
+function showResultSingle(res){
+  canDraw = false; lockButtons(true);
+  resultsContainer.classList.add('single');
+  resultsContainer.innerHTML = '';
+  const isWhite = res.rarity === 'normal';
+  const orb = createOrb(res, { autoReveal:isWhite, revealDelay:0, big:true });
+  const rowDiv = document.createElement('div');
+  rowDiv.className = 'gacha-row';
+  rowDiv.style.justifyContent = 'center';
   rowDiv.appendChild(orb);
   resultsContainer.appendChild(rowDiv);
-
   resizeAllTexts();
-
-  if (isWhite) {
-    // 單抽白球：自動翻 → 再等 0.5s 解鎖
-    setTimeout(tryUnlockAfterDelay, 10);
-  }
+  if (isWhite) { unlockAt = Date.now() + 500; setTimeout(()=>{ canDraw = true; unlockButtons(); }, 500); }
 }
 
 /* ==============================
-   背包（需全部翻開；每行 3 個；依 ID 排序；顯示玩家名）
+   背包（每行 3 個，依 ID）
 ============================== */
 function nameFromPools(rarity, character_id, event_name){
   if (rarity === 'normal') return pools.normal.find(x=>x.id===character_id)?.name || `#${character_id}`;
@@ -734,127 +685,98 @@ function nameFromPools(rarity, character_id, event_name){
   const hit = pools.limited.find(x=>x.id===character_id && x.event_name===event_name) || pools.limited.find(x=>x.id===character_id);
   return hit ? hit.name : `#${character_id}`;
 }
-function joinByRows(arr, rowLen=3) {
-  const lines = [];
-  for(let i=0; i<arr.length; i+=rowLen){
-    lines.push(arr.slice(i, i+rowLen).map(x=>x.html).join('、 '));
-  }
-  return lines.join('<br>');
-}
+
 async function openBackpack(){
-  // 有未翻開的卡 → 禁止開背包
-  const orbs = resultsContainer.querySelectorAll(".gacha-orb");
-  if ([...orbs].some(o => !o.classList.contains("revealed"))) {
-    alert("請先翻開所有扭蛋後才能打開背包！");
-    return;
+  // 必須翻完才能開
+  const orbs = resultsContainer.querySelectorAll('.gacha-orb');
+  if ([...orbs].some(o=>!o.classList.contains('revealed'))) {
+    alert('請先翻開所有扭蛋！'); return;
   }
 
-  if (!user) {
-    infoTitle.textContent = '背包（需登入才會顯示資料）';
-    infoBody.innerHTML = '<div class="backpack-items">請先登入圖書館專案。</div>';
-    infoModal.style.display = "flex";
-    resizeAllTexts();
-    return;
-  }
+  infoTitle.textContent = `${PLAYER_NAME}的背包`;
 
-  // ★ 方案1：直接用 A 專案提前帶過來的名稱
-  const ownerName = (localStorage.getItem('gacha_player_name') || '我') + '的';
-  infoTitle.textContent = `${ownerName}背包`;
-
-  // （以下照你原本的查 owned_characters → 排序/分組/每行 3 個 → render）
   const { data: rows=[] } = await G('owned_characters')
     .select('rarity,event_name,character_id,count')
-    .eq('player_id', user.id)
-    .order('rarity', {ascending:true})
-    .order('character_id', {ascending:true});
+    .eq('player_id', user.id);
 
-  const limited = [], hidden = [], normal = [];
-  rows.forEach(r => {
+  // 合併保險（理論上不會重複）
+  const byKey = new Map();
+  for (const r of rows){
+    const key = `${r.rarity}|${r.event_name}|${r.character_id}`;
+    const v = byKey.get(key);
+    byKey.set(key, v ? { ...r, count: v.count + r.count } : { ...r });
+  }
+  const merged = [...byKey.values()];
+
+  // 排序 & 分組
+  const limited=[], hidden=[], normal=[];
+  merged.forEach(r=>{
     const nm = nameFromPools(r.rarity, r.character_id, r.event_name);
-    const line = `${escapeHtml(nm)} × <span>${r.count}</span>`;
-    if (r.rarity === 'limited')   limited.push({ id: r.character_id, html: line });
-    else if (r.rarity === 'hidden') hidden.push({ id: r.character_id, html: line });
-    else normal.push({ id: r.character_id, html: line });
+    const item = { id:r.character_id, html:`${escapeHtml(nm)} × <span>${r.count}</span>` };
+    if (r.rarity==='limited') limited.push(item);
+    else if (r.rarity==='hidden') hidden.push(item);
+    else normal.push(item);
   });
-
   const byId = a=>a.sort((x,y)=>(x.id??0)-(y.id??0));
   byId(limited); byId(hidden); byId(normal);
 
-  function joinByRows(arr, rowLen=3) {
-    const lines = [];
-    for(let i=0; i<arr.length; i+=rowLen){
-      lines.push(arr.slice(i, i+rowLen).map(x=>x.html).join('、 '));
-    }
+  const joinRows = (arr, len=3)=>{
+    const lines=[]; for(let i=0;i<arr.length;i+=len){ lines.push(arr.slice(i,i+len).map(x=>x.html).join('、 ')); }
     return lines.join('<br>');
-  }
+  };
 
-  let html = "";
-  if (limited.length) html += `<div class="backpack-section"><h3>活動限定饅頭：</h3><div class="backpack-items">${joinByRows(limited)}</div></div>`;
-  if (hidden.length)  html += `<div class="backpack-section"><h3>隱藏饅頭：</h3><div class="backpack-items">${joinByRows(hidden)}</div></div>`;
-  if (normal.length)  html += `<div class="backpack-section"><h3>普通饅頭：</h3><div class="backpack-items">${joinByRows(normal)}</div></div>`;
+  let html='';
+  if (limited.length) html += `<div class="backpack-section"><h3>活動限定饅頭：</h3><div class="backpack-items">${joinRows(limited)}</div></div>`;
+  if (hidden.length)  html += `<div class="backpack-section"><h3>隱藏饅頭：</h3><div class="backpack-items">${joinRows(hidden)}</div></div>`;
+  if (normal.length)  html += `<div class="backpack-section"><h3>普通饅頭：</h3><div class="backpack-items">${joinRows(normal)}</div></div>`;
   if (!html) html = '<div class="backpack-items">目前沒有任何饅頭</div>';
 
   infoBody.innerHTML = html;
-  infoModal.style.display = "flex";
+  infoModal.style.display = 'flex';
   resizeAllTexts();
 }
-
-infoModal.addEventListener("click", () => infoModal.style.display = "none");
-infoModal.querySelector(".modal-content").addEventListener("click", e => e.stopPropagation());
+infoModal.addEventListener('click', ()=> infoModal.style.display='none');
+infoModal.querySelector('.modal-content').addEventListener('click', e=> e.stopPropagation());
 
 /* ==============================
-   綁定事件（含剩餘抽數與 0.5s 解鎖）
+   綁定按鈕
 ============================== */
 function bindUI(){
-  document.getElementById('btn-backpack').addEventListener('click', openBackpack);
+  btnBag.addEventListener('click', openBackpack);
 
-  btnTen.addEventListener("click", async () => {
-    if (!user) return alert('請先登入才能抽卡');
-    if (redirectIfExpired()) return;
-    if (!canDraw) return alert("請先翻開所有扭蛋（或待動畫完成）！");
-    if (remainingDraws < 10) return alert(`剩餘 ${remainingDraws} 抽，無法十連。`);
+  btnSingle.addEventListener('click', async ()=>{
+    if (!ensureAuthOrRedirect()) return;
+    if (!canDraw || Date.now()<unlockAt) return alert('稍等一下…');
+    gachaBtns.classList.add('bottom');
+    lockButtons(true);
 
-    canDraw = false;
-    gachaBtns.classList.add("bottom");
-
-    try {
-      const results = await drawTenTimes();
-      showResultsTen(results);
-    } catch(e) {
-      console.error(e);
-      await refreshCounter();
-      canDraw = true; // 出錯解除鎖定
-    }
+    const r = await drawOnce();
+    if (!r) { unlockButtons(); return; }
+    await refreshUIFromCounter();
+    showResultSingle({ rarity:r.rarity, name:r.name });
   });
 
-  btnSingle.addEventListener("click", async () => {
-    if (!user) return alert('請先登入才能抽卡');
-    if (redirectIfExpired()) return;
-    if (!canDraw) return alert("請先翻開扭蛋（或待動畫完成）！");
-    if (remainingDraws < 1) return alert("已達抽卡上限，無法再抽。");
+  btnTen.addEventListener('click', async ()=>{
+    if (!ensureAuthOrRedirect()) return;
+    if (!canDraw || Date.now()<unlockAt) return alert('稍等一下…');
+    // 檢查剩餘抽數
+    const c = await getCounter();
+    if ((c.max_draws ?? 1000) - c.total_draws < 10) { alert('剩餘抽數不足 10 抽'); return; }
 
-    canDraw = false;
-    gachaBtns.classList.add("bottom");
+    gachaBtns.classList.add('bottom');
+    lockButtons(true);
 
-    try {
-      const r = await drawOnce();
-      await refreshCounter();
-      showResultSingle({ rarity: r.rarity, name: r.name });
-    } catch(e) {
-      console.error(e);
-      await refreshCounter();
-      canDraw = true; // 出錯解除鎖定
-    }
+    const results = await drawTenTimes();
+    if (!results) { unlockButtons(); return; }
+    await refreshUIFromCounter();
+    showResultsTen(results);
   });
 
-  // 監聽 DOM 變動，確保動畫期間保持鎖定
-  const unlockObserver = new MutationObserver(() => {
-    resizeAllTexts();
-    // 不在這裡解鎖，改由 tryUnlockAfterDelay() 控制 0.5s
-  });
-  unlockObserver.observe(resultsContainer, { childList: true, subtree: true });
+  // 監控 DOM 變化，全部翻完即解鎖（已內建 0.5s 節流）
+  const obs = new MutationObserver(()=>{ resizeAllTexts(); checkAllRevealed(); });
+  obs.observe(resultsContainer, { childList:true, subtree:true });
 }
-</script>
+
 
 
 </body>
