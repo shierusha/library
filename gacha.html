@@ -489,16 +489,16 @@ function pick(arr){ return arr[Math.floor(Math.random() * arr.length)] }
 
 async function preloadPools(){
   const [{ data: n=[] }, { data: h=[] }, { data: l=[] }] = await Promise.all([
-    sb.from('gacha.normal_characters').select('*').order('id', {ascending:true}),
-    sb.from('gacha.hidden_characters').select('*').order('id', {ascending:true}),
-    sb.from('gacha.limited_characters').select('*').order('id', {ascending:true}),
+    sb.from('normal_characters').select('*').order('id', {ascending:true}),
+    sb.from('hidden_characters').select('*').order('id', {ascending:true}),
+    sb.from('limited_characters').select('*').order('id', {ascending:true}),
   ]);
   pools.normal = n; pools.hidden = h; pools.limited = l;
 }
 
 async function refreshDrawCount(){
   if (!user) { drawCounterEl.textContent = '0'; return; }
-  const { data } = await sb.from('gacha.counters').select('total_draws').eq('player_id', user.id).maybeSingle();
+  const { data } = await sb.from('counters').select('total_draws').eq('player_id', user.id).maybeSingle();
   drawCounterEl.textContent = data?.total_draws ?? 0;
 }
 
@@ -702,7 +702,7 @@ async function openBackpack(){
   }
   infoTitle.textContent = '我的背包';
   const { data: rows=[] } = await sb
-    .from('gacha.owned_characters')
+    .from('owned_characters')
     .select('rarity,event_name,character_id,count')
     .eq('player_id', user.id)
     .order('rarity', {ascending:true})
