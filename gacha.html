@@ -183,7 +183,7 @@ body.dark-bg::before {
 ============================== */
 .gacha-hud {
   position: absolute;
-  bottom: 7%;
+  bottom: 6%;
   right: 4%;
   display: flex;
   align-items: center;
@@ -202,7 +202,7 @@ body.dark-bg::before {
 }
 .gacha-counter {
   position: absolute;
-  bottom: 7%; right: 20%;
+  bottom: 5%; right: 17%;
   gap: 1rem; z-index: 30;
   color: #fff; text-shadow: 0 1px 4px #000a;
   height: 10%;
@@ -211,7 +211,7 @@ body.dark-bg::before {
 
 /* 背包按鈕 */
 .gacha-backpack {
-  height: 100%; aspect-ratio: 2.5/1;
+  height: 100%; aspect-ratio: 2/1;
   border: 2px solid #1eb5e5; border-radius: 8px;
   background: rgb(13 27 77 / 82%); color: #fff;
   cursor: pointer; transition: all 0.25s;
@@ -231,18 +231,21 @@ body.dark-bg::before {
    Loader（百分比定位/尺寸；不靠 JS 算大小）
 ============================== */
 .gacha-loader{
-  position:absolute; left:8%; right:8%;
-  top: 8%;          /* 你要改位置就改這裡的百分比 */
-  height: 12%;      /* 你要改高度就改這裡的百分比 */
-  z-index:60; display:none;
+  position:absolute; 
+  left:10%; 
+  right:10%;
+  top: 45%;          /* 你要改位置就改這裡的百分比 */
+  height: 15%;      /* 你要改高度就改這裡的百分比 */
+  z-index:60; 
+  display:none;
 }
 .gacha-loader.show{ display:block; }
 .gacha-loader .loader-box{
-  position:relative; height:100%;
-  background: rgba(0,0,0,.22);
-  border:1px solid #1eb5e5; border-radius:14px;
-  box-shadow: 0 10px 30px #0008, inset 0 0 18px #0af2;
-  padding:10px; display:flex; flex-direction:column; gap:8px; justify-content:center;
+  position:relative; 
+  height:100%;
+  display:flex; 
+  flex-direction:column; 
+  gap:8px; justify-content:center;
 }
 .loader-bar{
   position:relative; height:42%;
@@ -256,9 +259,10 @@ body.dark-bg::before {
   transition: width .26s cubic-bezier(.22,.61,.36,1);
 }
 .loader-cat{
-  position:absolute; top:50%; left:0%;
+  position:absolute; 
+  top:-35%; left:0%;
   transform: translate(-50%, -50%);
-  height: 90%;            /* 貓大小 = 進度條高的 90% */
+  height: 70%;            /* 貓大小 = 進度條高的 90% */
   aspect-ratio: 1 / 1;    /* 不變形 */
   filter: drop-shadow(0 3px 8px #000c);
   transition: left .26s cubic-bezier(.22,.61,.36,1);
@@ -267,7 +271,7 @@ body.dark-bg::before {
 .loader-text{
   text-align:center; color:#e9efff; font-weight:900;
   text-shadow:0 2px 6px #000c;
-  height: 42%;            /* 讓 JS 可以用這個高度算字體 */
+  height: 100%;            /* 讓 JS 可以用這個高度算字體 */
   display:flex; align-items:center; justify-content:center;
 }
 
