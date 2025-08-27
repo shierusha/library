@@ -376,10 +376,22 @@ async function sendGachaWebhook(rarity, itemName) {
         itemName
       })
     });
-  } catch (err) {
-    console.warn('[gacha-notify] failed:', err);
+//  } catch (err) {
+//    console.warn('[gacha-notify] failed:', err);
+//  }
+//}
+
+
+    if (!resp.ok) {
+      const txt = await resp.text();
+      console.error('[gacha-notify] status=', resp.status, 'body=', txt);
+    }
+  } catch (e) {
+    console.warn('[gacha-notify] failed:', e);
   }
 }
+
+
 
 
 /* ==============================
