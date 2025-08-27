@@ -373,7 +373,9 @@ async function sendGachaWebhook(rarity, itemName) {
       body: JSON.stringify({
         rarity,
         playerName: PLAYER_NAME || '玩家',
-        itemName
+        itemName,
+        threadId: "1409888757603106886"   // ← ★ 直接在這裡放活動主題 ID
+
       })
     });
     if (!resp.ok) {
