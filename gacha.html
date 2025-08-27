@@ -407,14 +407,30 @@ function decodeJWT(t){
   return JSON.parse(atob(pad(p).replace(/-/g,'+').replace(/_/g,'/')));
 }
 
+// ---- Supabase B 專案初始化（帶 apikey + 你的 B_TOKEN）----
 let sb, user = null;
+
 if (B_TOKEN) {
-  sb = window.supabase.createClient(B_URL, B_ANON, { global: { headers: { Authorization: `Bearer ${B_TOKEN}` } } });
-  user = { id: decodeJWT(B_TOKEN).sub };          // RLS 會把 sub 視為 auth.uid()
-  sb.realtime.setAuth(B_TOKEN);                   // 讓 Realtime 也帶上相同 JWT
+  const decoded = decodeJWT(B_TOKEN);           // 解析 sub 當 auth.uid()
+  user = decoded ? { id: decoded.sub } : null;
+
+  sb = window.supabase.createClient(B_URL, B_ANON, {
+    global: {
+      headers: {
+        apikey: B_ANON,                          // << 一定要帶，避免 "No API key found"
+        Authorization: `Bearer ${B_TOKEN}`,      // << 你的自簽 JWT，給 RLS 用
+      },
+    },
+  });
+
+  // 如果你有用 Realtime，記得把 token 也給它
+  try { sb.realtime.setAuth(B_TOKEN); } catch (_) {}
 } else {
-  sb = window.supabase.createClient(B_URL, B_ANON); // 只能讀不能寫
+  // 未登入：只能看（supabase-js 會自帶 apikey）
+  sb = window.supabase.createClient(B_URL, B_ANON);
+  user = null;
 }
+
 
 /* ==============================
    DOM 快取
