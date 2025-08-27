@@ -7,6 +7,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
+
 /* ==============================
    全域背景 / 字體
 ============================== */
@@ -17,16 +18,11 @@ body {
   font-family: 'Noto Sans TC', sans-serif;
   overflow: hidden;
 }
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  background: rgba(255,255,255,0.3);
-  z-index: 0;
-  pointer-events: none;
-}
 body.dark-bg::before {
+  content: "";
+  position: fixed; inset: 0;
   background: rgba(0,0,0,0.3);
+  z-index: 0; pointer-events: none;
 }
 
 /* ==============================
@@ -52,8 +48,6 @@ body.dark-bg::before {
 /* ==============================
    Modal（旋轉 / 背包）
 ============================== */
-
-
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -65,127 +59,43 @@ body.dark-bg::before {
   animation: modal-fadein-bg 0.25s;
 }
 @keyframes modal-fadein-bg {
-  from { background: rgba(0,0,0,0);}
-  to   { background: rgba(0,0,0,0.45);}
+  from { background: rgba(0,0,0,0); }
+  to   { background: rgba(0,0,0,0.45); }
 }
-
 .modal-content {
-
-  background: rgb(13 27 77 / 82%);      /* 深藍色 + 70%透明 */
+  background: rgb(13 27 77 / 82%);
   border-radius: 18px;
-  border: 2px solid #1eb5e5;              /* 藍色外框 */
-  box-shadow: 0 0 16px 2px #62f1fe88,     /* 外發光 */
-              0 8px 32px #1eb5e5aa;       /* 藍色下陰影 */
-  width: 500px;
-  max-width: 93vw;
-  height: 340px;
-  max-height: 80vh;
-  display: flex;
-  flex-direction: column;
+  border: 2px solid #1eb5e5;
+  box-shadow: 0 0 16px 2px #62f1fe88, 0 8px 32px #1eb5e5aa;
+  width: 500px; max-width: 93vw;
+  height: 340px; max-height: 80vh;
+  display: flex; flex-direction: column;
   overflow: hidden;
   animation: modal-pop 0.32s cubic-bezier(.42,1.4,.51,1.01);
 }
 @keyframes modal-pop {
-  from { opacity: 0; transform: scale(0.92);}
-  to   { opacity: 1; transform: scale(1);}
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
 }
-
 .modal-header {
   background: none;
   padding: 15px 20px 0px 24px;
-  color: #fff;
-  font-size: 1.5em;
-  font-weight: bold;
-  letter-spacing: 1px;
-  text-shadow: 0 1px 4px #000a;
+  color: #fff; font-size: 1.5em; font-weight: bold;
+  letter-spacing: 1px; text-shadow: 0 1px 4px #000a;
 }
-
 .modal-header::after {
-content: "";
-display: block;
-height: 5px;
-width: 70%;
-margin: 0.5rem 0 0 0;
-border-radius: 2px;
-background: linear-gradient(
-to right,
- #53e2ff99 65%,
-#53e2ff00 100%
-);
-pointer-events: none;
-
+  content: ""; display: block; height: 5px; width: 70%;
+  margin:.5rem 0 0; border-radius: 2px;
+  background: linear-gradient(to right,#53e2ff99 65%,#53e2ff00 100%);
+  pointer-events: none;
 }
-
-
 .modal-body {
-  color: #fff;
-  padding: 12px 24px 24px 24px;
-  font-size: 1.2em;
-  line-height: 1.5;
-  text-shadow: 0 1px 4px #0008;
-  overflow-y: auto;
-  word-break: break-all;  /* or break-word; 都可以 */
-  max-height: 240px;      /* 依照 modal 高度調整 */
-  white-space: pre-line;
-  overflow: auto;
-  scrollbar-width: none;          /* Firefox */
-  -ms-overflow-style: none;       /* IE & Edge */
+  color:#fff; padding: 12px 24px 24px 24px;
+  font-size: 1.2em; line-height:1.5; text-shadow:0 1px 4px #0008;
+  overflow-y:auto; max-height:240px; white-space: pre-line;
+  scrollbar-width:none;
 }
-
-.modal-body::-webkit-scrollbar {
-  display: none;                  /* Chrome & Safari */
-}
-
-
-
-
-
- /*翻轉按鈕 */
- .row-flip-btn {
-  display: flex;
-width: 80%; 
-height: 80%;
-}
-
-
-.flip-btn {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  background: rgba(250,250,250,0.8); 
-  color: #495079;
-  border: none;
-  border-radius: 12px;
-  font-weight: 900;
-  cursor: pointer;
-  box-shadow: 0 2px 8px #0002;
-  transition: background 0.18s, transform 0.13s;
-  position: relative;
-  outline: none;
-  align-items: center;
-  justify-content: center; /* 讓內文居中 */
-
-}
-
-.flip-btn:hover {
-  background: #fdffb8; 
-  transform: translateY(-2px) scale(1.04);
-}
-
-/* 箭頭樣式 */
-.flip-btn .arrow {
-  display: inline-block;
-  width: 0.35em;
-  height: 0.4em;
-  margin-left: 0.12em;
-  margin-top: 0.1em;
-border-right: 0.22em solid #495079;
-border-bottom: 0.22em solid #495079;
-  transform: rotate(-45deg);
-  vertical-align: middle;
-  content: "";
-}
+.modal-body::-webkit-scrollbar { display:none; }
 
 /* ==============================
    抽卡按鈕（初始置中 → 抽卡後移到底部）
@@ -264,10 +174,9 @@ border-bottom: 0.22em solid #495079;
 
 /* 大球：佔滿容器高度（保持正圓） */
 .gacha-orb.big {
-  aspect-ratio: 1/1;   /* 保持正圓 */
-  max-width: 25%;      /* 不要超過寬度 */
+  aspect-ratio: 1/1;
+  max-width: 25%;
 }
-
 
 /* ==============================
    HUD（右下角）
@@ -282,34 +191,25 @@ border-bottom: 0.22em solid #495079;
   z-index: 30;
   color: #fff;
   text-shadow: 0 1px 4px #000a;
-  height: 10%;    
+  height: 10%;
 }
-
-/* 累積抽數：不可見框讓 JS 依高度算字體 */
 .counter-box {
   height: 100%;
-  display: flex;
-  align-items: center;
-  font-weight: bold;
-  padding: 0 6px;
+  display: flex; align-items: center;
+  font-weight: bold; padding: 0 6px;
   border-radius: 4px;
-  background: rgba(255,255,255,0.01); /* 1% 透明，確保有尺寸 */
+  background: rgba(255,255,255,0.01);
 }
 .gacha-counter {
-position: absolute;
-  bottom: 7%;
-  right: 20%;
-  gap: 1rem;
-  z-index: 30;
-  color: #fff;
-  text-shadow: 0 1px 4px #000a;
-  height: 10%;    
+  position: absolute;
+  bottom: 7%; right: 20%;
+  gap: 1rem; z-index: 30;
+  color: #fff; text-shadow: 0 1px 4px #000a;
+  height: 10%;
 }
-
 .gacha-results { z-index: 10; }
 
-
-/* 背包按鈕 + 不可見框 */
+/* 背包按鈕 */
 .gacha-backpack {
   height: 100%; aspect-ratio: 2.5/1;
   border: 2px solid #1eb5e5; border-radius: 8px;
@@ -319,61 +219,121 @@ position: absolute;
   display: flex; align-items: center; justify-content: center;
 }
 .backpack-box {
-  height: 100%; display: flex; align-items: center; justify-content: center;
+  height: 100%;
+  display: flex; align-items: center; justify-content: center;
 }
-
-/* 背包 modal 的列表字體與數字顏色（JS 亦會縮放） */
 .backpack-section { margin: 0.5rem 0; }
 .backpack-section h3 { color: #53e2ff; margin-bottom: 0.3rem; }
 .backpack-items { color: #fff; }
 .backpack-items span { color: #ffe082; font-weight: bold; }
 
+/* ==============================
+   Loader（百分比定位/尺寸；不靠 JS 算大小）
+============================== */
+.gacha-loader{
+  position:absolute; left:8%; right:8%;
+  top: 8%;          /* 你要改位置就改這裡的百分比 */
+  height: 12%;      /* 你要改高度就改這裡的百分比 */
+  z-index:60; display:none;
+}
+.gacha-loader.show{ display:block; }
+.gacha-loader .loader-box{
+  position:relative; height:100%;
+  background: rgba(0,0,0,.22);
+  border:1px solid #1eb5e5; border-radius:14px;
+  box-shadow: 0 10px 30px #0008, inset 0 0 18px #0af2;
+  padding:10px; display:flex; flex-direction:column; gap:8px; justify-content:center;
+}
+.loader-bar{
+  position:relative; height:42%;
+  background:#263257; border-radius:999px; overflow:hidden;
+  box-shadow: inset 0 0 10px #000a;
+}
+.loader-fill{
+  position:absolute; left:0; top:0; height:100%; width:0%;
+  background: linear-gradient(90deg,#2de0ff88,#6dffae88);
+  box-shadow: 0 0 18px #53e2ff99 inset;
+  transition: width .26s cubic-bezier(.22,.61,.36,1);
+}
+.loader-cat{
+  position:absolute; top:50%; left:0%;
+  transform: translate(-50%, -50%);
+  height: 90%;            /* 貓大小 = 進度條高的 90% */
+  aspect-ratio: 1 / 1;    /* 不變形 */
+  filter: drop-shadow(0 3px 8px #000c);
+  transition: left .26s cubic-bezier(.22,.61,.36,1);
+  pointer-events:none;
+}
+.loader-text{
+  text-align:center; color:#e9efff; font-weight:900;
+  text-shadow:0 2px 6px #000c;
+  height: 42%;            /* 讓 JS 可以用這個高度算字體 */
+  display:flex; align-items:center; justify-content:center;
+}
+
+/* 自動字級：給需要自動縮放的元素加 .auto-resize */
+.auto-resize { /* 無樣式，純標記 */ }
+
+
 </style>
 </head>
 <body class="dark-bg">
-<!-- 16:9 主要容器 -->
-<div class="container-16-9">
-  <!-- 抽卡結果容器（單抽/十連共用） -->
-  <div class="gacha-results" id="gacha-results"></div>
+<body class="dark-bg">
+  <!-- 16:9 主要容器 -->
+  <div class="container-16-9">
+    <!-- 抽卡結果容器（單抽/十連共用） -->
+    <div class="gacha-results" id="gacha-results"></div>
 
-  <!-- 抽卡按鈕（初始置中，抽卡後會滑到下方） -->
-  <div class="gacha-buttons">
-    <button id="btn-single" class="gacha-btn">單抽</button>
-    <button id="btn-ten" class="gacha-btn">十連抽</button>
-  </div>
+    <!-- 轉蛋讀條 Loader（百分比定位/尺寸） -->
+    <div id="gacha-loader" class="gacha-loader">
+      <div class="loader-box">
+        <div class="loader-bar">
+          <div class="loader-fill" id="loader-fill"></div>
+          <img class="loader-cat" id="loader-cat"
+               src="https://shierusha.github.io/library/img/cat.png" alt="cat">
+        </div>
+        <div class="loader-text auto-resize" id="loader-text">Roro爆肝中……</div>
+      </div>
+    </div>
 
+    <!-- 抽卡按鈕（初始置中，抽卡後會滑到下方） -->
+    <div class="gacha-buttons">
+      <button id="btn-single" class="gacha-btn auto-resize">單抽</button>
+      <button id="btn-ten" class="gacha-btn auto-resize">十連抽</button>
+    </div>
 
-  <!--  HUD 要在這層 -->
-  <div class="gacha-hud">
-    <button id="btn-backpack" class="gacha-backpack">
-      <div class="backpack-box">背包</div>
-    </button>
-  </div>
-  
-    <div class="gacha-counter">
+    <!-- HUD -->
+    <div class="gacha-hud">
+      <button id="btn-backpack" class="gacha-backpack">
+        <div class="backpack-box auto-resize">背包</div>
+      </button>
+    </div>
+
+    <div class="gacha-counter auto-resize">
       <div class="counter-box">累積抽數：
         <span id="draw-count">0</span>
       </div>
     </div>
-  <!-- 背景圖 -->
-  <img class="bg-img" src="https://shierusha.github.io/school-battle/teachers/img/8.webp" alt="background">
-</div>
 
-<!-- 旋轉提示（不可關閉） -->
-<div id="orientation-modal" class="modal-overlay" style="display:none;">
-  <div class="modal-content">
-    <div class="modal-header">請旋轉螢幕</div>
-    <div class="modal-body">為了最佳體驗，請將裝置轉成橫向模式</div>
+    <!-- 背景圖 -->
+    <img class="bg-img" src="https://shierusha.github.io/school-battle/teachers/img/8.webp" alt="background">
   </div>
-</div>
 
-<!-- 背包 Modal（可隨意點背景關閉） -->
-<div id="info-modal" class="modal-overlay" style="display:none;">
-  <div class="modal-content">
-    <div class="modal-header" id="info-modal-title">標題</div>
-    <div class="modal-body" id="info-modal-body"></div>
+  <!-- 旋轉提示（不可關閉） -->
+  <div id="orientation-modal" class="modal-overlay" style="display:none;">
+    <div class="modal-content">
+      <div class="modal-header">請旋轉螢幕</div>
+      <div class="modal-body">為了最佳體驗，請將裝置轉成橫向模式</div>
+    </div>
   </div>
-</div>
+
+  <!-- 背包 Modal（可點背景關閉） -->
+  <div id="info-modal" class="modal-overlay" style="display:none;">
+    <div class="modal-content">
+      <div class="modal-header" id="info-modal-title">標題</div>
+      <div class="modal-body" id="info-modal-body"></div>
+    </div>
+  </div>
 
 
 
@@ -393,6 +353,8 @@ position: absolute;
 const $  = (s, r=document) => r.querySelector(s);
 const $$ = (s, r=document) => [...r.querySelectorAll(s)];
 const sleep = (ms) => new Promise(res => setTimeout(res, ms));
+const escapeHtml = s => (s||'').replace(/[&<>"']/g,c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pick = arr => arr[Math.floor(Math.random()*arr.length)];
 
 /* ==============================
    Supabase（圖書館 B 專案）
@@ -420,7 +382,7 @@ let sb = window.supabase.createClient(B_URL, B_ANON, {
 });
 if (B_TOKEN) sb.realtime.setAuth(B_TOKEN);
 
-// ✅ 正確指定 gacha schema 的 helper（避免 /rest/v1/gacha.xxx 造成 404）
+// ✅ 正確指定 gacha schema 的 helper
 const G = (t) => sb.schema('gacha').from(t);
 
 /* ==============================
@@ -438,16 +400,12 @@ const drawCounterEl = $('#draw-count');
 const orientationModal = $('#orientation-modal');
 
 /* ==============================
-   文字自適應（保留你的寫法）
+   自動字級（統一倍率，凡是 .auto-resize 都吃）
 ============================== */
 function resizeAllTexts() {
-  $$('.gacha-btn').forEach(btn => { btn.style.fontSize = (btn.offsetHeight * 0.40) + "px"; });
-  $$('.orb-inner').forEach(inner => { inner.style.fontSize = (inner.offsetHeight * 0.35) + "px"; });
-  $$('.counter-box').forEach(box => { box.style.fontSize = (box.offsetHeight * 0.50) + "px"; });
-  $$('.backpack-box').forEach(box => { box.style.fontSize = (box.offsetHeight * 0.50) + "px"; });
-  $$('.backpack-items span').forEach(span => {
-    const h = (span.offsetHeight || 20);
-    span.style.fontSize = (h * 0.80) + "px";
+  $$('.auto-resize').forEach(el => {
+    const h = el.offsetHeight || el.getBoundingClientRect().height || 20;
+    el.style.fontSize = (h * 0.50) + 'px'; // 想改整體倍率改這裡
   });
 }
 resizeAllTexts();
@@ -489,12 +447,9 @@ ensureAuthOrRedirect();
 /* ==============================
    工具 & 狀態
 ============================== */
-const escapeHtml = s => (s||'').replace(/[&<>"']/g,c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const pick = arr => arr[Math.floor(Math.random()*arr.length)];
 let pools = { normal: [], hidden: [], limited: [] };
-
-let canDraw = true; // 翻完才可再抽
-let unlockAt = 0;   // 節流時間（抽完 0.5 秒）
+let canDraw = true;   // 翻完才可再抽
+let unlockAt = 0;     // 抽完 0.5 秒節流
 function lockButtons(force=true){ [btnSingle,btnTen].forEach(b=>{ if(!b) return; b._forceDisabled = force; enforceLandscape(); }); }
 function unlockButtons(){ [btnSingle,btnTen].forEach(b=>{ if(!b) return; b._forceDisabled = false; enforceLandscape(); }); }
 
@@ -518,6 +473,7 @@ function unlockButtons(){ [btnSingle,btnTen].forEach(b=>{ if(!b) return; b._forc
   await refreshUIFromCounter();
 
   bindUI();
+
   // 管理端若改 max_draws，前端 15 秒同步一次
   setInterval(refreshUIFromCounter, 15000);
 })();
@@ -552,7 +508,6 @@ async function refreshUIFromCounter(){
    Owned 變更（穩定 upsert）
 ============================== */
 async function addOwned(rarity, character_id, event_name){
-  // 先查現有 count（避免 race）
   const { data: rows } = await G('owned_characters')
     .select('count')
     .eq('player_id', user.id)
@@ -603,7 +558,7 @@ async function drawOnce(){
   if (!chosen) { alert('對應池子沒有資料'); return null; }
 
   await addOwned(rarity, chosen.id, event_name);
-  await setCounter(totalNext, nextPity);
+  await setCounter(totalNext, next_pity = nextPity);
 
   return { rarity, name: chosen.name, id: chosen.id, event_name, totalAfter: totalNext };
 }
@@ -623,13 +578,38 @@ async function drawTenTimes(){
 }
 
 /* ==============================
+   Loader（百分比移動；字體大小交給 .auto-resize）
+============================== */
+const loaderEl  = $('#gacha-loader');
+const fillEl    = $('#loader-fill');
+const catEl     = $('#loader-cat');
+const loaderTxt = $('#loader-text');
+
+const Loader = {
+  show(label='Roro爆肝中……'){
+    if (loaderTxt) loaderTxt.textContent = label;
+    if (fillEl) fillEl.style.width = '0%';
+    if (catEl)  catEl.style.left  = '0%';
+    loaderEl?.classList.add('show');
+    resizeAllTexts();
+  },
+  async step(stepIndex, total){ // stepIndex: 1..total
+    const pct = Math.max(0, Math.min(100, Math.round(stepIndex * (100/total))));
+    fillEl && (fillEl.style.width = pct + '%');
+    catEl  && (catEl.style.left  = pct + '%');
+    await sleep(240); // 調節節奏（跟 CSS transition 差不多即可）
+  },
+  hide(){ loaderEl?.classList.remove('show'); }
+};
+
+/* ==============================
    UI：建立球 / 翻牌與節流
 ============================== */
 function createOrb(res, { autoReveal=false, revealDelay=0, big=false } = {}){
   const orb = document.createElement('div');
   orb.className = `gacha-orb orb-${res.rarity}` + (big?' big':'');
   const inner = document.createElement('div');
-  inner.className = 'orb-inner';
+  inner.className = 'orb-inner auto-resize';
   inner.textContent = '';
 
   const reveal = () => {
@@ -712,7 +692,7 @@ async function openBackpack(){
     .eq('player_id', user.id);
 
   if (error) { console.error('[owned_characters] query error:', error); alert('讀取背包失敗'); return; }
-  const rows = Array.isArray(data) ? data : []; // 防呆
+  const rows = Array.isArray(data) ? data : [];
 
   // 合併同 key
   const byKey = new Map();
@@ -754,7 +734,7 @@ infoModal?.addEventListener('click', ()=> infoModal.style.display='none');
 infoModal?.querySelector('.modal-content')?.addEventListener('click', e=> e.stopPropagation());
 
 /* ==============================
-   綁定按鈕
+   綁定按鈕 + Loader 節奏（先抽→再推進→關閉→顯示）
 ============================== */
 function bindUI(){
   btnBag?.addEventListener('click', openBackpack);
@@ -765,7 +745,14 @@ function bindUI(){
     gachaBtns?.classList.add('bottom');
     lockButtons(true);
 
-    const r = await drawOnce();
+    // Loader：單抽 = 1 步
+    Loader.show('Roro爆肝中……');
+    await sleep(80); // 確保畫面渲染
+
+    const r = await drawOnce();           // ✅ 先抽
+    if (r) await Loader.step(1,1);        // ✅ 再前進到 100%
+    Loader.hide();
+
     if (!r) { unlockButtons(); return; }
     await refreshUIFromCounter();
     showResultSingle({ rarity:r.rarity, name:r.name });
@@ -781,8 +768,20 @@ function bindUI(){
     gachaBtns?.classList.add('bottom');
     lockButtons(true);
 
-    const results = await drawTenTimes();
-    if (!results) { unlockButtons(); return; }
+    // Loader：十連 = 10 步
+    Loader.show('Roro爆肝中……');
+    await sleep(80);
+
+    const results = [];
+    for (let i=0;i<10;i++){
+      const r = await drawOnce();                 // ✅ 先抽
+      if (!r) break;
+      results.push({ rarity:r.rarity, name:r.name });
+      await Loader.step(i+1, 10);                 // ✅ 再推進到 (i+1)/10
+    }
+    Loader.hide();
+
+    if (!results.length) { unlockButtons(); return; }
     await refreshUIFromCounter();
     showResultsTen(results);
   });
@@ -790,7 +789,6 @@ function bindUI(){
   const obs = new MutationObserver(()=>{ resizeAllTexts(); checkAllRevealed(); });
   obs.observe(resultsContainer, { childList:true, subtree:true });
 }
-
 
 </script>
 
