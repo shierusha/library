@@ -374,18 +374,26 @@ position: absolute;
     <div class="modal-body" id="info-modal-body"></div>
   </div>
 </div>
+
+
+
+
+
+
+
+
+
+
+
+
 <script>
 /* ==============================
-   小工具
+   小工具（保留）
 ============================== */
-function escapeHtml(s){return (s||'').replace(/[&<>"']/g,c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]))}
-function pick(arr){ return arr[Math.floor(Math.random() * arr.length)] }
-function decodeJWT(t){
-  if(!t) return null;
-  const pad=s=>s+'='.repeat((4-s.length%4)%4);
-  const [,p]=t.split('.');
-  try{ return JSON.parse(atob(pad(p).replace(/-/g,'+').replace(/_/g,'/'))) }catch{ return null }
-}
+const $  = (s,r=document)=>r.querySelector(s);
+const $$ = (s,r=document)=>[...r.querySelectorAll(s)];
+const sleep = (ms)=>new Promise(res=>setTimeout(res,ms));
+
 /* ==============================
    Supabase（圖書館 B 專案）
 ============================== */
@@ -395,22 +403,21 @@ const B_TOKEN = localStorage.getItem('gacha_b_jwt') || '';
 const B_TOKEN_EXP = Number(localStorage.getItem('gacha_b_jwt_exp') || 0);
 const PLAYER_NAME = localStorage.getItem('gacha_player_name') || '我的';
 const REDIRECT_PLAYER = 'https://shierusha.github.io/create-student/player';
+const DEFAULT_EVENT = '常駐';
 
 function decodeJWT(t){
   if(!t) return null;
   const pad = s => s + '='.repeat((4 - s.length % 4) % 4);
-  const payload = t.split('.')[1];
-  try { return JSON.parse(atob(pad(payload).replace(/-/g,'+').replace(/_/g,'/'))); }
+  try { return JSON.parse(atob(pad(t.split('.')[1]).replace(/-/g,'+').replace(/_/g,'/'))); }
   catch { return null; }
 }
+const payload = decodeJWT(B_TOKEN);
+const user = B_TOKEN && payload ? { id: payload.sub } : null;
 
 let sb = window.supabase.createClient(B_URL, B_ANON, {
   global: { headers: B_TOKEN ? { Authorization: `Bearer ${B_TOKEN}` } : {} }
 });
 if (B_TOKEN) sb.realtime.setAuth(B_TOKEN);
-
-const user = B_TOKEN ? { id: (decodeJWT(B_TOKEN)||{}).sub } : null;
-const DEFAULT_EVENT = '常駐';
 
 /* ==============================
    DOM 快取
@@ -424,6 +431,30 @@ const infoModal  = document.getElementById('info-modal');
 const infoTitle  = document.getElementById('info-modal-title');
 const infoBody   = document.getElementById('info-modal-body');
 const drawCounterEl = document.getElementById('draw-count');
+
+/* ==============================
+   文字自適應（你原本那套）
+============================== */
+function resizeAllTexts() {
+  document.querySelectorAll('.gacha-btn').forEach(btn => {
+    btn.style.fontSize = (btn.offsetHeight * 0.40) + "px";
+  });
+  document.querySelectorAll('.orb-inner').forEach(inner => {
+    inner.style.fontSize = (inner.offsetHeight * 0.35) + "px";
+  });
+  document.querySelectorAll('.counter-box').forEach(box => {
+    box.style.fontSize = (box.offsetHeight * 0.50) + "px";
+  });
+  document.querySelectorAll('.backpack-box').forEach(box => {
+    box.style.fontSize = (box.offsetHeight * 0.50) + "px";
+  });
+  document.querySelectorAll('.backpack-items span').forEach(span => {
+    const h = (span.offsetHeight || 20);
+    span.style.fontSize = (h * 0.80) + "px";
+  });
+}
+resizeAllTexts();
+window.addEventListener("resize", resizeAllTexts);
 
 /* ==============================
    強制橫向（不可手動關閉）
@@ -456,7 +487,7 @@ function ensureAuthOrRedirect(){
   }
   return true;
 }
-setInterval(ensureAuthOrRedirect, 60*1000); // 每分鐘檢查
+setInterval(ensureAuthOrRedirect, 60*1000);
 ensureAuthOrRedirect();
 
 /* ==============================
@@ -476,7 +507,6 @@ function unlockButtons(){ [btnSingle,btnTen].forEach(b=>{ if(!b) return; b._forc
    初始化
 ============================== */
 (async function boot(){
-  // 未登入只允許看背包空畫面
   if (!ensureAuthOrRedirect()) return;
 
   // 載池
@@ -489,26 +519,32 @@ function unlockButtons(){ [btnSingle,btnTen].forEach(b=>{ if(!b) return; b._forc
   pools.hidden  = h.data || [];
   pools.limited = l.data || [];
 
-  // 建立/讀取保底
+  // 建立/讀取保底（不傳 max_draws，吃 DB default）
   await ensureCounter();
   await refreshUIFromCounter();
 
   // 綁定
   bindUI();
+
+  // 管理端可能改 max_draws，定期重抓
+  setInterval(refreshUIFromCounter, 15000);
 })();
 
 /* ==============================
-   Counter
+   Counter（完全吃資料庫值）
 ============================== */
 async function ensureCounter(){
-  const { data, error } = await G('counters').select('*').eq('player_id', user.id).single();
+  const { data } = await G('counters').select('*').eq('player_id', user.id).single();
   if (!data){
-    await G('counters').insert({ player_id: user.id, total_draws: 0, next_pity: 50, max_draws: 1000 });
+    await G('counters').insert({ player_id: user.id, total_draws: 0, next_pity: 50 });
+    // max_draws 由 DB default 自動填
   }
 }
 async function getCounter(){
-  const { data } = await G('counters').select('total_draws,next_pity,max_draws').eq('player_id', user.id).single();
-  return data || { total_draws: 0, next_pity: 50, max_draws: 1000 };
+  const { data } = await G('counters')
+    .select('total_draws,next_pity,max_draws')
+    .eq('player_id', user.id).single();
+  return data || { total_draws: 0, next_pity: 50, max_draws: 0 };
 }
 async function setCounter(total_draws, next_pity){
   await G('counters').upsert({ player_id: user.id, total_draws, next_pity }, { onConflict: 'player_id' });
@@ -516,25 +552,24 @@ async function setCounter(total_draws, next_pity){
 async function refreshUIFromCounter(){
   const c = await getCounter();
   drawCounterEl.textContent = c.total_draws;
-  const remain = Math.max(0, (c.max_draws ?? 1000) - c.total_draws);
-  btnTen.disabled   = remain < 10 || btnTen._forceDisabled === true || isPortrait();
-  btnSingle.disabled= remain < 1  || btnSingle._forceDisabled === true || isPortrait();
+  const remain = Math.max(0, c.max_draws - c.total_draws);
+  btnTen.disabled    = remain < 10 || btnTen._forceDisabled === true || isPortrait();
+  btnSingle.disabled = remain < 1  || btnSingle._forceDisabled === true || isPortrait();
 }
 
 /* ==============================
    Own 增量（穩定 upsert）
 ============================== */
 async function addOwned(rarity, character_id, event_name){
-  // 查現值
-  let q = G('owned_characters')
+  // 查現值（安全：不用 single，避免無資料報錯）
+  const { data: rows } = await G('owned_characters')
     .select('count')
     .eq('player_id', user.id)
     .eq('rarity', rarity)
     .eq('character_id', character_id)
     .eq('event_name', event_name)
-    .maybeSingle?.() ?? G('owned_characters').select('count').limit(1); // 兼容舊版
-  const { data: row } = await q;
-  const prev = row?.count || 0;
+    .limit(1);
+  const prev = rows?.[0]?.count || 0;
 
   await G('owned_characters').upsert({
     player_id: user.id,
@@ -546,11 +581,11 @@ async function addOwned(rarity, character_id, event_name){
 }
 
 /* ==============================
-   抽卡核心
+   抽卡核心（100 顆：金=100、銀=1、其餘白；50 抽保底；完全吃 DB 上限）
 ============================== */
 async function drawOnce(){
   const c = await getCounter();
-  if (c.total_draws >= (c.max_draws ?? 1000)) {
+  if (c.total_draws >= c.max_draws) {
     alert('已達抽卡上限'); await refreshUIFromCounter(); return null;
   }
 
@@ -574,7 +609,8 @@ async function drawOnce(){
       rarity = 'normal'; chosen = pick(pools.normal); event_name = DEFAULT_EVENT;
     }
   }
-  if (!chosen) return null;
+
+  if (!chosen) { alert('對應池子目前沒有資料'); return null; }
 
   await addOwned(rarity, chosen.id, event_name);
   await setCounter(totalNext, nextPity);
@@ -583,7 +619,7 @@ async function drawOnce(){
 
 async function drawTenTimes(){
   const c = await getCounter();
-  const remain = Math.max(0, (c.max_draws ?? 1000) - c.total_draws);
+  const remain = Math.max(0, c.max_draws - c.total_draws);
   if (remain < 10) { alert('剩餘抽數不足 10 抽'); return null; }
 
   const results = [];
@@ -598,18 +634,6 @@ async function drawTenTimes(){
 /* ==============================
    UI：建立球 / 翻牌與節流
 ============================== */
-function resizeAllTexts() {
-  document.querySelectorAll('.gacha-btn').forEach(btn => btn.style.fontSize = (btn.offsetHeight * 0.40) + "px");
-  document.querySelectorAll('.orb-inner').forEach(inner => inner.style.fontSize = (inner.offsetHeight * 0.35) + "px");
-  document.querySelectorAll('.counter-box').forEach(box => box.style.fontSize = (box.offsetHeight * 0.50) + "px");
-  document.querySelectorAll('.backpack-box').forEach(box => box.style.fontSize = (box.offsetHeight * 0.50) + "px");
-  document.querySelectorAll('.backpack-items span').forEach(span => {
-    const h = (span.offsetHeight || 20); span.style.fontSize = (h * 0.80) + "px";
-  });
-}
-window.addEventListener('resize', resizeAllTexts);
-resizeAllTexts();
-
 function createOrb(res, { autoReveal=false, revealDelay=0, big=false } = {}){
   const orb = document.createElement('div');
   orb.className = `gacha-orb orb-${res.rarity}` + (big?' big':'');
@@ -677,7 +701,7 @@ function showResultSingle(res){
 }
 
 /* ==============================
-   背包（每行 3 個，依 ID）
+   背包（每行 3 個，依 ID 排序）
 ============================== */
 function nameFromPools(rarity, character_id, event_name){
   if (rarity === 'normal') return pools.normal.find(x=>x.id===character_id)?.name || `#${character_id}`;
@@ -759,9 +783,9 @@ function bindUI(){
   btnTen.addEventListener('click', async ()=>{
     if (!ensureAuthOrRedirect()) return;
     if (!canDraw || Date.now()<unlockAt) return alert('稍等一下…');
-    // 檢查剩餘抽數
+
     const c = await getCounter();
-    if ((c.max_draws ?? 1000) - c.total_draws < 10) { alert('剩餘抽數不足 10 抽'); return; }
+    if (c.max_draws - c.total_draws < 10) { alert('剩餘抽數不足 10 抽'); return; }
 
     gachaBtns.classList.add('bottom');
     lockButtons(true);
@@ -776,6 +800,8 @@ function bindUI(){
   const obs = new MutationObserver(()=>{ resizeAllTexts(); checkAllRevealed(); });
   obs.observe(resultsContainer, { childList:true, subtree:true });
 }
+
+
 </script>
 
 </body>
