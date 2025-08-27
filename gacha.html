@@ -374,10 +374,9 @@ position: absolute;
     <div class="modal-body" id="info-modal-body"></div>
   </div>
 </div>
-
 <script>
 /* ==============================
-   基本工具
+   小工具
 ============================== */
 function escapeHtml(s){return (s||'').replace(/[&<>"']/g,c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]))}
 function pick(arr){ return arr[Math.floor(Math.random() * arr.length)] }
@@ -394,6 +393,8 @@ function decodeJWT(t){
 const B_URL  = 'https://ogzpfrkwnqqaitytncla.supabase.co';
 const B_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nenBmcmt3bnFxYWl0eXRuY2xhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxODQzNzEsImV4cCI6MjA3MDc2MDM3MX0.Ls83xOXcKIW7FUcavr8_sOs37I18VGFWYNW3sNFRS24';
 const B_TOKEN = localStorage.getItem('gacha_b_jwt');
+const B_TOKEN_EXP = +(localStorage.getItem('gacha_b_jwt_exp') || 0);
+const PLAYER_CENTER = 'https://shierusha.github.io/create-student/player';
 
 let sb, user = null;
 if (B_TOKEN) {
@@ -415,7 +416,7 @@ if (B_TOKEN) {
   user = null;
 }
 
-// 方便：固定用 gacha schema
+// gacha schema 快捷
 const G = (table) => sb.schema('gacha').from(table);
 
 /* ==============================
@@ -444,56 +445,99 @@ resizeAllTexts();
 window.addEventListener("resize", resizeAllTexts);
 
 /* ==============================
-   狀態
+   Token 過期保護
 ============================== */
-let canDraw = true;
-let pools = { normal: [], hidden: [], limited: [] };
+function redirectIfExpired() {
+  // 提前 30 秒判定過期
+  if (B_TOKEN && B_TOKEN_EXP && (Date.now()/1000 > B_TOKEN_EXP - 30)) {
+    alert('登入過期，已返回玩家中心。');
+    location.href = PLAYER_CENTER;
+    return true;
+  }
+  return false;
+}
+function checkApiError(error){
+  if (error && (error.code === '401' || String(error.message||'').includes('JWT'))) {
+    alert('登入過期或未授權，請重新登入。');
+    location.href = PLAYER_CENTER;
+    return true;
+  }
+  return false;
+}
 
 /* ==============================
-   開機：載池、建立/讀取保底、綁事件
+   狀態
+============================== */
+let canDraw = true;                 // 是否允許點擊抽卡
+let pools = { normal: [], hidden: [], limited: [] };
+let remainingDraws = Infinity;      // 剩餘抽數（由 refreshCounter() 更新）
+
+/* ==============================
+   啟動流程
 ============================== */
 (async function boot(){
+  if (redirectIfExpired()) return;
+
   await preloadPools();
 
   if (!user) {
+    // 沒登入：禁用抽卡，但可以看背包（會提示需登入）
     btnSingle.disabled = true;
-    btnTen.disabled = true;
+    btnTen.disabled    = true;
   } else {
-    await ensureCounter();
-    await refreshDrawCount();
+    await ensureCounter();     // 沒有就建 { total_draws:0, next_pity:50, max_draws:1000 }
+    await refreshCounter();    // 抓 total/max，更新剩餘與按鈕狀態
   }
 
   bindUI();
 })();
 
 /* ==============================
-   讀取各池
+   讀取三個池
 ============================== */
 async function preloadPools(){
-  const [{ data: n=[] }, { data: h=[] }, { data: l=[] }] = await Promise.all([
+  const [{ data: n, error: e1 }, { data: h, error: e2 }, { data: l, error: e3 }] = await Promise.all([
     G('normal_characters').select('*').order('id', {ascending:true}),
     G('hidden_characters').select('*').order('id', {ascending:true}),
     G('limited_characters').select('*').order('id', {ascending:true}),
   ]);
-  pools.normal = n; pools.hidden = h; pools.limited = l;
+  if (e1||e2||e3) console.warn('load pools error', e1||e2||e3);
+  pools.normal = n || [];
+  pools.hidden = h || [];
+  pools.limited= l || [];
 }
 
 /* ==============================
-   保底計數（counters）
+   保底計數 & 上限
 ============================== */
 async function ensureCounter(){
-  const { data: rows } = await G('counters').select('*').eq('player_id', user.id).limit(1);
-  if (!rows || !rows.length) {
-    await G('counters').insert({ player_id: user.id, total_draws: 0, next_pity: 50 });
+  const { data, error } = await G('counters').select('player_id').eq('player_id', user.id).limit(1);
+  if (checkApiError(error)) return;
+  if (!data || !data.length) {
+    const { error: insErr } = await G('counters').insert({ player_id: user.id, total_draws: 0, next_pity: 50, max_draws: 1000 });
+    if (checkApiError(insErr)) return;
   }
 }
-async function refreshDrawCount(){
-  const { data: rows } = await G('counters').select('total_draws').eq('player_id', user.id).limit(1);
-  drawCounterEl.textContent = rows?.[0]?.total_draws ?? 0;
+
+async function refreshCounter(){
+  const { data: row, error } = await G('counters')
+    .select('total_draws, max_draws')
+    .eq('player_id', user.id)
+    .single();
+  if (checkApiError(error)) return;
+  const total = row?.total_draws ?? 0;
+  const max   = row?.max_draws ?? 1000;
+  remainingDraws = Math.max(0, max - total);
+
+  drawCounterEl.textContent = total;
+
+  // 依剩餘抽數控管按鈕
+  btnSingle.disabled = remainingDraws < 1;
+  btnTen.disabled    = remainingDraws < 10;
 }
 
 /* ==============================
-   增加持有（owned_characters）
+   增加持有（Upsert）
 ============================== */
 async function addOwned(rarity, event_name, character_id){
   let q = G('owned_characters')
@@ -503,62 +547,78 @@ async function addOwned(rarity, event_name, character_id){
     .eq('character_id', character_id);
   event_name == null ? q = q.is('event_name', null) : q = q.eq('event_name', event_name);
 
-  const { data: rows } = await q.limit(1);
+  const { data: rows, error: qErr } = await q.limit(1);
+  if (checkApiError(qErr)) throw qErr;
   const prev = rows?.[0]?.count || 0;
 
-  await G('owned_characters').upsert({
+  const { error: upErr } = await G('owned_characters').upsert({
     player_id: user.id,
     rarity,
     event_name,
     character_id,
     count: prev + 1
   }, { onConflict: 'player_id,rarity,event_name,character_id' });
+  if (checkApiError(upErr)) throw upErr;
 }
 
 /* ==============================
-   單抽（100顆：1=銀、100=金，其餘白；每 50 保底金）
+   單抽（100 顆：1=銀、100=金，其餘白；每 50 抽保底）
 ============================== */
 async function drawOnce(){
-  const { data: cntRows } = await G('counters').select('*').eq('player_id', user.id).limit(1);
-  const counter  = cntRows?.[0] || { total_draws: 0, next_pity: 50 };
+  if (redirectIfExpired()) throw new Error('TOKEN_EXPIRED');
+  if (remainingDraws < 1) throw new Error('NO_QUOTA');
 
-  let totalNext = counter.total_draws + 1;
-  let nextPity  = counter.next_pity;
+  const { data: cntRows, error: cErr } = await G('counters')
+    .select('*')
+    .eq('player_id', user.id)
+    .limit(1);
+  if (checkApiError(cErr)) throw cErr;
+
+  const counter  = cntRows?.[0] || { total_draws: 0, next_pity: 50, max_draws: 1000 };
+  const nextCount= counter.total_draws + 1;
+  const maxDraws = counter.max_draws ?? 1000;
+
+  if (nextCount > maxDraws) throw new Error('OVER_LIMIT');
 
   let rarity, chosen, event_name = null;
 
-  if (totalNext === nextPity) {
+  if (nextCount === counter.next_pity) {
     // 保底：金
     rarity = 'limited';
     chosen = pick(pools.limited);
     event_name = chosen.event_name;
-    nextPity += 50;
   } else {
+    // 1~100：1 銀、100 金、其餘白
     const r = Math.floor(Math.random() * 100) + 1;
     if (r === 1) {
-      rarity = 'hidden';
-      chosen = pick(pools.hidden);
+      rarity = 'hidden';  chosen = pick(pools.hidden);
     } else if (r === 100) {
-      rarity = 'limited';
-      chosen = pick(pools.limited);
-      event_name = chosen.event_name;
+      rarity = 'limited'; chosen = pick(pools.limited); event_name = chosen.event_name;
     } else {
-      rarity = 'normal';
-      chosen = pick(pools.normal);
+      rarity = 'normal';  chosen = pick(pools.normal);
     }
   }
 
-  // 寫入背包
+  // 背包 +1
   await addOwned(rarity, event_name, chosen.id);
 
-  // 更新保底計數
-  await G('counters').upsert({
+  // 更新保底 / 抽數（DB 端若有 trigger 會在此擋住超抽）
+  const { error: upErr } = await G('counters').upsert({
     player_id: user.id,
-    total_draws: totalNext,
-    next_pity: nextPity
+    total_draws: nextCount,
+    next_pity:  (nextCount === counter.next_pity) ? counter.next_pity + 50 : counter.next_pity,
+    max_draws:  maxDraws
   });
+  if (upErr) {
+    if (checkApiError(upErr)) throw upErr;
+    alert('抽卡失敗，請稍後再試');
+    throw upErr;
+  }
 
-  return { rarity, name: chosen.name, id: chosen.id, event_name, totalAfter: totalNext };
+  // 同步前端剩餘
+  remainingDraws = Math.max(0, maxDraws - nextCount);
+
+  return { rarity, name: chosen.name, id: chosen.id, event_name, totalAfter: nextCount };
 }
 
 /* ==============================
@@ -570,17 +630,26 @@ async function drawTenTimes(){
     const r = await drawOnce();
     results.push({ rarity: r.rarity, name: r.name });
   }
-  await refreshDrawCount();
+  await refreshCounter();
   return results;
 }
 
 /* ==============================
-   UI：抽球與顯示
+   UI：球 & 顯示（含 0.5s 解鎖）
 ============================== */
-function checkAllRevealed() {
+function allRevealed(){
   const orbs = resultsContainer.querySelectorAll(".gacha-orb");
-  const allRevealed = [...orbs].every(o => o.classList.contains("revealed"));
-  if (allRevealed) canDraw = true;
+  return [...orbs].every(o => o.classList.contains("revealed"));
+}
+function tryUnlockAfterDelay(){
+  if (allRevealed()) {
+    setTimeout(() => {
+      canDraw = true;                     // 0.5 秒後才允許下一次抽
+      // 依剩餘抽數再控管按鈕狀態
+      btnSingle.disabled = remainingDraws < 1;
+      btnTen.disabled    = remainingDraws < 10;
+    }, 500);
+  }
 }
 function createOrb(res, options = {}) {
   const { autoReveal = false, revealDelay = 0, big = false } = options;
@@ -597,7 +666,7 @@ function createOrb(res, options = {}) {
       inner.textContent = res.name;
       orb.classList.add("revealed");
       resizeAllTexts();
-      checkAllRevealed();
+      tryUnlockAfterDelay();
     }, revealDelay);
   } else {
     orb.addEventListener("click", () => {
@@ -605,7 +674,7 @@ function createOrb(res, options = {}) {
         inner.textContent = res.name;
         orb.classList.add("revealed");
         resizeAllTexts();
-        checkAllRevealed();
+        tryUnlockAfterDelay();
       }
     });
   }
@@ -627,10 +696,12 @@ function showResultsTen(results) {
       const orb = createOrb(res, { autoReveal: isWhite, revealDelay: index * 200 });
       rowDiv.appendChild(orb);
     });
-
     resultsContainer.appendChild(rowDiv);
   }
   resizeAllTexts();
+
+  // 預防萬一：最後再補一次延遲檢查解鎖
+  setTimeout(tryUnlockAfterDelay, 500);
 }
 function showResultSingle(res) {
   canDraw = false;
@@ -647,11 +718,15 @@ function showResultSingle(res) {
   resultsContainer.appendChild(rowDiv);
 
   resizeAllTexts();
-  if (isWhite) setTimeout(() => { canDraw = true; }, 10);
+
+  if (isWhite) {
+    // 單抽白球：自動翻 → 再等 0.5s 解鎖
+    setTimeout(tryUnlockAfterDelay, 10);
+  }
 }
 
 /* ==============================
-   背包（讀 owned_characters）
+   背包（需全部翻開；每行 3 個；依 ID 排序；顯示玩家名）
 ============================== */
 function nameFromPools(rarity, character_id, event_name){
   if (rarity === 'normal') return pools.normal.find(x=>x.id===character_id)?.name || `#${character_id}`;
@@ -659,7 +734,21 @@ function nameFromPools(rarity, character_id, event_name){
   const hit = pools.limited.find(x=>x.id===character_id && x.event_name===event_name) || pools.limited.find(x=>x.id===character_id);
   return hit ? hit.name : `#${character_id}`;
 }
+function joinByRows(arr, rowLen=3) {
+  const lines = [];
+  for(let i=0; i<arr.length; i+=rowLen){
+    lines.push(arr.slice(i, i+rowLen).map(x=>x.html).join('、 '));
+  }
+  return lines.join('<br>');
+}
 async function openBackpack(){
+  // 有未翻開的卡 → 禁止開背包
+  const orbs = resultsContainer.querySelectorAll(".gacha-orb");
+  if ([...orbs].some(o => !o.classList.contains("revealed"))) {
+    alert("請先翻開所有扭蛋後才能打開背包！");
+    return;
+  }
+
   if (!user) {
     infoTitle.textContent = '背包（需登入才會顯示資料）';
     infoBody.innerHTML = '<div class="backpack-items">請先登入圖書館專案。</div>';
@@ -667,27 +756,39 @@ async function openBackpack(){
     resizeAllTexts();
     return;
   }
-  infoTitle.textContent = '我的背包';
 
-  const { data: rows=[] } = await G('owned_characters')
+  // 嘗試抓玩家名稱（public.players），若沒有就顯示「我的背包」
+  let ownerName = '我的';
+  try {
+    const { data: playerRow } = await sb.from('players').select('username').eq('player_id', user.id).single();
+    if (playerRow?.username) ownerName = `${playerRow.username} 的`;
+  } catch(_) {}
+  infoTitle.textContent = `${ownerName}背包`;
+
+  const { data: rows=[], error } = await G('owned_characters')
     .select('rarity,event_name,character_id,count')
     .eq('player_id', user.id)
     .order('rarity', {ascending:true})
     .order('character_id', {ascending:true});
+  if (checkApiError(error)) return;
 
   const limited = [], hidden = [], normal = [];
   rows.forEach(r => {
     const nm = nameFromPools(r.rarity, r.character_id, r.event_name);
     const line = `${escapeHtml(nm)} × <span>${r.count}</span>`;
-    if (r.rarity === 'limited') limited.push(line);
-    else if (r.rarity === 'hidden') hidden.push(line);
-    else normal.push(line);
+    if (r.rarity === 'limited')   limited.push({ id: r.character_id, html: line });
+    else if (r.rarity === 'hidden') hidden.push({ id: r.character_id, html: line });
+    else normal.push({ id: r.character_id, html: line });
   });
 
+  // 依 ID 排序
+  const byId = a=>a.sort((x,y)=>(x.id??0)-(y.id??0));
+  byId(limited); byId(hidden); byId(normal);
+
   let html = "";
-  if (limited.length) html += `<div class="backpack-section"><h3>活動限定饅頭：</h3><div class="backpack-items">${limited.join("、 ")}</div></div>`;
-  if (hidden.length)  html += `<div class="backpack-section"><h3>隱藏饅頭：</h3><div class="backpack-items">${hidden.join("、 ")}</div></div>`;
-  if (normal.length)  html += `<div class="backpack-section"><h3>普通饅頭：</h3><div class="backpack-items">${normal.join("、 ")}</div></div>`;
+  if (limited.length) html += `<div class="backpack-section"><h3>活動限定饅頭：</h3><div class="backpack-items">${joinByRows(limited)}</div></div>`;
+  if (hidden.length)  html += `<div class="backpack-section"><h3>隱藏饅頭：</h3><div class="backpack-items">${joinByRows(hidden)}</div></div>`;
+  if (normal.length)  html += `<div class="backpack-section"><h3>普通饅頭：</h3><div class="backpack-items">${joinByRows(normal)}</div></div>`;
   if (!html) html = '<div class="backpack-items">目前沒有任何饅頭</div>';
 
   infoBody.innerHTML = html;
@@ -698,34 +799,54 @@ infoModal.addEventListener("click", () => infoModal.style.display = "none");
 infoModal.querySelector(".modal-content").addEventListener("click", e => e.stopPropagation());
 
 /* ==============================
-   綁定事件
+   綁定事件（含剩餘抽數與 0.5s 解鎖）
 ============================== */
 function bindUI(){
   document.getElementById('btn-backpack').addEventListener('click', openBackpack);
 
   btnTen.addEventListener("click", async () => {
     if (!user) return alert('請先登入才能抽卡');
-    if (!canDraw) return alert("請先翻開所有扭蛋！");
+    if (redirectIfExpired()) return;
+    if (!canDraw) return alert("請先翻開所有扭蛋（或待動畫完成）！");
+    if (remainingDraws < 10) return alert(`剩餘 ${remainingDraws} 抽，無法十連。`);
+
+    canDraw = false;
     gachaBtns.classList.add("bottom");
-    const results = await drawTenTimes();
-    showResultsTen(results);
+
+    try {
+      const results = await drawTenTimes();
+      showResultsTen(results);
+    } catch(e) {
+      console.error(e);
+      await refreshCounter();
+      canDraw = true; // 出錯解除鎖定
+    }
   });
 
   btnSingle.addEventListener("click", async () => {
     if (!user) return alert('請先登入才能抽卡');
-    if (!canDraw) return alert("請先翻開扭蛋！");
+    if (redirectIfExpired()) return;
+    if (!canDraw) return alert("請先翻開扭蛋（或待動畫完成）！");
+    if (remainingDraws < 1) return alert("已達抽卡上限，無法再抽。");
+
+    canDraw = false;
     gachaBtns.classList.add("bottom");
-    const r = await drawOnce();
-    await refreshDrawCount();
-    showResultSingle({ rarity: r.rarity, name: r.name });
+
+    try {
+      const r = await drawOnce();
+      await refreshCounter();
+      showResultSingle({ rarity: r.rarity, name: r.name });
+    } catch(e) {
+      console.error(e);
+      await refreshCounter();
+      canDraw = true; // 出錯解除鎖定
+    }
   });
 
+  // 監聽 DOM 變動，確保動畫期間保持鎖定
   const unlockObserver = new MutationObserver(() => {
     resizeAllTexts();
-    const orbs = resultsContainer.querySelectorAll(".gacha-orb");
-    if (orbs.length === 0) return;
-    const allRevealed = [...orbs].every(o => o.classList.contains("revealed"));
-    if (allRevealed) canDraw = true;
+    // 不在這裡解鎖，改由 tryUnlockAfterDelay() 控制 0.5s
   });
   unlockObserver.observe(resultsContainer, { childList: true, subtree: true });
 }
