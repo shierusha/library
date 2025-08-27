@@ -260,8 +260,8 @@ body.dark-bg::before {
 }
 .loader-cat{
   position:absolute; 
-  top:-35%; left:0%;
-  transform: translate(-50%, -50%);
+  top:0; left:0;
+  transform: translate(-50%, -90%); /* 露出在上方 */
   height: 70%;            /* 貓大小 = 進度條高的 90% */
   aspect-ratio: 1 / 1;    /* 不變形 */
   filter: drop-shadow(0 3px 8px #000c);
@@ -290,10 +290,9 @@ body.dark-bg::before {
     <!-- 轉蛋讀條 Loader（百分比定位/尺寸） -->
     <div id="gacha-loader" class="gacha-loader">
       <div class="loader-box">
+          <img class="loader-cat" id="loader-cat" src="https://shierusha.github.io/library/img/cat.png" alt="cat">
         <div class="loader-bar">
           <div class="loader-fill" id="loader-fill"></div>
-          <img class="loader-cat" id="loader-cat"
-               src="https://shierusha.github.io/library/img/cat.png" alt="cat">
         </div>
         <div class="loader-text auto-resize" id="loader-text">Roro爆肝中……</div>
       </div>
