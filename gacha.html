@@ -493,7 +493,7 @@ ensureAuthOrRedirect();
 /* ==============================
    工具 & 狀態
 ============================== */
-const G = (t) => sb.from(`gacha.${t}`);
+const G = (t) => sb.schema('gacha').from(t);
 const escapeHtml = s => (s||'').replace(/[&<>"']/g,c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pick = arr => arr[Math.floor(Math.random()*arr.length)];
 let pools = { normal: [], hidden: [], limited: [] };
