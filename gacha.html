@@ -602,6 +602,14 @@ const Loader = {
   hide(){ loaderEl?.classList.remove('show'); }
 };
 
+
+
+
+function clearResults(){
+  resultsContainer.classList.remove('single'); // 確保不是 single 佈局
+  resultsContainer.innerHTML = '';             // 清空球
+}
+
 /* ==============================
    UI：建立球 / 翻牌與節流
 ============================== */
@@ -739,52 +747,72 @@ infoModal?.querySelector('.modal-content')?.addEventListener('click', e=> e.stop
 function bindUI(){
   btnBag?.addEventListener('click', openBackpack);
 
-  btnSingle?.addEventListener('click', async ()=>{
-    if (!ensureAuthOrRedirect()) return;
-    if (!canDraw || Date.now()<unlockAt) return alert('稍等一下…');
-    gachaBtns?.classList.add('bottom');
-    lockButtons(true);
+btnSingle?.addEventListener('click', async ()=>{
+  if (!ensureAuthOrRedirect()) return;
+  if (!canDraw || Date.now() < unlockAt) return alert('稍等一下…');
 
-    // Loader：單抽 = 1 步
-    Loader.show('Roro爆肝中……');
-    await sleep(80); // 確保畫面渲染
+  gachaBtns?.classList.add('bottom');
+  lockButtons(true);
 
-    const r = await drawOnce();           // ✅ 先抽
-    if (r) await Loader.step(1,1);        // ✅ 再前進到 100%
+  // 先清空畫面，再顯示跑條
+  clearResults();
+  Loader.show('Roro爆肝中……');
+
+  // 真抽
+  const r = await drawOnce();
+  if (!r) {
     Loader.hide();
-
-    if (!r) { unlockButtons(); return; }
     await refreshUIFromCounter();
-    showResultSingle({ rarity:r.rarity, name:r.name });
-  });
+    unlockButtons();
+    return;
+  }
 
-  btnTen?.addEventListener('click', async ()=>{
-    if (!ensureAuthOrRedirect()) return;
-    if (!canDraw || Date.now()<unlockAt) return alert('稍等一下…');
+  // 跑條前進到 1/1
+  await Loader.step(1, 1);
+  Loader.hide();
 
-    const c = await getCounter();
-    if (c.max_draws - c.total_draws < 10) { alert('剩餘抽數不足 10 抽'); return; }
+  await refreshUIFromCounter();
+  showResultSingle({ rarity: r.rarity, name: r.name });
+});
 
-    gachaBtns?.classList.add('bottom');
-    lockButtons(true);
 
-    // Loader：十連 = 10 步
-    Loader.show('Roro爆肝中……');
-    await sleep(80);
+btnTen?.addEventListener('click', async ()=>{
+  if (!ensureAuthOrRedirect()) return;
+  if (!canDraw || Date.now() < unlockAt) return alert('稍等一下…');
 
-    const results = [];
-    for (let i=0;i<10;i++){
-      const r = await drawOnce();                 // ✅ 先抽
-      if (!r) break;
-      results.push({ rarity:r.rarity, name:r.name });
-      await Loader.step(i+1, 10);                 // ✅ 再推進到 (i+1)/10
-    }
-    Loader.hide();
+  const c = await getCounter();
+  if (c.max_draws - c.total_draws < 10) {
+    return alert('剩餘抽數不足 10 抽');
+  }
 
-    if (!results.length) { unlockButtons(); return; }
-    await refreshUIFromCounter();
-    showResultsTen(results);
-  });
+  gachaBtns?.classList.add('bottom');
+  lockButtons(true);
+
+  // 先清空畫面，再顯示跑條
+  clearResults();
+  Loader.show('Roro爆肝中……');
+
+  const results = [];
+  for (let i = 0; i < 10; i++) {
+    const r = await drawOnce();
+    if (!r) break;
+    results.push({ rarity: r.rarity, name: r.name });
+
+    // 每抽到一顆，就把跑條往前推一格
+    await Loader.step(i + 1, 10);
+  }
+
+  Loader.hide();
+
+  if (!results.length) {
+    unlockButtons();
+    return;
+  }
+
+  await refreshUIFromCounter();
+  showResultsTen(results);
+});
+
 
   const obs = new MutationObserver(()=>{ resizeAllTexts(); checkAllRevealed(); });
   obs.observe(resultsContainer, { childList:true, subtree:true });
