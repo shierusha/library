@@ -388,25 +388,26 @@ position: absolute;
 
 <script>
 /* ==============================
-   小工具（保留）
+   小工具
 ============================== */
-const $  = (s,r=document)=>r.querySelector(s);
-const $$ = (s,r=document)=>[...r.querySelectorAll(s)];
-const sleep = (ms)=>new Promise(res=>setTimeout(res,ms));
+const $  = (s, r=document) => r.querySelector(s);
+const $$ = (s, r=document) => [...r.querySelectorAll(s)];
+const sleep = (ms) => new Promise(res => setTimeout(res, ms));
 
 /* ==============================
    Supabase（圖書館 B 專案）
 ============================== */
 const B_URL  = 'https://ogzpfrkwnqqaitytncla.supabase.co';
 const B_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nenBmcmt3bnFxYWl0eXRuY2xhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxODQzNzEsImV4cCI6MjA3MDc2MDM3MX0.Ls83xOXcKIW7FUcavr8_sOs37I18VGFWYNW3sNFRS24';
-const B_TOKEN    = localStorage.getItem('gacha_b_jwt') || '';
-const B_TOKEN_EXP= Number(localStorage.getItem('gacha_b_jwt_exp') || 0);
-const PLAYER_NAME= localStorage.getItem('gacha_player_name') || '我的';
+
+const B_TOKEN     = localStorage.getItem('gacha_b_jwt') || '';
+const B_TOKEN_EXP = Number(localStorage.getItem('gacha_b_jwt_exp') || 0);
+const PLAYER_NAME = localStorage.getItem('gacha_player_name') || '我的';
 const REDIRECT_PLAYER = 'https://shierusha.github.io/create-student/player';
-const DEFAULT_EVENT   = '常駐';
+const DEFAULT_EVENT   = '常駐'; // normal/hidden 的 event_name
 
 function decodeJWT(t){
-  if(!t) return null;
+  if (!t) return null;
   const pad = s => s + '='.repeat((4 - s.length % 4) % 4);
   try { return JSON.parse(atob(pad(t.split('.')[1]).replace(/-/g,'+').replace(/_/g,'/'))); }
   catch { return null; }
@@ -418,7 +419,8 @@ let sb = window.supabase.createClient(B_URL, B_ANON, {
   global: { headers: B_TOKEN ? { Authorization: `Bearer ${B_TOKEN}` } : {} }
 });
 if (B_TOKEN) sb.realtime.setAuth(B_TOKEN);
-// 正確指定 gacha schema（避免 /rest/v1/gacha.xxx 的 404）
+
+// ✅ 正確指定 gacha schema 的 helper（避免 /rest/v1/gacha.xxx 造成 404）
 const G = (t) => sb.schema('gacha').from(t);
 
 /* ==============================
@@ -436,17 +438,20 @@ const drawCounterEl = $('#draw-count');
 const orientationModal = $('#orientation-modal');
 
 /* ==============================
-   文字自適應（原本的寫法）
+   文字自適應（保留你的寫法）
 ============================== */
 function resizeAllTexts() {
   $$('.gacha-btn').forEach(btn => { btn.style.fontSize = (btn.offsetHeight * 0.40) + "px"; });
   $$('.orb-inner').forEach(inner => { inner.style.fontSize = (inner.offsetHeight * 0.35) + "px"; });
   $$('.counter-box').forEach(box => { box.style.fontSize = (box.offsetHeight * 0.50) + "px"; });
   $$('.backpack-box').forEach(box => { box.style.fontSize = (box.offsetHeight * 0.50) + "px"; });
-  $$('.backpack-items span').forEach(span => { const h = (span.offsetHeight || 20); span.style.fontSize = (h * 0.80) + "px"; });
+  $$('.backpack-items span').forEach(span => {
+    const h = (span.offsetHeight || 20);
+    span.style.fontSize = (h * 0.80) + "px";
+  });
 }
 resizeAllTexts();
-window.addEventListener("resize", resizeAllTexts);
+window.addEventListener('resize', resizeAllTexts);
 
 /* ==============================
    強制橫向（不可手動關閉）
@@ -471,7 +476,7 @@ if (orientationModal) orientationModal.addEventListener('click', e => e.stopProp
 ============================== */
 function ensureAuthOrRedirect(){
   const now = Math.floor(Date.now()/1000);
-  if (!user || !B_TOKEN || (B_TOKEN_EXP && now >= B_TOKEN_EXP)){
+  if (!user || !B_TOKEN || (B_TOKEN_EXP && now >= B_TOKEN_EXP)) {
     alert('登入逾期，將返回玩家中心。');
     location.href = REDIRECT_PLAYER;
     return false;
@@ -488,8 +493,8 @@ const escapeHtml = s => (s||'').replace(/[&<>"']/g,c=>({ '&':'&amp;','<':'&lt;',
 const pick = arr => arr[Math.floor(Math.random()*arr.length)];
 let pools = { normal: [], hidden: [], limited: [] };
 
-let canDraw = true;   // 要翻完才會再抽
-let unlockAt = 0;     // 抽完後 0.5 秒節流
+let canDraw = true; // 翻完才可再抽
+let unlockAt = 0;   // 節流時間（抽完 0.5 秒）
 function lockButtons(force=true){ [btnSingle,btnTen].forEach(b=>{ if(!b) return; b._forceDisabled = force; enforceLandscape(); }); }
 function unlockButtons(){ [btnSingle,btnTen].forEach(b=>{ if(!b) return; b._forceDisabled = false; enforceLandscape(); }); }
 
@@ -499,31 +504,31 @@ function unlockButtons(){ [btnSingle,btnTen].forEach(b=>{ if(!b) return; b._forc
 (async function boot(){
   if (!ensureAuthOrRedirect()) return;
 
-  // 池
+  // 一次載三個池
   const [n, h, l] = await Promise.all([
     G('normal_characters').select('*').order('id',{ascending:true}),
     G('hidden_characters').select('*').order('id',{ascending:true}),
     G('limited_characters').select('*').order('id',{ascending:true}),
   ]);
-  pools.normal  = Array.isArray(n.data)? n.data : [];
-  pools.hidden  = Array.isArray(h.data)? h.data : [];
-  pools.limited = Array.isArray(l.data)? l.data : [];
+  pools.normal  = Array.isArray(n.data) ? n.data : [];
+  pools.hidden  = Array.isArray(h.data) ? h.data : [];
+  pools.limited = Array.isArray(l.data) ? l.data : [];
 
-  // Counter
   await ensureCounter();
   await refreshUIFromCounter();
 
   bindUI();
-  setInterval(refreshUIFromCounter, 15000); // 管理端改 max_draws 時自動更新
+  // 管理端若改 max_draws，前端 15 秒同步一次
+  setInterval(refreshUIFromCounter, 15000);
 })();
 
 /* ==============================
-   Counter（吃資料庫值）
+   Counter（吃資料庫 max_draws）
 ============================== */
 async function ensureCounter(){
   const { data } = await G('counters').select('*').eq('player_id', user.id).single();
   if (!data){
-    await G('counters').insert({ player_id: user.id, total_draws: 0, next_pity: 50 }); // max_draws 走 DB default
+    await G('counters').insert({ player_id: user.id, total_draws: 0, next_pity: 50 }); // max_draws 走 DB 預設
   }
 }
 async function getCounter(){
@@ -544,9 +549,10 @@ async function refreshUIFromCounter(){
 }
 
 /* ==============================
-   Own 增量（穩定 upsert）
+   Owned 變更（穩定 upsert）
 ============================== */
 async function addOwned(rarity, character_id, event_name){
+  // 先查現有 count（避免 race）
   const { data: rows } = await G('owned_characters')
     .select('count')
     .eq('player_id', user.id)
@@ -566,7 +572,10 @@ async function addOwned(rarity, character_id, event_name){
 }
 
 /* ==============================
-   抽卡核心（100 顆：金=100、銀=1；50 抽保底；上限吃 DB）
+   抽卡核心
+   - 100 顆：1=銀、100=金、其餘白
+   - 每 50 抽保底金
+   - 上限吃 DB 的 max_draws
 ============================== */
 async function drawOnce(){
   const c = await getCounter();
@@ -586,15 +595,16 @@ async function drawOnce(){
     nextPity += 50;
   } else {
     const r = Math.floor(Math.random()*100) + 1; // 1..100
-    if (r === 1)      { rarity = 'hidden';  chosen = pick(pools.hidden);  event_name = DEFAULT_EVENT; }
+    if (r === 1)       { rarity = 'hidden';  chosen = pick(pools.hidden);  event_name = DEFAULT_EVENT; }
     else if (r === 100){ rarity = 'limited'; chosen = pick(pools.limited); event_name = chosen?.event_name || '活動'; }
-    else              { rarity = 'normal';  chosen = pick(pools.normal);  event_name = DEFAULT_EVENT; }
+    else               { rarity = 'normal';  chosen = pick(pools.normal);  event_name = DEFAULT_EVENT; }
   }
 
   if (!chosen) { alert('對應池子沒有資料'); return null; }
 
   await addOwned(rarity, chosen.id, event_name);
   await setCounter(totalNext, nextPity);
+
   return { rarity, name: chosen.name, id: chosen.id, event_name, totalAfter: totalNext };
 }
 
@@ -680,7 +690,7 @@ function showResultSingle(res){
 }
 
 /* ==============================
-   背包（每行 3 個，依 ID 排序；需翻完才可開）
+   背包（需翻完；每行 3 個；依 ID 排序；合併重複）
 ============================== */
 function nameFromPools(rarity, character_id, event_name){
   if (rarity === 'normal') return pools.normal.find(x=>x.id===character_id)?.name || `#${character_id}`;
@@ -700,10 +710,11 @@ async function openBackpack(){
   const { data, error } = await G('owned_characters')
     .select('rarity,event_name,character_id,count')
     .eq('player_id', user.id);
-  if (error) { console.error('[owned_characters] error:', error); alert('讀取背包失敗'); return; }
-  const rows = Array.isArray(data) ? data : [];
 
-  // 合併（保險）
+  if (error) { console.error('[owned_characters] query error:', error); alert('讀取背包失敗'); return; }
+  const rows = Array.isArray(data) ? data : []; // 防呆
+
+  // 合併同 key
   const byKey = new Map();
   for (const r of rows){
     const key = `${r.rarity}|${r.event_name}|${r.character_id}`;
@@ -714,14 +725,14 @@ async function openBackpack(){
 
   // 排序 & 分組
   const limited=[], hidden=[], normal=[];
+  const byId = a=>a.sort((x,y)=>(x.id??0)-(y.id??0));
   merged.forEach(r=>{
     const nm = nameFromPools(r.rarity, r.character_id, r.event_name);
     const item = { id:r.character_id, html:`${escapeHtml(nm)} × <span>${r.count}</span>` };
-    if (r.rarity==='limited') limited.push(item);
-    else if (r.rarity==='hidden') hidden.push(item);
-    else normal.push(item);
+    if (r.rarity==='limited')      limited.push(item);
+    else if (r.rarity==='hidden')  hidden.push(item);
+    else                           normal.push(item);
   });
-  const byId = a=>a.sort((x,y)=>(x.id??0)-(y.id??0));
   byId(limited); byId(hidden); byId(normal);
 
   const joinRows = (arr, len=3)=>{
@@ -730,9 +741,9 @@ async function openBackpack(){
   };
 
   let html='';
-  if (limited.length) html += `<div class="backpack-section"><h3>活動限定饅頭：</h3><div class="backpack-items">${joinRows(limited)}</div></div>`;
-  if (hidden.length)  html += `<div class="backpack-section"><h3>隱藏饅頭：</h3><div class="backpack-items">${joinRows(hidden)}</div></div>`;
-  if (normal.length)  html += `<div class="backpack-section"><h3>普通饅頭：</h3><div class="backpack-items">${joinRows(normal)}</div></div>`;
+  if (limited.length) html += `<div class="backpack-section"><h3>活動限定饅頭：</h3><div class="backpack-items">${joinRows(limited,3)}</div></div>`;
+  if (hidden.length)  html += `<div class="backpack-section"><h3>隱藏饅頭：</h3><div class="backpack-items">${joinRows(hidden,3)}</div></div>`;
+  if (normal.length)  html += `<div class="backpack-section"><h3>普通饅頭：</h3><div class="backpack-items">${joinRows(normal,3)}</div></div>`;
   if (!html) html = '<div class="backpack-items">目前沒有任何饅頭</div>';
 
   infoBody.innerHTML = html;
