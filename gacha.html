@@ -359,6 +359,29 @@ const sleep = (ms) => new Promise(res => setTimeout(res, ms));
 const escapeHtml = s => (s||'').replace(/[&<>"']/g,c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pick = arr => arr[Math.floor(Math.random()*arr.length)];
 
+
+async function sendGachaWebhook(rarity, itemName) {
+  if (rarity !== 'limited' && rarity !== 'hidden') return; // 只發銀/金
+  try {
+    const url = `${B_URL}/functions/v1/gacha-notify`;
+    await fetch(url, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        ...(B_TOKEN ? { Authorization: `Bearer ${B_TOKEN}` } : {})
+      },
+      body: JSON.stringify({
+        rarity,
+        playerName: PLAYER_NAME || '玩家',
+        itemName
+      })
+    });
+  } catch (err) {
+    console.warn('[gacha-notify] failed:', err);
+  }
+}
+
+
 /* ==============================
    Supabase（圖書館 B 專案）
 ============================== */
@@ -639,6 +662,12 @@ function createOrb(res, { autoReveal=false, revealDelay=0, big=false } = {}){
     if (orb.classList.contains('revealed')) return;
     inner.textContent = res.name;
     orb.classList.add('revealed');
+
+    // ★ 只在銀/金被玩家翻開時通知（白球不送）
+    if (res.rarity === 'limited' || res.rarity === 'hidden') {
+      sendGachaWebhook(res.rarity, res.name);
+    }
+
     resizeAllTexts();
     checkAllRevealed();
   };
