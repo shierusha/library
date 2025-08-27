@@ -282,7 +282,6 @@ body.dark-bg::before {
 </style>
 </head>
 <body class="dark-bg">
-<body class="dark-bg">
   <!-- 16:9 主要容器 -->
   <div class="container-16-9">
     <!-- 抽卡結果容器（單抽/十連共用） -->
@@ -562,7 +561,7 @@ async function drawOnce(){
   if (!chosen) { alert('對應池子沒有資料'); return null; }
 
   await addOwned(rarity, chosen.id, event_name);
-  await setCounter(totalNext, next_pity = nextPity);
+await setCounter(totalNext, nextPity);
 
   return { rarity, name: chosen.name, id: chosen.id, event_name, totalAfter: totalNext };
 }
