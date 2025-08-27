@@ -459,8 +459,15 @@ function lockButtons(force = true) {
     b._forceDisabled = force;
   });
   enforceLandscape();
-}function unlockButtons(){ [btnSingle,btnTen].forEach(b=>{ if(!b) return; b._forceDisabled = false; enforceLandscape(); }); }
-
+}
+  
+function unlockButtons() {
+  [btnSingle, btnTen, btnBag].forEach(b => {
+    if (!b) return;
+    b._forceDisabled = false;
+  });
+  enforceLandscape();
+}
 /* ==============================
    初始化
 ============================== */
