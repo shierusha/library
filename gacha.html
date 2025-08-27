@@ -453,8 +453,13 @@ ensureAuthOrRedirect();
 let pools = { normal: [], hidden: [], limited: [] };
 let canDraw = true;   // 翻完才可再抽
 let unlockAt = 0;     // 抽完 0.5 秒節流
-function lockButtons(force=true){ [btnSingle,btnTen].forEach(b=>{ if(!b) return; b._forceDisabled = force; enforceLandscape(); }); }
-function unlockButtons(){ [btnSingle,btnTen].forEach(b=>{ if(!b) return; b._forceDisabled = false; enforceLandscape(); }); }
+function lockButtons(force = true) {
+  [btnSingle, btnTen, btnBag].forEach(b => {
+    if (!b) return;
+    b._forceDisabled = force;
+  });
+  enforceLandscape();
+}function unlockButtons(){ [btnSingle,btnTen].forEach(b=>{ if(!b) return; b._forceDisabled = false; enforceLandscape(); }); }
 
 /* ==============================
    初始化
