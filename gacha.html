@@ -757,20 +757,16 @@ async function openBackpack(){
     return;
   }
 
-  // 嘗試抓玩家名稱（public.players），若沒有就顯示「我的背包」
-  let ownerName = '我的';
-  try {
-    const { data: playerRow } = await sb.from('players').select('username').eq('player_id', user.id).single();
-    if (playerRow?.username) ownerName = `${playerRow.username} 的`;
-  } catch(_) {}
+  // ★ 方案1：直接用 A 專案提前帶過來的名稱
+  const ownerName = (localStorage.getItem('gacha_player_name') || '我的') + '的';
   infoTitle.textContent = `${ownerName}背包`;
 
-  const { data: rows=[], error } = await G('owned_characters')
+  // （以下照你原本的查 owned_characters → 排序/分組/每行 3 個 → render）
+  const { data: rows=[] } = await G('owned_characters')
     .select('rarity,event_name,character_id,count')
     .eq('player_id', user.id)
     .order('rarity', {ascending:true})
     .order('character_id', {ascending:true});
-  if (checkApiError(error)) return;
 
   const limited = [], hidden = [], normal = [];
   rows.forEach(r => {
@@ -781,9 +777,16 @@ async function openBackpack(){
     else normal.push({ id: r.character_id, html: line });
   });
 
-  // 依 ID 排序
   const byId = a=>a.sort((x,y)=>(x.id??0)-(y.id??0));
   byId(limited); byId(hidden); byId(normal);
+
+  function joinByRows(arr, rowLen=3) {
+    const lines = [];
+    for(let i=0; i<arr.length; i+=rowLen){
+      lines.push(arr.slice(i, i+rowLen).map(x=>x.html).join('、 '));
+    }
+    return lines.join('<br>');
+  }
 
   let html = "";
   if (limited.length) html += `<div class="backpack-section"><h3>活動限定饅頭：</h3><div class="backpack-items">${joinByRows(limited)}</div></div>`;
@@ -795,6 +798,7 @@ async function openBackpack(){
   infoModal.style.display = "flex";
   resizeAllTexts();
 }
+
 infoModal.addEventListener("click", () => infoModal.style.display = "none");
 infoModal.querySelector(".modal-content").addEventListener("click", e => e.stopPropagation());
 
