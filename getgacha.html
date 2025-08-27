@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <title>謝爾夏｜扭蛋持有榜</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css?family=Noto+Sans+TC:400,700&display=swap" rel="stylesheet">
+  <style>
+    body{
+      font-family:'Noto Sans TC',sans-serif;
+      background:url(https://shierusha.github.io/create-student/imgs/citybg.png) center/cover fixed no-repeat;
+      margin:0; padding:2rem;
+    }
+    .container{
+      max-width:1100px; margin:auto; background:#fff; border-radius:16px;
+      box-shadow:0 2px 16px #0001; padding:1.6rem 1.4rem 2rem;
+      backdrop-filter:saturate(140%) blur(2px);
+    }
+    h1{margin:.2rem 0 0; color:#143158; text-align:center; letter-spacing:.04em}
+    .sub{margin:.3rem 0 1.2rem; text-align:center; color:#276191}
+    .hr{height:4px; width:78%; background:#1767a0; margin:.6rem auto 1.6rem; border-radius:2px; opacity:.9}
+    .section-title{
+      margin:.6rem 0 .6rem; font-size:1.2rem; color:#143158; font-weight:700;
+      display:flex; align-items:center; gap:.6rem;
+    }
+    .section-title .tag{background:#1767a0; color:#fff; padding:.2rem .55rem; border-radius:.5rem; font-size:.85rem;}
+    .grid{ display:grid; grid-template-columns: repeat(2, 1fr); gap: 1.2rem 1rem; }
+    @media (max-width:860px){ .grid{grid-template-columns:1fr;} }
+    .card{
+      background:#eef4f5; border-radius:14px;
+      box-shadow:0 2px 10px #0002, 0 0 0 2.5px rgba(33,41,55,.5);
+      padding:1rem .9rem;
+    }
+    .player{
+      font-weight:700; color:#0f2d52; margin-bottom:.5rem; word-break:break-all;
+    }
+    .list{ color:#303a4d; line-height:1.55; white-space:pre-line; }
+    .pill{
+      display:inline-block; background:#212937; color:#fff; border-radius:999px;
+      padding:.18rem .6rem; font-size:.82rem; margin:.2rem .25rem 0 0;
+    }
+    .muted{color:#667; font-size:.95rem}
+    .event-title{margin:1.2rem 0 .5rem; color:#0f2d52; font-weight:800;}
+    .legend{display:flex; flex-wrap:wrap; gap:.3rem .5rem; margin:.2rem 0 1rem}
+    .legend .chip{background:#f0f4ff; border:1px solid #cfe0ff; color:#1e4a79; border-radius:999px; padding:.15rem .55rem; font-size:.8rem}
+    .loading{ text-align:center; color:#143158; padding:1rem 0 .4rem; }
+    .err{ color:#9b0b18; text-align:center; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>全服隱藏／限定持有榜</h1>
+    <div class="sub">純前端查詢 · 依角色編號排序 · 每位玩家一張卡</div>
+    <div class="hr"></div>
+
+    <div id="msg" class="loading">載入中…</div>
+
+    <!-- 隱藏款 -->
+    <div class="section-title"><span class="tag">HIDDEN</span><span>隱藏款</span></div>
+    <div id="hiddenGrid" class="grid"></div>
+
+    <!-- 限定款（依活動分段） -->
+    <div class="section-title" style="margin-top:1.2rem;"><span class="tag">LIMITED</span><span>期間限定</span></div>
+    <div id="limitedWrap"></div>
+  </div>
+
+<script>
+/* ====== Supabase 連線 ====== */
+/* B：圖書館（讀池與 owned_characters） */
+const B = window.supabase.createClient(
+  'https://ogzpfrkwnqqaitytncla.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nenBmcmt3bnFxYWl0eXRuY2xhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxODQzNzEsImV4cCI6MjA3MDc2MDM3MX0.Ls83xOXcKIW7FUcavr8_sOs37I18VGFWYNW3sNFRS24'
+);
+/* A：玩家名稱（RPC：get_player_username） */
+const A = window.supabase.createClient(
+  'https://wfhwhvodgikpducrhgda.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmaHdodm9kZ2lrcGR1Y3JoZ2RhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgwMTAwNjEsImV4cCI6MjA2MzU4NjA2MX0.P6P-x4SxjiR4VdWH6VFgY_ktgMac_OzuI4Bl7HWskz8'
+);
+
+/* ====== 小工具 ====== */
+const $  = (s, r=document)=>r.querySelector(s);
+const $$ = (s, r=document)=>[...r.querySelectorAll(s)];
+const escapeHtml = s => (s||'').replace(/[&<>"']/g,c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+const G = t => B.schema('gacha').from(t);
+
+/* ====== 讀角色池（拿名字、排序用） ====== */
+async function loadPools(){
+  const [{data:h=[]},{data:l=[]}] = await Promise.all([
+    G('hidden_characters').select('id,name').order('id',{ascending:true}),
+    G('limited_characters').select('id,event_name,name').order('id',{ascending:true}),
+  ]);
+  const hiddenNameById = new Map(h.map(x=>[x.id, x.name]));
+  // 限定不分活動名字通常同一個 id 一樣；這裡先做 id->name 映射
+  const limitedNameById = new Map(l.map(x=>[x.id, x.name]));
+  return { hiddenNameById, limitedNameById };
+}
+
+/* ====== 撈全服 owned（只抓 hidden/limited）並彙整 ====== */
+async function loadOwned(){
+  const { data: rows=[] } = await G('owned_characters')
+    .select('player_id,rarity,event_name,character_id,count');
+
+  // 過濾只要 hidden / limited
+  return rows.filter(r => r.rarity === 'hidden' || r.rarity === 'limited');
+}
+
+/* ====== 玩家名稱查詢（A 專案 RPC；避免 RLS） ====== */
+async function fetchNames(playerIds){
+  const uniq = [...new Set(playerIds)];
+  const map = new Map();
+  // 併發但避免太多（這裡一次全開通常也行）
+  await Promise.all(uniq.map(async id=>{
+    try{
+      const { data, error } = await A.rpc('get_player_username', { p_id: id });
+      map.set(id, (data && String(data).trim()) || '玩家');
+    }catch{
+      map.set(id, '玩家');
+    }
+  }));
+  return map;
+}
+
+/* ====== 渲染：隱藏款 ====== */
+function renderHidden({ hiddenByPlayer, nameById, playerNameMap }){
+  const grid = $('#hiddenGrid');
+  grid.innerHTML = '';
+
+  // 依玩家名稱排序
+  const players = [...hiddenByPlayer.keys()].sort((a,b)=>{
+    return (playerNameMap.get(a)||'').localeCompare(playerNameMap.get(b)||'', 'zh-Hant');
+  });
+
+  players.forEach(pid=>{
+    const items = hiddenByPlayer.get(pid) || [];
+    if (!items.length) return;
+
+    // 依角色 id 升冪
+    items.sort((a,b)=>a.character_id - b.character_id);
+
+    const card = document.createElement('div');
+    card.className = 'card';
+
+    const title = document.createElement('div');
+    title.className = 'player';
+    title.textContent = playerNameMap.get(pid) || '玩家';
+    card.appendChild(title);
+
+    const list = document.createElement('div');
+    list.className = 'list';
+    list.innerHTML = items.map(it=>{
+      const nm = nameById.get(it.character_id) || `#${it.character_id}`;
+      return `${escapeHtml(nm)} × ${it.count}`;
+    }).join('\n');
+    card.appendChild(list);
+
+    grid.appendChild(card);
+  });
+
+  if (!players.length) {
+    grid.innerHTML = `<div class="muted">非洲人求拍拍</div>`;
+  }
+}
+
+/* ====== 渲染：限定款（依活動分段） ====== */
+function renderLimited({ limitedByEventThenPlayer, nameById, playerNameMap }){
+  const wrap = $('#limitedWrap');
+  wrap.innerHTML = '';
+
+  const events = [...limitedByEventThenPlayer.keys()].sort((a,b)=>a.localeCompare(b,'zh-Hant'));
+  if (!events.length){
+    wrap.innerHTML = `<div class="muted">無</div>`;
+    return;
+  }
+
+  for (const ev of events){
+    const sectionTitle = document.createElement('div');
+    sectionTitle.className = 'event-title';
+    sectionTitle.textContent = `限定活動：${ev}`;
+    wrap.appendChild(sectionTitle);
+
+    const grid = document.createElement('div');
+    grid.className = 'grid';
+
+    // 依玩家名稱排序
+    const perPlayer = limitedByEventThenPlayer.get(ev) || new Map();
+    const players = [...perPlayer.keys()].sort((a,b)=>{
+      return (playerNameMap.get(a)||'').localeCompare(playerNameMap.get(b)||'', 'zh-Hant');
+    });
+
+    players.forEach(pid=>{
+      const items = perPlayer.get(pid) || [];
+      if (!items.length) return;
+
+      items.sort((a,b)=>a.character_id - b.character_id);
+
+      const card = document.createElement('div');
+      card.className = 'card';
+
+      const title = document.createElement('div');
+      title.className = 'player';
+      title.textContent = playerNameMap.get(pid) || '玩家';
+      card.appendChild(title);
+
+      const list = document.createElement('div');
+      list.className = 'list';
+      list.innerHTML = items.map(it=>{
+        const nm = nameById.get(it.character_id) || `#${it.character_id}`;
+        return `${escapeHtml(nm)} × ${it.count}`;
+      }).join('\n');
+      card.appendChild(list);
+
+      grid.appendChild(card);
+    });
+
+    wrap.appendChild(grid);
+  }
+}
+
+/* ====== 主流程 ====== */
+(async function main(){
+  try{
+    $('#msg').textContent = '載入角色池…';
+    const pools = await loadPools();
+
+    $('#msg').textContent = '彙整持有資料…';
+    const owned = await loadOwned();
+
+    // 分組
+    const hiddenByPlayer = new Map();                           // pid -> [{character_id,count}]
+    const limitedByEventThenPlayer = new Map();                 // event -> (pid -> [{character_id,count}])
+    const allPids = new Set();
+
+    for (const r of owned){
+      allPids.add(r.player_id);
+      if (r.rarity === 'hidden'){
+        const arr = hiddenByPlayer.get(r.player_id) || [];
+        arr.push({ character_id: r.character_id, count: r.count });
+        hiddenByPlayer.set(r.player_id, arr);
+      } else if (r.rarity === 'limited'){
+        const ev = r.event_name || '限定活動';
+        if (!limitedByEventThenPlayer.has(ev)) limitedByEventThenPlayer.set(ev, new Map());
+        const mp = limitedByEventThenPlayer.get(ev);
+        const arr = mp.get(r.player_id) || [];
+        arr.push({ character_id: r.character_id, count: r.count });
+        mp.set(r.player_id, arr);
+      }
+    }
+
+    $('#msg').textContent = '取得玩家名稱…';
+    const playerNameMap = await fetchNames([...allPids]);       // pid -> username
+
+    // 渲染
+    $('#msg').textContent = '';
+    renderHidden({ hiddenByPlayer, nameById: pools.hiddenNameById, playerNameMap });
+    renderLimited({ limitedByEventThenPlayer, nameById: pools.limitedNameById, playerNameMap });
+
+  }catch(e){
+    console.error(e);
+    $('#msg').className = 'err';
+    $('#msg').textContent = '讀取失敗：' + (e?.message || e);
+  }
+})();
+</script>
+</body>
+</html>
