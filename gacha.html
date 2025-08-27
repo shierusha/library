@@ -758,7 +758,7 @@ async function openBackpack(){
   }
 
   // ★ 方案1：直接用 A 專案提前帶過來的名稱
-  const ownerName = (localStorage.getItem('gacha_player_name') || '我的') + '的';
+  const ownerName = (localStorage.getItem('gacha_player_name') || '我') + '的';
   infoTitle.textContent = `${ownerName}背包`;
 
   // （以下照你原本的查 owned_characters → 排序/分組/每行 3 個 → render）
