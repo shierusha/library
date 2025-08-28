@@ -54,7 +54,7 @@
 </head>
 <body>
   <div class="container">
-    <h1 id="pageH1">全服隱藏／限定持有榜</h1>
+    <h1 id="pageH1">特殊扭蛋持有榜</h1>
     <div class="hr"></div>
 
     <div id="msg" class="loading">載入中…</div>
@@ -185,7 +185,7 @@ function renderLimited({ limitedByEventThenPlayer, nameById, playerNameMap }){
   if (hasLim){
     // Title 與頁面 H1 調整
     document.title = `謝爾夏｜限定活動持有榜「${LIM}」`;
-    $('#pageH1').textContent = '限定活動持有榜';
+    $('#pageH1').textContent = '限定扭蛋持有榜';
 
     // 藍標 + 活動名
     $('#limitedTitle').innerHTML =
