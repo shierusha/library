@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8">
-  <title>謝爾夏｜扭蛋持有榜</title>
+  <title id="pageTitle">謝爾夏｜扭蛋持有榜</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <link href="https://fonts.googleapis.com/css?family=Noto+Sans+TC:400,700&display=swap" rel="stylesheet">
@@ -50,20 +50,21 @@
 </head>
 <body>
   <div class="container">
-    <h1>全服隱藏／限定持有榜</h1>
+    <h1 id="pageH1">全服隱藏／限定持有榜</h1>
     <div class="hr"></div>
 
     <div id="msg" class="loading">載入中…</div>
 
-
-    
     <!-- 限定款（依活動分段） -->
-    <div class="section-title" style="margin-top:1.2rem;"><span class="tag">LIMITED</span><span>期間限定</span></div>
+    <div id="limitedTitle" class="section-title" style="margin-top:1.2rem;">
+      <span class="tag">LIMITED</span><span>期間限定</span>
+    </div>
     <div id="limitedWrap"></div>
 
-    
     <!-- 隱藏款 -->
-    <div class="section-title"><span class="tag">HIDDEN</span><span>隱藏款</span></div>
+    <div id="hiddenTitle" class="section-title">
+      <span class="tag">HIDDEN</span><span>隱藏款</span>
+    </div>
     <div id="hiddenGrid" class="grid"></div>
 
   </div>
@@ -81,6 +82,11 @@ const A = window.supabase.createClient(
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmaHdodm9kZ2lrcGR1Y3JoZ2RhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgwMTAwNjEsImV4cCI6MjA2MzU4NjA2MX0.P6P-x4SxjiR4VdWH6VFgY_ktgMac_OzuI4Bl7HWskz8'
 );
 
+/* ====== URL 參數：?lim=活動名稱 ====== */
+const params = new URLSearchParams(location.search);
+const LIM = (params.get('lim') || '').trim();
+const hasLim = LIM.length > 0;
+
 /* ====== 小工具 ====== */
 const $  = (s, r=document)=>r.querySelector(s);
 const $$ = (s, r=document)=>[...r.querySelectorAll(s)];
@@ -94,28 +100,27 @@ async function loadPools(){
     G('limited_characters').select('id,event_name,name').order('id',{ascending:true}),
   ]);
   const hiddenNameById = new Map(h.map(x=>[x.id, x.name]));
-  // 限定不分活動名字通常同一個 id 一樣；這裡先做 id->name 映射
   const limitedNameById = new Map(l.map(x=>[x.id, x.name]));
   return { hiddenNameById, limitedNameById };
 }
 
-/* ====== 撈全服 owned（只抓 hidden/limited）並彙整 ====== */
+/* ====== 撈 owned：若有 lim，就只抓該活動的 limited ====== */
 async function loadOwned(){
-  const { data: rows=[] } = await G('owned_characters')
-    .select('player_id,rarity,event_name,character_id,count');
-
-  // 過濾只要 hidden / limited
-  return rows.filter(r => r.rarity === 'hidden' || r.rarity === 'limited');
+  let q = G('owned_characters').select('player_id,rarity,event_name,character_id,count');
+  if (hasLim){
+    q = q.eq('rarity','limited').eq('event_name', LIM);
+  }
+  const { data: rows=[] } = await q;
+  return hasLim ? rows : rows.filter(r => r.rarity === 'hidden' || r.rarity === 'limited');
 }
 
 /* ====== 玩家名稱查詢（A 專案 RPC；避免 RLS） ====== */
 async function fetchNames(playerIds){
   const uniq = [...new Set(playerIds)];
   const map = new Map();
-  // 併發但避免太多（這裡一次全開通常也行）
   await Promise.all(uniq.map(async id=>{
     try{
-      const { data, error } = await A.rpc('get_player_username', { p_id: id });
+      const { data } = await A.rpc('get_player_username', { p_id: id });
       map.set(id, (data && String(data).trim()) || '玩家');
     }catch{
       map.set(id, '玩家');
@@ -129,7 +134,6 @@ function renderHidden({ hiddenByPlayer, nameById, playerNameMap }){
   const grid = $('#hiddenGrid');
   grid.innerHTML = '';
 
-  // 依玩家名稱排序
   const players = [...hiddenByPlayer.keys()].sort((a,b)=>{
     return (playerNameMap.get(a)||'').localeCompare(playerNameMap.get(b)||'', 'zh-Hant');
   });
@@ -138,7 +142,6 @@ function renderHidden({ hiddenByPlayer, nameById, playerNameMap }){
     const items = hiddenByPlayer.get(pid) || [];
     if (!items.length) return;
 
-    // 依角色 id 升冪
     items.sort((a,b)=>a.character_id - b.character_id);
 
     const card = document.createElement('div');
@@ -165,14 +168,19 @@ function renderHidden({ hiddenByPlayer, nameById, playerNameMap }){
   }
 }
 
-/* ====== 渲染：限定款（依活動分段） ====== */
+/* ====== 渲染：限定款（依活動分段；若有 lim 只渲染該活動） ====== */
 function renderLimited({ limitedByEventThenPlayer, nameById, playerNameMap }){
   const wrap = $('#limitedWrap');
   wrap.innerHTML = '';
 
-  const events = [...limitedByEventThenPlayer.keys()].sort((a,b)=>a.localeCompare(b,'zh-Hant'));
+  let events = [...limitedByEventThenPlayer.keys()];
+  if (hasLim){
+    events = events.filter(e => e === LIM);
+  }
+  events.sort((a,b)=>a.localeCompare(b,'zh-Hant'));
+
   if (!events.length){
-    wrap.innerHTML = `<div class="muted">無</div>`;
+    wrap.innerHTML = `<div class="muted">${hasLim ? '此活動目前無任何持有資料。' : '無'}</div>`;
     return;
   }
 
@@ -185,7 +193,6 @@ function renderLimited({ limitedByEventThenPlayer, nameById, playerNameMap }){
     const grid = document.createElement('div');
     grid.className = 'grid';
 
-    // 依玩家名稱排序
     const perPlayer = limitedByEventThenPlayer.get(ev) || new Map();
     const players = [...perPlayer.keys()].sort((a,b)=>{
       return (playerNameMap.get(a)||'').localeCompare(playerNameMap.get(b)||'', 'zh-Hant');
@@ -223,6 +230,17 @@ function renderLimited({ limitedByEventThenPlayer, nameById, playerNameMap }){
 /* ====== 主流程 ====== */
 (async function main(){
   try{
+    // 調整標題與區塊可見性
+    if (hasLim){
+      $('#pageTitle').textContent = `謝爾夏｜限定活動「${LIM}」持有榜`;
+      $('#pageH1').textContent   = `限定活動「${LIM}」持有榜`;
+      // 限定區標題也標出活動
+      $('#limitedTitle').innerHTML = `<span class="tag">LIMITED</span><span>期間限定：${escapeHtml(LIM)}</span>`;
+      // 隱藏「隱藏款」整段
+      $('#hiddenTitle').style.display = 'none';
+      $('#hiddenGrid').style.display  = 'none';
+    }
+
     $('#msg').textContent = '載入角色池…';
     const pools = await loadPools();
 
@@ -230,13 +248,13 @@ function renderLimited({ limitedByEventThenPlayer, nameById, playerNameMap }){
     const owned = await loadOwned();
 
     // 分組
-    const hiddenByPlayer = new Map();                           // pid -> [{character_id,count}]
-    const limitedByEventThenPlayer = new Map();                 // event -> (pid -> [{character_id,count}])
+    const hiddenByPlayer = new Map();           // pid -> [{character_id,count}]
+    const limitedByEventThenPlayer = new Map(); // event -> (pid -> [{character_id,count}])
     const allPids = new Set();
 
     for (const r of owned){
       allPids.add(r.player_id);
-      if (r.rarity === 'hidden'){
+      if (!hasLim && r.rarity === 'hidden'){
         const arr = hiddenByPlayer.get(r.player_id) || [];
         arr.push({ character_id: r.character_id, count: r.count });
         hiddenByPlayer.set(r.player_id, arr);
@@ -251,11 +269,13 @@ function renderLimited({ limitedByEventThenPlayer, nameById, playerNameMap }){
     }
 
     $('#msg').textContent = '取得玩家名稱…';
-    const playerNameMap = await fetchNames([...allPids]);       // pid -> username
+    const playerNameMap = await fetchNames([...allPids]);
 
     // 渲染
     $('#msg').textContent = '';
-    renderHidden({ hiddenByPlayer, nameById: pools.hiddenNameById, playerNameMap });
+    if (!hasLim){
+      renderHidden({ hiddenByPlayer, nameById: pools.hiddenNameById, playerNameMap });
+    }
     renderLimited({ limitedByEventThenPlayer, nameById: pools.limitedNameById, playerNameMap });
 
   }catch(e){
