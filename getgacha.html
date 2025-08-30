@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8" />
-  <title id="pageTitle">謝爾夏｜扭蛋持有榜</title>
+  <title>扭蛋持有榜</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <link href="https://fonts.googleapis.com/css?family=Noto+Sans+TC:400,700&display=swap" rel="stylesheet">
@@ -18,85 +18,55 @@
       backdrop-filter:saturate(140%) blur(2px);
     }
     h1{margin:.2rem 0 0; color:#143158; text-align:center; letter-spacing:.04em}
-    .sub{margin:.3rem 0 1.2rem; text-align:center; color:#276191}
     .hr{height:4px; width:78%; background:#1767a0; margin:.6rem auto 1.6rem; border-radius:2px; opacity:.9}
-
     .section-title{
-      margin:.6rem 0 .6rem; font-size:1.2rem; color:#143158; font-weight:700;
+      margin:1.0rem 0 .6rem; font-size:1.2rem; color:#143158; font-weight:700;
       display:flex; align-items:center; gap:.6rem;
     }
-    .section-title .tag{
-      background:#1767a0; color:#fff; padding:.2rem .55rem; border-radius:.5rem; font-size:.85rem;
-    }
-    /* 活動名會顯示在 LIMITED 標籤右邊（僅當 ?lim 有帶時） */
-    .section-title .evt-name{
-      font-weight:700; color:#143158;
-    }
-
+    .section-title .tag{background:#1767a0; color:#fff; padding:.2rem .55rem; border-radius:.5rem; font-size:.85rem;}
+    .section-title .right{color:#0f2d52}
     .grid{ display:grid; grid-template-columns: repeat(2, 1fr); gap: 1.2rem 1rem; }
     @media (max-width:860px){ .grid{grid-template-columns:1fr;} }
-
     .card{
       background:#eef4f5; border-radius:14px;
       box-shadow:0 2px 10px #0002, 0 0 0 2.5px rgba(33,41,55,.5);
       padding:1rem .9rem;
     }
-    .player{
-      font-weight:700; color:#0f2d52; margin-bottom:.5rem; word-break:break-all;
-    }
-    .list{ color:#303a4d; line-height:1.55; white-space:pre-line; }
+    .player-row{display:flex;align-items:baseline;justify-content:space-between;gap:.6rem}
+    .player{font-weight:700; color:#0f2d52; word-break:break-all;}
+    .total{color:#b11226;font-weight:900;font-style:italic;white-space:nowrap}
+    .list{ color:#303a4d; line-height:1.55; white-space:pre-line; margin-top:.35rem; }
     .muted{color:#667; font-size:.95rem}
-
-    .event-title{margin:1.2rem 0 .5rem; color:#0f2d52; font-weight:800;}
+    .event-title{margin:.6rem 0 .3rem; color:#0f2d52; font-weight:800;}
     .loading{ text-align:center; color:#143158; padding:1rem 0 .4rem; }
     .err{ color:#9b0b18; text-align:center; }
-
-  
-  /* 玩家卡片標題：左名右數 */
-.player-row{
-  display:flex;
-  align-items:baseline;
-  justify-content:space-between;  /* 名字靠左、數字靠右 */
-  gap:.6rem;
-}
-.total{
-  color:#b11226;       
-  font-weight:900;     
-  font-style:italic;   
-  white-space:nowrap;  /* 不要換行 */
-}
-
-  
   </style>
 </head>
 <body>
   <div class="container">
-    <h1 id="pageH1">特殊扭蛋持有榜</h1>
+    <h1 id="pageTitle">全服隱藏／限定持有榜</h1>
     <div class="hr"></div>
 
     <div id="msg" class="loading">載入中…</div>
 
-    <!-- 限定款（依活動分段；若有 ?lim 只顯示該活動，且活動名出現在藍標右側） -->
-    <div class="section-title" id="limitedTitle" style="margin-top:1.2rem;">
+    <!-- 限定款（依活動分段；或 lim= 活動時只顯示該活動） -->
+    <div class="section-title" id="limitedSectionTitle" style="display:none;">
       <span class="tag">LIMITED</span>
-      <span>期間限定</span>
+      <span class="right" id="limitedRight">期間限定</span>
     </div>
     <div id="limitedWrap"></div>
 
-    <!-- 隱藏款（若有 ?lim 會整段隱藏） -->
-    <div class="section-title" id="hiddenTitle">
-      <span class="tag">HIDDEN</span><span>隱藏款</span>
+    <!-- 隱藏款 -->
+    <div class="section-title" id="hiddenSectionTitle" style="display:none;">
+      <span class="tag">HIDDEN</span>
+      <span class="right">隱藏款</span>
     </div>
     <div id="hiddenGrid" class="grid"></div>
   </div>
 
 <script>
-/* ====== URL 參數：?lim=活動名稱（僅顯示該活動，且活動名貼在 LIMITED 標籤右邊） ====== */
-const LIM   = new URLSearchParams(location.search).get('lim');
-const hasLim = !!LIM;
-
 /* ====== Supabase 連線 ====== */
-/* B：圖書館（讀池與 owned_characters） */
+/* B：圖書館（讀池與 owned_characters, counters） */
 const B = window.supabase.createClient(
   'https://ogzpfrkwnqqaitytncla.supabase.co',
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nenBmcmt3bnFxYWl0eXRuY2xhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxODQzNzEsImV4cCI6MjA3MDc2MDM3MX0.Ls83xOXcKIW7FUcavr8_sOs37I18VGFWYNW3sNFRS24'
@@ -107,10 +77,25 @@ const A = window.supabase.createClient(
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmaHdodm9kZ2lrcGR1Y3JoZ2RhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgwMTAwNjEsImV4cCI6MjA2MzU4NjA2MX0.P6P-x4SxjiR4VdWH6VFgY_ktgMac_OzuI4Bl7HWskz8'
 );
 
-const $  = (s, r=document)=>r.querySelector(s);
-const $$ = (s, r=document)=>[...r.querySelectorAll(s)];
-const escapeHtml = s => (s||'').replace(/[&<>"']/g,c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 const G = t => B.schema('gacha').from(t);
+const $  = (s, r=document)=>r.querySelector(s);
+
+/* ====== URL 參數（活動過濾） ====== */
+const params = new URLSearchParams(location.search);
+const eventFilter = params.get('lim')?.trim() || '';
+
+/* ====== UI 動態標題 ====== */
+const pageTitleEl = $('#pageTitle');
+const limitedRightEl = $('#limitedRight');
+const limitedSectionTitle = $('#limitedSectionTitle');
+const hiddenSectionTitle = $('#hiddenSectionTitle');
+if (eventFilter) {
+  pageTitleEl.textContent = '限定活動持有榜';
+  limitedRightEl.textContent = eventFilter;
+} else {
+  pageTitleEl.textContent = '全服隱藏／限定持有榜';
+  limitedRightEl.textContent = '期間限定';
+}
 
 /* ====== 讀角色池（拿名字、排序用） ====== */
 async function loadPools(){
@@ -119,15 +104,30 @@ async function loadPools(){
     G('limited_characters').select('id,event_name,name').order('id',{ascending:true}),
   ]);
   const hiddenNameById  = new Map(h.map(x=>[x.id, x.name]));
-  const limitedNameById = new Map(l.map(x=>[x.id, x.name]));
+  const limitedNameById = new Map(l.map(x=>[x.id, x.name])); // id -> name（不同活動同 id 名稱通常一致）
   return { hiddenNameById, limitedNameById };
 }
 
-/* ====== 撈全服 owned（只抓 hidden/limited）並彙整 ====== */
+/* ====== 撈全服 owned（只抓 hidden/limited；若帶 lim 只抓該活動的 limited） ====== */
 async function loadOwned(){
-  const { data: rows=[] } = await G('owned_characters')
+  let q = G('owned_characters')
     .select('player_id,rarity,event_name,character_id,count');
-  return rows.filter(r => r.rarity === 'hidden' || r.rarity === 'limited');
+
+  const { data: rows=[] } = await q;
+  // 過濾只要 hidden / limited
+  let filtered = rows.filter(r => r.rarity === 'hidden' || r.rarity === 'limited');
+  if (eventFilter) {
+    filtered = filtered.filter(r => r.rarity === 'limited' && (r.event_name || '') === eventFilter);
+  }
+  return filtered;
+}
+
+/* ====== 讀 counters：player_id -> total_draws ====== */
+async function loadCounters(){
+  const { data = [] } = await G('counters').select('player_id,total_draws');
+  const map = new Map();
+  data.forEach(r => map.set(r.player_id, r.total_draws || 0));
+  return map;
 }
 
 /* ====== 玩家名稱查詢（A 專案 RPC；避免 RLS） ====== */
@@ -145,32 +145,11 @@ async function fetchNames(playerIds){
   return map;
 }
 
-
-
-
-
-  // 讀 counters：player_id -> total_draws
-async function loadCounters(){
-  const { data = [] } = await G('counters').select('player_id,total_draws');
-  const map = new Map();
-  data.forEach(r => map.set(r.player_id, r.total_draws || 0));
-  return map;
-}
-
-
 /* ====== 渲染：隱藏款 ====== */
-function renderHidden({ hiddenByPlayer, nameById, playerNameMap }){
-  // 有 ?lim 時整段隱藏
-  if (hasLim){
-    $('#hiddenTitle').style.display = 'none';
-    $('#hiddenGrid').style.display  = 'none';
-    return;
-  }
-
+function renderHidden({ hiddenByPlayer, nameById, playerNameMap, countersMap }){
   const grid = $('#hiddenGrid');
   grid.innerHTML = '';
 
-  // 依玩家名稱排序
   const players = [...hiddenByPlayer.keys()].sort((a,b)=>{
     return (playerNameMap.get(a)||'').localeCompare(playerNameMap.get(b)||'', 'zh-Hant');
   });
@@ -179,28 +158,26 @@ function renderHidden({ hiddenByPlayer, nameById, playerNameMap }){
     const items = hiddenByPlayer.get(pid) || [];
     if (!items.length) return;
 
-    // 依角色 id 升冪
     items.sort((a,b)=>a.character_id - b.character_id);
 
     const card = document.createElement('div');
     card.className = 'card';
 
-const header = document.createElement('div');
-header.className = 'player-row';
+    const header = document.createElement('div');
+    header.className = 'player-row';
 
-const title = document.createElement('div');
-title.className = 'player';
-title.textContent = playerNameMap.get(pid) || '玩家';
+    const title = document.createElement('div');
+    title.className = 'player';
+    title.textContent = playerNameMap.get(pid) || '玩家';
 
-const total = document.createElement('div');
-total.className = 'total';
-total.textContent = `總抽數：${countersMap.get(pid) ?? 0}`;
+    const total = document.createElement('div');
+    total.className = 'total';
+    total.textContent = `總抽數：${countersMap.get(pid) ?? 0}`;
 
-header.appendChild(title);
-header.appendChild(total);
-card.appendChild(header);
+    header.appendChild(title);
+    header.appendChild(total);
+    card.appendChild(header);
 
-    
     const list = document.createElement('div');
     list.className = 'list';
     list.innerHTML = items.map(it=>{
@@ -212,89 +189,31 @@ card.appendChild(header);
     grid.appendChild(card);
   });
 
+  hiddenSectionTitle.style.display = players.length ? 'flex' : 'none';
   if (!players.length) {
-    grid.innerHTML = `<div class="muted">非洲人求拍拍</div>`;
+    grid.innerHTML = `<div class="muted">無隱藏款持有資料</div>`;
   }
 }
 
-/* ====== 渲染：限定款 ====== */
-function renderLimited({ limitedByEventThenPlayer, nameById, playerNameMap }){
+/* ====== 渲染：限定款（依活動分段；若 lim 僅顯示單一活動） ====== */
+function renderLimited({ limitedByEventThenPlayer, nameById, playerNameMap, countersMap }){
   const wrap = $('#limitedWrap');
   wrap.innerHTML = '';
 
-  // 如果有 ?lim，藍標右邊顯示活動名，且只顯示該活動、不要活動小標
-  if (hasLim){
-    // Title 與頁面 H1 調整
-    document.title = `謝爾夏｜限定活動持有榜「${LIM}」`;
-    $('#pageH1').textContent = '限定扭蛋持有榜';
-
-    // 藍標 + 活動名
-    $('#limitedTitle').innerHTML =
-      `<span class="tag">LIMITED</span><span class="evt-name">${escapeHtml(LIM)}</span>`;
-
-    const mp = limitedByEventThenPlayer.get(LIM);
-    if (!mp){
-      wrap.innerHTML = `<div class="muted">此活動目前無資料</div>`;
-      return;
-    }
-
-    const grid = document.createElement('div');
-    grid.className = 'grid';
-
-    // 依玩家名稱排序
-    const players = [...mp.keys()].sort((a,b)=>{
-      return (playerNameMap.get(a)||'').localeCompare(playerNameMap.get(b)||'', 'zh-Hant');
-    });
-
-    players.forEach(pid=>{
-      const items = (mp.get(pid) || []).slice().sort((a,b)=>a.character_id - b.character_id);
-      if (!items.length) return;
-
-      const card = document.createElement('div');
-      card.className = 'card';
-
-const header = document.createElement('div');
-header.className = 'player-row';
-
-const title = document.createElement('div');
-title.className = 'player';
-title.textContent = playerNameMap.get(pid) || '玩家';
-
-const total = document.createElement('div');
-total.className = 'total';
-total.textContent = `總抽數：${countersMap.get(pid) ?? 0}`;
-
-header.appendChild(title);
-header.appendChild(total);
-card.appendChild(header);
-
-      const list = document.createElement('div');
-      list.className = 'list';
-      list.innerHTML = items.map(it=>{
-        const nm = nameById.get(it.character_id) || `#${it.character_id}`;
-        return `${escapeHtml(nm)} × ${it.count}`;
-      }).join('\n');
-      card.appendChild(list);
-
-      grid.appendChild(card);
-    });
-
-    wrap.appendChild(grid);
-    return;
-  }
-
-  // 沒有 ?lim：顯示所有活動，每個活動一個小段落 + grid
   const events = [...limitedByEventThenPlayer.keys()].sort((a,b)=>a.localeCompare(b,'zh-Hant'));
+  limitedSectionTitle.style.display = events.length ? 'flex' : 'none';
+
   if (!events.length){
-    wrap.innerHTML = `<div class="muted">無</div>`;
+    wrap.innerHTML = `<div class="muted">無限定款持有資料</div>`;
     return;
   }
 
   for (const ev of events){
-    const sectionTitle = document.createElement('div');
-    sectionTitle.className = 'event-title';
-    sectionTitle.textContent = `限定活動：${ev}`;
-    wrap.appendChild(sectionTitle);
+    // 活動小標題（不加「限定活動：」，只顯示活動名，避免重複）
+    const evTitle = document.createElement('div');
+    evTitle.className = 'event-title';
+    evTitle.textContent = ev;
+    wrap.appendChild(evTitle);
 
     const grid = document.createElement('div');
     grid.className = 'grid';
@@ -305,16 +224,28 @@ card.appendChild(header);
     });
 
     players.forEach(pid=>{
-      const items = (perPlayer.get(pid) || []).slice().sort((a,b)=>a.character_id - b.character_id);
+      const items = perPlayer.get(pid) || [];
       if (!items.length) return;
+
+      items.sort((a,b)=>a.character_id - b.character_id);
 
       const card = document.createElement('div');
       card.className = 'card';
 
+      const header = document.createElement('div');
+      header.className = 'player-row';
+
       const title = document.createElement('div');
       title.className = 'player';
       title.textContent = playerNameMap.get(pid) || '玩家';
-      card.appendChild(title);
+
+      const total = document.createElement('div');
+      total.className = 'total';
+      total.textContent = `總抽數：${countersMap.get(pid) ?? 0}`;
+
+      header.appendChild(title);
+      header.appendChild(total);
+      card.appendChild(header);
 
       const list = document.createElement('div');
       list.className = 'list';
@@ -341,8 +272,8 @@ card.appendChild(header);
     const owned = await loadOwned();
 
     // 分組
-    const hiddenByPlayer = new Map();                   // pid -> [{character_id,count}]
-    const limitedByEventThenPlayer = new Map();         // event -> (pid -> [{character_id,count}])
+    const hiddenByPlayer = new Map();           // pid -> [{character_id,count}]
+    const limitedByEventThenPlayer = new Map(); // event -> (pid -> [{character_id,count}])
     const allPids = new Set();
 
     for (const r of owned){
@@ -361,23 +292,39 @@ card.appendChild(header);
       }
     }
 
-    $('#msg').textContent = '取得玩家名稱…';
-const [playerNameMap, countersMap] = await Promise.all([
-  fetchNames([...allPids]),     // pid -> username（專案A RPC）
-  loadCounters()                // pid -> total_draws（專案B）
-]);
+    $('#msg').textContent = '取得玩家名稱與總抽數…';
+    const [playerNameMap, countersMap] = await Promise.all([
+      fetchNames([...allPids]),  // pid -> username（專案A RPC）
+      loadCounters()             // pid -> total_draws（專案B）
+    ]);
 
-// 渲染
-$('#msg').textContent = '';
-renderHidden({ hiddenByPlayer, nameById: pools.hiddenNameById, playerNameMap, countersMap });
-renderLimited({ limitedByEventThenPlayer, nameById: pools.limitedNameById, playerNameMap, countersMap });
+    // 渲染
+    $('#msg').textContent = '';
+    renderLimited({
+      limitedByEventThenPlayer,
+      nameById: pools.limitedNameById,
+      playerNameMap,
+      countersMap
+    });
+    renderHidden({
+      hiddenByPlayer,
+      nameById: pools.hiddenNameById,
+      playerNameMap,
+      countersMap
+    });
 
   }catch(e){
     console.error(e);
-    $('#msg').className = 'err';
-    $('#msg').textContent = '讀取失敗：' + (e?.message || e);
+    const m = $('#msg');
+    m.className = 'err';
+    m.textContent = '讀取失敗：' + (e?.message || e);
   }
 })();
+
+/* ====== Utils ====== */
+function escapeHtml(s){
+  return (s||'').replace(/[&<>"']/g,c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
 </script>
 </body>
 </html>
