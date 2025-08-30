@@ -145,6 +145,19 @@ async function fetchNames(playerIds){
   return map;
 }
 
+
+
+
+
+  // 讀 counters：player_id -> total_draws
+async function loadCounters(){
+  const { data = [] } = await G('counters').select('player_id,total_draws');
+  const map = new Map();
+  data.forEach(r => map.set(r.player_id, r.total_draws || 0));
+  return map;
+}
+
+
 /* ====== 渲染：隱藏款 ====== */
 function renderHidden({ hiddenByPlayer, nameById, playerNameMap }){
   // 有 ?lim 時整段隱藏
@@ -172,7 +185,7 @@ function renderHidden({ hiddenByPlayer, nameById, playerNameMap }){
     const card = document.createElement('div');
     card.className = 'card';
 
-    const header = document.createElement('div');
+const header = document.createElement('div');
 header.className = 'player-row';
 
 const title = document.createElement('div');
@@ -181,9 +194,7 @@ title.textContent = playerNameMap.get(pid) || '玩家';
 
 const total = document.createElement('div');
 total.className = 'total';
-// 只統計這個活動、這位玩家卡片裡的數量總和
-const sum = items.reduce((s, it) => s + (it.count || 0), 0);
-total.textContent = `總抽數：${sum}`;
+total.textContent = `總抽數：${countersMap.get(pid) ?? 0}`;
 
 header.appendChild(title);
 header.appendChild(total);
@@ -242,10 +253,20 @@ function renderLimited({ limitedByEventThenPlayer, nameById, playerNameMap }){
       const card = document.createElement('div');
       card.className = 'card';
 
-      const title = document.createElement('div');
-      title.className = 'player';
-      title.textContent = playerNameMap.get(pid) || '玩家';
-      card.appendChild(title);
+const header = document.createElement('div');
+header.className = 'player-row';
+
+const title = document.createElement('div');
+title.className = 'player';
+title.textContent = playerNameMap.get(pid) || '玩家';
+
+const total = document.createElement('div');
+total.className = 'total';
+total.textContent = `總抽數：${countersMap.get(pid) ?? 0}`;
+
+header.appendChild(title);
+header.appendChild(total);
+card.appendChild(header);
 
       const list = document.createElement('div');
       list.className = 'list';
@@ -341,12 +362,15 @@ function renderLimited({ limitedByEventThenPlayer, nameById, playerNameMap }){
     }
 
     $('#msg').textContent = '取得玩家名稱…';
-    const playerNameMap = await fetchNames([...allPids]); // pid -> username
+const [playerNameMap, countersMap] = await Promise.all([
+  fetchNames([...allPids]),     // pid -> username（專案A RPC）
+  loadCounters()                // pid -> total_draws（專案B）
+]);
 
-    // 渲染
-    $('#msg').textContent = '';
-    renderHidden({ hiddenByPlayer, nameById: pools.hiddenNameById,  playerNameMap });
-    renderLimited({ limitedByEventThenPlayer, nameById: pools.limitedNameById, playerNameMap });
+// 渲染
+$('#msg').textContent = '';
+renderHidden({ hiddenByPlayer, nameById: pools.hiddenNameById, playerNameMap, countersMap });
+renderLimited({ limitedByEventThenPlayer, nameById: pools.limitedNameById, playerNameMap, countersMap });
 
   }catch(e){
     console.error(e);
