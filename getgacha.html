@@ -40,6 +40,10 @@
     .event-title{margin:.6rem 0 .3rem; color:#0f2d52; font-weight:800;}
     .loading{ text-align:center; color:#143158; padding:1rem 0 .4rem; }
     .err{ color:#9b0b18; text-align:center; }
+
+    /* 新增：右欄容器與藍色進度字 */
+    .rightbox{ display:flex; flex-direction:column; align-items:flex-end; gap:.15rem; }
+    .progress{ color:#1767a0; font-weight:700; font-size:.95rem; }
   </style>
 </head>
 <body>
@@ -56,7 +60,7 @@
     </div>
     <div id="limitedWrap"></div>
 
-    <!-- 隱藏款 -->
+    <!-- 隱藏款（若帶 lim=，依你原本行為：不顯示隱藏資料） -->
     <div class="section-title" id="hiddenSectionTitle" style="display:none;">
       <span class="tag">HIDDEN</span>
       <span class="right">隱藏款</span>
@@ -97,15 +101,25 @@ if (eventFilter) {
   limitedRightEl.textContent = '期間限定';
 }
 
-/* ====== 讀角色池（拿名字、排序用） ====== */
+/* ====== 讀角色池（拿名字、排序、以及總種類數） ====== */
 async function loadPools(){
   const [{data:h=[]},{data:l=[]}] = await Promise.all([
     G('hidden_characters').select('id,name').order('id',{ascending:true}),
     G('limited_characters').select('id,event_name,name').order('id',{ascending:true}),
   ]);
-  const hiddenNameById  = new Map(h.map(x=>[x.id, x.name]));
-  const limitedNameById = new Map(l.map(x=>[x.id, x.name])); // id -> name（不同活動同 id 名稱通常一致）
-  return { hiddenNameById, limitedNameById };
+
+  const hiddenNameById   = new Map(h.map(x=>[x.id, x.name]));
+  const limitedNameById  = new Map(l.map(x=>[x.id, x.name]));
+
+  // 總種類數（隱藏總數；每個限定活動的總數）
+  const hiddenTotal = h.length;
+  const limitedCountsByEvent = new Map();
+  l.forEach(row=>{
+    const ev = row.event_name || '';
+    limitedCountsByEvent.set(ev, (limitedCountsByEvent.get(ev) || 0) + 1);
+  });
+
+  return { hiddenNameById, limitedNameById, hiddenTotal, limitedCountsByEvent };
 }
 
 /* ====== 撈全服 owned（只抓 hidden/limited；若帶 lim 只抓該活動的 limited） ====== */
@@ -114,8 +128,11 @@ async function loadOwned(){
     .select('player_id,rarity,event_name,character_id,count');
 
   const { data: rows=[] } = await q;
-  // 過濾只要 hidden / limited
+
+  // 只要 hidden / limited
   let filtered = rows.filter(r => r.rarity === 'hidden' || r.rarity === 'limited');
+
+  // 帶 lim= 時，只顯示該活動的限定（依你原本行為會同時隱藏 Hidden 區塊）
   if (eventFilter) {
     filtered = filtered.filter(r => r.rarity === 'limited' && (r.event_name || '') === eventFilter);
   }
@@ -146,7 +163,7 @@ async function fetchNames(playerIds){
 }
 
 /* ====== 渲染：隱藏款 ====== */
-function renderHidden({ hiddenByPlayer, nameById, playerNameMap, countersMap }){
+function renderHidden({ hiddenByPlayer, nameById, playerNameMap, countersMap, hiddenTotal }){
   const grid = $('#hiddenGrid');
   grid.innerHTML = '';
 
@@ -170,12 +187,24 @@ function renderHidden({ hiddenByPlayer, nameById, playerNameMap, countersMap }){
     title.className = 'player';
     title.textContent = playerNameMap.get(pid) || '玩家';
 
+    // 右側：總抽數 + 蒐集進度（隱藏）
+    const right = document.createElement('div');
+    right.className = 'rightbox';
+
     const total = document.createElement('div');
     total.className = 'total';
     total.textContent = `總抽數：${countersMap.get(pid) ?? 0}`;
 
+    const progress = document.createElement('div');
+    progress.className = 'progress';
+    const ownedKinds = items.length; // 隱藏款持有種類數
+    progress.textContent = `蒐集進度：(${ownedKinds}/${hiddenTotal})`;
+
+    right.appendChild(total);
+    right.appendChild(progress);
+
     header.appendChild(title);
-    header.appendChild(total);
+    header.appendChild(right);
     card.appendChild(header);
 
     const list = document.createElement('div');
@@ -196,7 +225,7 @@ function renderHidden({ hiddenByPlayer, nameById, playerNameMap, countersMap }){
 }
 
 /* ====== 渲染：限定款（依活動分段；若 lim 僅顯示單一活動） ====== */
-function renderLimited({ limitedByEventThenPlayer, nameById, playerNameMap, countersMap }){
+function renderLimited({ limitedByEventThenPlayer, nameById, playerNameMap, countersMap, limitedCountsByEvent }){
   const wrap = $('#limitedWrap');
   wrap.innerHTML = '';
 
@@ -209,7 +238,7 @@ function renderLimited({ limitedByEventThenPlayer, nameById, playerNameMap, coun
   }
 
   for (const ev of events){
-    // 活動小標題（不加「限定活動：」，只顯示活動名，避免重複）
+    // 活動小標題
     const evTitle = document.createElement('div');
     evTitle.className = 'event-title';
     evTitle.textContent = ev;
@@ -222,6 +251,8 @@ function renderLimited({ limitedByEventThenPlayer, nameById, playerNameMap, coun
     const players = [...perPlayer.keys()].sort((a,b)=>{
       return (playerNameMap.get(a)||'').localeCompare(playerNameMap.get(b)||'', 'zh-Hant');
     });
+
+    const denom = limitedCountsByEvent.get(ev) ?? 0; // 此活動總種類數
 
     players.forEach(pid=>{
       const items = perPlayer.get(pid) || [];
@@ -239,12 +270,24 @@ function renderLimited({ limitedByEventThenPlayer, nameById, playerNameMap, coun
       title.className = 'player';
       title.textContent = playerNameMap.get(pid) || '玩家';
 
+      // 右側：總抽數 + 蒐集進度（此活動）
+      const right = document.createElement('div');
+      right.className = 'rightbox';
+
       const total = document.createElement('div');
       total.className = 'total';
       total.textContent = `總抽數：${countersMap.get(pid) ?? 0}`;
 
+      const progress = document.createElement('div');
+      progress.className = 'progress';
+      const ownedKinds = items.length; // 這位玩家在「此活動」擁有幾種
+      progress.textContent = `蒐集進度：(${ownedKinds}/${denom})`;
+
+      right.appendChild(total);
+      right.appendChild(progress);
+
       header.appendChild(title);
-      header.appendChild(total);
+      header.appendChild(right);
       card.appendChild(header);
 
       const list = document.createElement('div');
@@ -304,14 +347,24 @@ function renderLimited({ limitedByEventThenPlayer, nameById, playerNameMap, coun
       limitedByEventThenPlayer,
       nameById: pools.limitedNameById,
       playerNameMap,
-      countersMap
+      countersMap,
+      limitedCountsByEvent: pools.limitedCountsByEvent
     });
-    renderHidden({
-      hiddenByPlayer,
-      nameById: pools.hiddenNameById,
-      playerNameMap,
-      countersMap
-    });
+
+    // 若帶 lim=，依你原本行為：不顯示隱藏區塊，因此只在未帶 lim 時渲染隱藏
+    if (!eventFilter) {
+      renderHidden({
+        hiddenByPlayer,
+        nameById: pools.hiddenNameById,
+        playerNameMap,
+        countersMap,
+        hiddenTotal: pools.hiddenTotal
+      });
+    } else {
+      // 帶 lim 時，隱藏小標題
+      hiddenSectionTitle.style.display = 'none';
+      $('#hiddenGrid').innerHTML = '';
+    }
 
   }catch(e){
     console.error(e);
