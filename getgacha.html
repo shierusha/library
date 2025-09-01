@@ -198,7 +198,7 @@ function renderHidden({ hiddenByPlayer, nameById, playerNameMap, countersMap, hi
     const progress = document.createElement('div');
     progress.className = 'progress';
     const ownedKinds = items.length; // 隱藏款持有種類數
-    progress.textContent = `蒐集進度：(${ownedKinds}/${hiddenTotal})`;
+    progress.textContent = `蒐集：(${ownedKinds}/${hiddenTotal})`;
 
     right.appendChild(total);
     right.appendChild(progress);
@@ -281,7 +281,7 @@ function renderLimited({ limitedByEventThenPlayer, nameById, playerNameMap, coun
       const progress = document.createElement('div');
       progress.className = 'progress';
       const ownedKinds = items.length; // 這位玩家在「此活動」擁有幾種
-      progress.textContent = `蒐集進度：(${ownedKinds}/${denom})`;
+      progress.textContent = `蒐集：(${ownedKinds}/${denom})`;
 
       right.appendChild(total);
       right.appendChild(progress);
