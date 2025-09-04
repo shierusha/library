@@ -258,7 +258,7 @@
 
       thead.innerHTML = `
         <tr>
-          <th class="col-name">${isMovement ? '移動技能' : '技能效果'}</th>
+          <th class="col-name">技能效果</th>
           <th class="col-detail">詳細</th>
           <th class="col-target">對象</th>
           <th class="col-count">人數</th>
@@ -307,7 +307,7 @@
 
       rows.forEach(r => {
         const name = (isMovement ? r.move_name : r.effect_name) || '-';
-        const titleLabel = isMovement ? '移動技能' : '技能效果';
+const titleLabel = '技能效果';
 
         const card = document.createElement('div');
         card.className = 'card';
