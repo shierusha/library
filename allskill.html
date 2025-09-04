@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <title>謝爾夏｜技能一覽表</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css?family=Noto+Sans+TC:400,700&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+      background: url(https://shierusha.github.io/create-student/imgs/citybg.png) center center no-repeat;
+      background-size: cover;
+      margin: 0;
+      padding: 2rem;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 1100px;
+      margin: auto;
+      background: #fff;
+      padding: 1.4rem;
+      border-radius: 1.1rem;
+      box-shadow: 0 2px 16px #0001;
+    }
+    h2 {
+      color: #143158;
+      text-align: center;
+      margin: 0 0 .6rem 0;
+      font-weight: 700;
+      letter-spacing: 1px;
+    }
+    .hr-blue {
+      width: 80%;
+      height: 4px;
+      background: #1767a0;
+      margin: .6rem auto 1.2rem auto;
+      border-radius: 2px;
+      opacity: .88;
+    }
+
+    /* tabs */
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .6rem;
+      justify-content: center;
+      margin-bottom: 1rem;
+    }
+    .tab-btn {
+      border: none;
+      background: #e9f1f9;
+      color: #143158;
+      padding: .5rem .9rem;
+      border-radius: .6rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 1px 4px #0001;
+    }
+    .tab-btn.active {
+      background: #1767a0;
+      color: #fff;
+    }
+
+    .section-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #1767a0;
+      margin: 1.2rem 0 .4rem 0;
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+    }
+    .section-title .badge {
+      background: #143158;
+      color: #fff;
+      font-size: .8rem;
+      padding: .1rem .45rem;
+      border-radius: .4rem;
+    }
+
+    .table-wrap { overflow-x: auto; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #f7fbff;
+      border-radius: .6rem;
+      overflow: hidden;
+    }
+    thead {
+      background: #ddebf7;
+    }
+    th, td {
+      padding: .6rem .7rem;
+      text-align: left;
+      vertical-align: top;
+      border-bottom: 1px solid #e6eef6;
+      line-height: 1.4;
+    }
+    th { font-weight: 700; color: #143158; }
+    tbody tr:hover { background: #eef6ff; }
+    .desc { color: #3a4b5f; font-size: .95rem; }
+    .muted { color: #6c7a8a; }
+    .empty {
+      text-align: center; padding: 1rem; color: #6c7a8a;
+    }
+
+    @media (max-width: 700px) {
+      body { padding: 1rem; }
+      th, td { font-size: .95rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>謝爾夏｜技能一覽表</h2>
+    <div class="hr-blue"></div>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="attack">攻擊</button>
+      <button class="tab-btn" data-tab="tank">坦克</button>
+      <button class="tab-btn" data-tab="heal">恢復</button>
+      <button class="tab-btn" data-tab="buff">增益</button>
+      <button class="tab-btn" data-tab="debuff">妨礙</button>
+      <button class="tab-btn" data-tab="move">移動</button>
+    </div>
+
+    <div id="content"></div>
+  </div>
+
+  <script>
+    // ===== Supabase 連線 =====
+    const client = window.supabase.createClient(
+      'https://wfhwhvodgikpducrhgda.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmaHdodm9kZ2lrcGR1Y3JoZ2RhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgwMTAwNjEsImV4cCI6MjA2MzU4NjA2MX0.P6P-x4SxjiR4VdWH6VFgY_ktgMac_OzuI4Bl7HWskz8'
+    );
+
+    // ===== 可見類別（排除沒職業分類／客製化）=====
+    const EFFECT_GROUPS = {
+      attack:      ['attack', 'attack_only'],
+      tank:        ['tank', 'tank_only'],
+      heal:        ['heal', 'heal_only'],
+      buff:        ['buff', 'buff_only'],
+      debuff:      ['debuff', 'debuff_only']
+    };
+    const ALL_EFFECT_TYPES = Object.values(EFFECT_GROUPS).flat();
+
+    // ===== 小工具：轉中文、格式化 =====
+    function prettyTarget(v) {
+      if (!v) return '-';
+      const m = {
+        self: '自己',
+        ally: '友方單體',
+        allies: '友方',
+        'all_allies': '友方全體',
+        enemy: '敵方單體',
+        enemies: '敵方',
+        'all_enemies': '敵方全體',
+        neutral: '任意',
+      };
+      return m[v] || v;
+    }
+    function prettyNum(n) { return (n === null || n === undefined) ? '-' : n; }
+    function prettyCD(extra_cd) {
+      // 有些資料表把技能本體 CD 放別處，這裡先顯示 extra_cd（追加 CD/冷卻增量）
+      return (extra_cd === null || extra_cd === undefined) ? '-' : extra_cd;
+    }
+
+    // ===== 取資料 =====
+    async function fetchEffectSkills() {
+      // 只拿有分類（在 ALL_EFFECT_TYPES）者
+      const { data, error } = await client
+        .from('skill_effects')
+        .select('effect_name, description, target_faction, max_targets, effect_type, extra_cd')
+        .in('effect_type', ALL_EFFECT_TYPES);
+
+      if (error) {
+        console.error(error);
+        return [];
+      }
+      // 排序：名稱字母／數字自然排序
+      return (data || []).sort((a, b) => {
+        return String(a.effect_name || '').localeCompare(String(b.effect_name || ''), 'zh-Hant', { numeric:true });
+      });
+    }
+
+    async function fetchMovementSkills() {
+      const { data, error } = await client
+        .from('movement_skills')
+        .select('move_name, description, target_faction, max_targets, range, extra_cd');
+
+      if (error) {
+        console.error(error);
+        return [];
+      }
+      return (data || []).sort((a, b) => {
+        return String(a.move_name || '').localeCompare(String(b.move_name || ''), 'zh-Hant', { numeric:true });
+      });
+    }
+
+    // ===== 資料載入與快取 =====
+    let EFFECT_CACHE = null;
+    let MOVE_CACHE = null;
+    async function ensureData() {
+      if (!EFFECT_CACHE) EFFECT_CACHE = await fetchEffectSkills();
+      if (!MOVE_CACHE) MOVE_CACHE = await fetchMovementSkills();
+    }
+
+    // ===== 繪表 =====
+    function renderSection(title, rows, isMovement=false) {
+      const wrap = document.createElement('div');
+
+      const h = document.createElement('div');
+      h.className = 'section-title';
+      h.innerHTML = title;
+      wrap.appendChild(h);
+
+      const tableWrap = document.createElement('div');
+      tableWrap.className = 'table-wrap';
+
+      const table = document.createElement('table');
+      const thead = document.createElement('thead');
+      const tbody = document.createElement('tbody');
+
+      thead.innerHTML = `
+        <tr>
+          <th>${isMovement ? '移動技能名稱' : '技能名稱'}</th>
+          <th>技能描述</th>
+          <th>施放對象</th>
+          <th>最多人數</th>
+          <th>CD</th>
+        </tr>
+      `;
+
+      if (!rows || rows.length === 0) {
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = 5;
+        td.className = 'empty';
+        td.textContent = '目前沒有可顯示的技能。';
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+      } else {
+        rows.forEach(r => {
+          const tr = document.createElement('tr');
+          const name = (isMovement ? r.move_name : r.effect_name) || '-';
+          tr.innerHTML = `
+            <td><strong>${name}</strong></td>
+            <td class="desc">${r.description || '-'}</td>
+            <td class="muted">${prettyTarget(r.target_faction)}</td>
+            <td>${prettyNum(r.max_targets)}</td>
+            <td>${prettyCD(r.extra_cd)}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+
+      table.appendChild(thead);
+      table.appendChild(tbody);
+      tableWrap.appendChild(table);
+      wrap.appendChild(tableWrap);
+      return wrap;
+    }
+
+    function renderTab(tabKey) {
+      const content = document.getElementById('content');
+      content.innerHTML = '';
+
+      if (tabKey === 'move') {
+        // 移動技能
+        const sec = renderSection(
+          `<span class="badge">移動</span> 移動技能`,
+          MOVE_CACHE, true
+        );
+        content.appendChild(sec);
+        return;
+      }
+
+      // 一般 + 專屬（_only）
+      const [normalType, onlyType] = EFFECT_GROUPS[tabKey];
+
+      const normals = EFFECT_CACHE.filter(x => x.effect_type === normalType);
+      const onlys = EFFECT_CACHE.filter(x => x.effect_type === onlyType);
+
+      const secA = renderSection(
+        `<span class="badge">${labelOfTab(tabKey)}</span> 一般`,
+        normals
+      );
+      const secB = renderSection(
+        `<span class="badge">${labelOfTab(tabKey)}</span> 專屬限定`,
+        onlys
+      );
+
+      content.appendChild(secA);
+      content.appendChild(secB);
+    }
+
+    function labelOfTab(k) {
+      return {
+        attack: '攻擊',
+        tank: '坦克',
+        heal: '恢復',
+        buff: '增益',
+        debuff: '妨礙',
+        move: '移動'
+      }[k] || k;
+    }
+
+    // ===== Tabs 互動 =====
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        await ensureData();
+        renderTab(btn.dataset.tab);
+      });
+    });
+
+    // 初始化（預設顯示：攻擊）
+    (async function init() {
+      await ensureData();
+      renderTab('attack');
+    })();
+  </script>
+</body>
+</html>
