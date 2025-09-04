@@ -7,7 +7,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <link href="https://fonts.googleapis.com/css?family=Noto+Sans+TC:400,700&display=swap" rel="stylesheet" />
   <style>
-    :root { --name-w: auto; } /* 由 JS 動態設定 */
+    :root { --name-w: auto; } /* 由 JS 動態設定第一欄寬 */
 
     body {
       font-family: 'Noto Sans TC', sans-serif;
@@ -92,8 +92,8 @@
     thead { background: #ddebf7; }
     th, td {
       padding: .6rem .7rem;
-      text-align: left;
-      vertical-align: middle;
+      text-align: left;       /* 靠左 */
+      vertical-align: middle; /* 上下置中 */
       border-bottom: 1px solid #e6eef6;
       line-height: 1.4;
       white-space: normal;
@@ -104,20 +104,17 @@
     .muted { color: #3a4b5f; }
     .empty { text-align: center; padding: 1rem; color: #6c7a8a; }
 
-    /* >700px：第一欄依最長名稱動態寬、其餘欄維持兩字寬不換行 */
+    /* >700px：第一欄依最長名稱動態寬，其餘三欄維持兩字寬不換行，詳細吃剩餘寬 */
     @media (min-width: 701px) {
       th.col-name, td.col-name {
         white-space: nowrap;
         width: var(--name-w);   /* 例如 28ch，由 JS 設定 */
       }
-      th.col-detail, td.col-detail {
-        width: auto;            /* 讓「詳細」吃剩餘空間換行 */
-      }
-      /* 下面三欄維持兩字不換行（約 2～3 個中文字寬度）*/
+      th.col-detail, td.col-detail { width: auto; } /* 詳細自動換行 */
       th.col-target, td.col-target,
       th.col-count,  td.col-count,
       th.col-cd,     td.col-cd {
-        width: 6ch;
+        width: 6ch;            /* 約兩個中文字寬度 */
         white-space: nowrap;
       }
     }
@@ -135,15 +132,21 @@
       }
       .kv {
         display: flex;
-        align-items: center;
+        align-items: center;  /* 上下置中 */
         gap: .6rem;
         padding: .25rem 0;
       }
       .k {
-        width: 2em;          /* 表頭兩字寬 */
+        width: 2em;                 /* 標題兩字寬 */
         font-weight: 700;
         color: #143158;
+        background: #ddebf7;        /* 和表頭同底色 */
+        padding: .1rem .2rem;
+        border-radius: .25rem;
+        line-height: 1.2;
+        word-break: break-all;      /* 讓「技能效果」顯示為「技能／效果」 */
         flex: 0 0 auto;
+        text-align: left;           /* 靠左 */
       }
       .v {
         flex: 1 1 auto;
@@ -156,7 +159,7 @@
 </head>
 <body>
   <div class="container">
-    <h2>謝爾夏｜技能一覽表</h2>
+    <h2>謝爾夏｜技能效果表</h2>
     <div class="hr-blue"></div>
 
     <div class="tabs">
@@ -209,8 +212,7 @@
     function setNameColumnWidth(rows, isMovement=false) {
       const getName = r => (isMovement ? r.move_name : r.effect_name) || '';
       const maxLen = rows.reduce((m, r) => Math.max(m, getName(r).length), 0);
-      // 預留 2ch 邊距、上限避免過寬（可調整）
-      const ch = Math.min(maxLen + 2, 50);
+      const ch = Math.min(maxLen + 2, 50);  // 預留 2ch，最多 50ch
       document.documentElement.style.setProperty('--name-w', ch + 'ch');
     }
 
@@ -290,7 +292,7 @@
       return tableWrap;
     }
 
-    // ===== 手機卡片 =====
+    // ===== 手機卡片（只有一欄標題，兩字寬自動換行）=====
     function renderCards(rows, isMovement=false) {
       const list = document.createElement('div');
       list.className = 'cards';
@@ -305,11 +307,12 @@
 
       rows.forEach(r => {
         const name = (isMovement ? r.move_name : r.effect_name) || '-';
+        const titleLabel = isMovement ? '移動技能' : '技能效果';
+
         const card = document.createElement('div');
         card.className = 'card';
         card.innerHTML = `
-          <div class="kv"><div class="k">技能</div><div class="v"><strong>${name}</strong></div></div>
-          <div class="kv"><div class="k">效果</div><div class="v">${isMovement ? '移動' : '效果'}</div></div>
+          <div class="kv"><div class="k">${titleLabel}</div><div class="v"><strong>${name}</strong></div></div>
           <div class="divider"></div>
           <div class="kv"><div class="k">詳細</div><div class="v">${r.description || '-'}</div></div>
           <div class="divider"></div>
@@ -353,7 +356,9 @@
       const normals = EFFECT_CACHE.filter(x => x.effect_type === normalType);
       const onlys   = EFFECT_CACHE.filter(x => x.effect_type === onlyType);
 
-      const secA = renderSection(`<span class="badge">${TAB_LABEL[tabKey]}</span> 一般`, normals);
+      const secA = renderSection(`<span class="badge">${TAB_LABEL[tabKey]}</span>`, normals);
+
+      // 專職限定：徽章顯示 專攻／專坦／專補／專增益／專妨礙
       const onlyBadge = ONLY_BADGE[onlyType] || '專屬';
       const secB = renderSection(`<span class="badge">${onlyBadge}</span> <span class="hint">專職限定</span>`, onlys);
 
@@ -371,7 +376,7 @@
       });
     });
 
-    // 視窗尺寸改變時，切換表格/卡片；桌機下重新計算第一欄寬
+    // 視窗尺寸改變：切換表格/卡片
     window.addEventListener('resize', () => {
       const active = document.querySelector('.tab-btn.active')?.dataset.tab || 'attack';
       renderTab(active);
