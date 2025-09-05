@@ -287,14 +287,17 @@ function getQueryParam(name) {
 function filterByIdc(groups, idcTitle) {
   if (!idcTitle) return groups;
   const g = {};
-  if (idcTitle === "教師證" || idcTitle === "公務員證") {
-    g[idcTitle] = groups[idcTitle];
+  if (idcTitle === "教師證") {
+    g["教師證"] = groups["教師證"];
   } else if (groups["其他"][idcTitle]) {
     g[idcTitle] = groups["其他"][idcTitle];
+  } else {
+    g[idcTitle] = []; // 沒有這組給空
   }
   g["其他"] = {};
   return g;
 }
+
 window.addEventListener("DOMContentLoaded", ()=>{
   const groups = groupTeachers();
   const idc = getQueryParam('idc');
