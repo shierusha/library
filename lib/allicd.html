@@ -5,7 +5,6 @@
   <title>謝爾夏｜證件一覽表</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://shierusha.github.io/school-battle/teachers/teachers-data.js"></script>
-
   <link href="https://fonts.googleapis.com/css?family=Noto+Sans+TC:400,700&display=swap" rel="stylesheet">
   <style>
 body {
@@ -16,13 +15,6 @@ body {
   background: url(https://shierusha.github.io/create-student/imgs/citybg.png) center center no-repeat;
   background-size: cover;
   min-height: 100vh;
-}
-h2 {
-  color: #143158;
-  text-align: center;
-  margin-bottom: 1.2rem;
-  font-weight: 700;
-  letter-spacing: 1px;
 }
 .container {
   max-width: 950px;
@@ -40,94 +32,124 @@ h2 {
   border-radius: 2px;
   opacity: 0.88;
 }
-.teacher-group { margin-bottom: 2.5em; }
-.group-title {
-  font-weight: bold; font-size: 1.3em;
-  margin: 2em 0 1em 0;
-  color: #143158; letter-spacing: 0.08em;
-  border-bottom: 1.5px solid #1767a0;
-  padding-bottom: 0.4em;
-  background: #eef4f5;
-  border-radius: 0.4em 0.4em 0 0;
-  text-align:left;
-  padding-left:1.2em;
+h2 {
+  color: #143158;
+  text-align: center;
+  margin-bottom: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 1px;
 }
-.teacher-card-list {
+
+/* 卡片排版：每行2張，手機1張 */
+.teacher-list {
   display: grid;
-  grid-template-columns: repeat(2,1fr);
-  gap: 1.5em 1em;
-  margin-bottom:1.5em;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2.3rem 1.3rem;
+  margin-top: 1.5em;
 }
 .teacher-card {
-  background: #eef4f5;
   border-radius: 1.1em;
-  padding: 1.3em;
+  padding: 1.5em 1.3em 1.2em 1.3em;
+  box-shadow: 0 2px 10px #0002, 0 0 0 2.5px rgba(33, 41, 55, 0.5);
+  transition: box-shadow .18s;
+  background: #eef4f5;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+/* 切一半橫排 */
+.card-row {
+  display: flex;
+  width: 100%;
+  height: 100%;
+}
+.card-left, .card-right {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+.card-left {
+  border-right: 1px solid rgba(220,220,220,0.18);
+  padding-right: 1em;
+}
+.card-right {
+  padding-left: 1em;
+}
+/* 頭像與資訊 */
+.avatar-frame {
+  width: 110px; height: 110px;
+  border-radius: 1em;
+  overflow: hidden;
+  background: #e7e8f3;
+  margin-bottom: 1em;
+  display: flex; align-items: center; justify-content: center;
+}
+.avatar-img-canvas {
+  width: 110px; height: 110px;
+  background: #e2e2e2;
+  border-radius: 1em;
+  display: block;
+}
+.teacher-info {
+  width: 100%;
+}
+.teacher-name {
+  font-size: 1.15em;
+  font-weight: bold;
+  min-height: 2.7em;
+  line-height: 1.2em;
+  word-break: break-all;
+  letter-spacing: .04em;
+  text-align: center;
+}
+.card-btn-group {
+  width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
-  box-shadow: 0 2px 8px #0001;
-  border: 1.5px solid #e2e6ed;
-  transition: box-shadow .16s;
-}
-.teacher-card:hover {
-  box-shadow: 0 4px 16px #1767a044, 0 0 0 2.5px #34668933;
-}
-.avatar-img-canvas {
-  width: 90px;
-  height: 90px;
-  border-radius: 0.7em;
-  background: #e2e2e2;
-  display:block;
-  box-shadow: 0 2px 6px #0002;
-  border: 2px solid #dde6ec;
-}
-.teacher-name {
-  margin-top: 0.7em;
-  font-weight: bold;
-  font-size: 1.13em;
-  color: #143158;
-  text-align:center;
-  min-height:2.4em;
-  line-height:1.2em;
-  letter-spacing: 0.02em;
+  gap: 0.55em;
 }
 .btn-link {
-  margin-top: 1.2em;
-  padding: 0.5em 1.3em;
-  font-size: 1em;
+  min-width: 90px;
+  width: 100%;
+  max-width: 220px;
+  margin: 0.18em 0;
+  background: #1767a0;
+  color: #fff;
+  border: none;
   border-radius: 0.5em;
-  border:none;
-  background:#346689;
-  color:#fff;
-  font-weight:600;
-  letter-spacing:0.09em;
-  cursor:pointer;
-  box-shadow:0 2px 8px #0001;
-  transition: background .13s;
+  padding: 0.3em 0.8em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s;
 }
-.btn-link:hover { background: #1767a0; }
+.btn-link:hover { background: #346689; }
 @media (max-width: 700px) {
   .container { padding: 1em; }
-  .teacher-card-list { grid-template-columns: 1fr; }
+  .teacher-list { grid-template-columns: 1fr; }
+}
+@media (max-width: 375px) {
+  .teacher-list { grid-template-columns: 1fr; }
+  .teacher-card { padding: 1.2em 0.7em 1em 0.7em; }
+  .card-row { flex-direction: column; }
+  .card-left, .card-right { padding: 0; border: none; }
 }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h2>謝爾夏｜證件一覽表</h2>
-    <div class="hr-blue"></div>
-    <div id="teacher-list"></div>
+  <div class="container" id="teacher-list-root">
+    <!-- 這裡會被 JS 填入各分組、卡片 -->
   </div>
 <script>
-// -------------- 自動補圖片完整路徑 --------------
+// 圖片路徑自動補全
 function getFullImgUrl(path) {
   if (!path) return "https://fakeimg.pl/120x120?text=No+Photo";
   if (/^https?:\/\//.test(path)) return path;
-  // 自動加 teachers/ 路徑
   return "https://shierusha.github.io/school-battle/teachers/" + path.replace(/^\.?\//,'');
 }
-
-// --------- 分組分類邏輯 ---------
+// 分類
 function groupTeachers() {
   const teachers = window.teachers || {};
   const groups = {
@@ -148,9 +170,8 @@ function groupTeachers() {
   }
   return groups;
 }
-
-// --------- 頭像canvas裁切(從最上方正方形) ---------
-function getTopSquareFromImg(imgUrl, size=90, callback) {
+// 頭像canvas裁切(從最上方正方形)
+function getTopSquareFromImg(imgUrl, size=110, callback) {
   let img = new window.Image();
   img.crossOrigin = "anonymous";
   img.onload = function() {
@@ -161,110 +182,116 @@ function getTopSquareFromImg(imgUrl, size=90, callback) {
     canvas.width = canvas.height = size;
     let ctx = canvas.getContext('2d');
     ctx.clearRect(0,0,size,size);
-    // 只取圖片最上方的正方形部分
     ctx.drawImage(img, sx, sy, cropSize, cropSize, 0, 0, size, size);
     callback(canvas.toDataURL('image/png'));
   };
-  img.onerror = ()=>callback("https://fakeimg.pl/90x90?text=No+Photo");
+  img.onerror = ()=>callback("https://fakeimg.pl/110x110?text=No+Photo");
   img.src = imgUrl;
 }
-
-// --------- 渲染 ---------
-function renderTeachers(grouped) {
-  const wrap = document.getElementById('teacher-list');
-  wrap.innerHTML = '';
-
-  // 分組順序：教師證 -> 其他title(字母順) -> 公務員證
+// 分組顯示
+function renderTeachers(groups) {
+  const root = document.getElementById('teacher-list-root');
+  root.innerHTML = '';
+  // 排序
   const groupOrder = [
-    ["教師證", grouped["教師證"]],
-    ...Object.entries(grouped["其他"]).sort(),
-    ["公務員證", grouped["公務員證"]]
+    ["教師證", groups["教師證"]],
+    ...Object.entries(groups["其他"]).sort(),
+    ["公務員證", groups["公務員證"]]
   ];
-
+  let first = true;
   for (const [gName, list] of groupOrder) {
     if (!list || !list.length) continue;
-    // 組標題
-    const groupDiv = document.createElement('div');
-    groupDiv.className = 'teacher-group';
-
-    const titleDiv = document.createElement('div');
-    titleDiv.className = 'group-title';
-    titleDiv.textContent = "謝爾夏 | " + gName;
-    groupDiv.appendChild(titleDiv);
-
-    // 卡片們
-    const cardList = document.createElement('div');
-    cardList.className = 'teacher-card-list';
-
+    // 分組標題
+    const h2 = document.createElement('h2');
+    h2.textContent = "謝爾夏｜" + gName;
+    root.appendChild(h2);
+    const hr = document.createElement('div');
+    hr.className = "hr-blue";
+    root.appendChild(hr);
+    // 卡片列表
+    const wrap = document.createElement('div');
+    wrap.className = 'teacher-list';
     for (const t of list) {
-      const card = document.createElement('div');
-      card.className = 'teacher-card';
-
-      // canvas 頭像
-      const avatarCanvas = document.createElement('canvas');
-      avatarCanvas.width = avatarCanvas.height = 90;
+      let card = document.createElement('div');
+      card.className = "teacher-card";
+      // 卡片內容橫排
+      let cardRow = document.createElement('div');
+      cardRow.className = "card-row";
+      // 左頭像
+      let left = document.createElement('div');
+      left.className = "card-left";
+      let avatarFrame = document.createElement('div');
+      avatarFrame.className = "avatar-frame";
+      let avatarCanvas = document.createElement('canvas');
+      avatarCanvas.width = avatarCanvas.height = 110;
       avatarCanvas.className = "avatar-img-canvas";
-      card.appendChild(avatarCanvas);
-
-      // 裁切老師圖片 (自動補全路徑)
+      avatarFrame.appendChild(avatarCanvas);
+      left.appendChild(avatarFrame);
+      // 裁切頭像
       getTopSquareFromImg(
         getFullImgUrl(t.img),
-        90,
+        110,
         (dataUrl) => {
           const ctx = avatarCanvas.getContext('2d');
           let tmpImg = new window.Image();
           tmpImg.onload = function() {
-            ctx.clearRect(0,0,90,90);
-            ctx.drawImage(tmpImg,0,0,90,90);
+            ctx.clearRect(0,0,110,110);
+            ctx.drawImage(tmpImg,0,0,110,110);
           }
           tmpImg.src = dataUrl;
         }
       );
-
+      // 右資訊
+      let right = document.createElement('div');
+      right.className = "card-right";
       // 姓名
-      const nameDiv = document.createElement('div');
-      nameDiv.className = 'teacher-name';
-      nameDiv.textContent = t.bigname || t.littlename || t.idc || '';
-      card.appendChild(nameDiv);
-
+      let infoDiv = document.createElement('div');
+      infoDiv.className = "teacher-info";
+      infoDiv.innerHTML = `
+        <div class="teacher-name">${t.bigname || t.littlename || t.idc || ''}</div>
+      `;
+      right.appendChild(infoDiv);
       // 按鈕
-      const btn = document.createElement('button');
+      let btnGroup = document.createElement('div');
+      btnGroup.className = 'card-btn-group';
+      let btn = document.createElement('button');
       btn.className = 'btn-link';
       btn.textContent = t.title?.trim() ? t.title : "教師證";
-      btn.onclick = ()=>window.open(`https://shierusha.github.io/school-battle/teachers/idcard?idc=${t.idc}`, '_blank');
-      card.appendChild(btn);
-
-      cardList.appendChild(card);
+      btn.onclick = ()=>window.open(`https://shierusha.github.io/school-battle/teachers/idcard?idc=${t.idc}`,'_blank');
+      btnGroup.appendChild(btn);
+      right.appendChild(btnGroup);
+      // 組合
+      cardRow.appendChild(left);
+      cardRow.appendChild(right);
+      card.appendChild(cardRow);
+      wrap.appendChild(card);
     }
-    groupDiv.appendChild(cardList);
-    wrap.appendChild(groupDiv);
+    root.appendChild(wrap);
+    first = false;
   }
 }
-
-// ------- 支援網址過濾 ?idc=xxxx -------
+// 支援網址過濾 ?idc=xxx
 function getQueryParam(name) {
   const url = new URL(window.location.href);
   return url.searchParams.get(name);
 }
-function filterByIdc(grouped, idcTitle) {
-  if (!idcTitle) return grouped; // 全部顯示
+function filterByIdc(groups, idcTitle) {
+  if (!idcTitle) return groups;
   const g = {};
   if (idcTitle === "教師證" || idcTitle === "公務員證") {
-    g[idcTitle] = grouped[idcTitle];
-  } else if (grouped["其他"][idcTitle]) {
-    g[idcTitle] = grouped["其他"][idcTitle];
+    g[idcTitle] = groups[idcTitle];
+  } else if (groups["其他"][idcTitle]) {
+    g[idcTitle] = groups["其他"][idcTitle];
   }
   g["其他"] = {};
   return g;
 }
-
 window.addEventListener("DOMContentLoaded", ()=>{
-  const grouped = groupTeachers();
+  const groups = groupTeachers();
   const idc = getQueryParam('idc');
-  const showGroups = idc ? filterByIdc(grouped, idc) : grouped;
+  const showGroups = idc ? filterByIdc(groups, idc) : groups;
   renderTeachers(showGroups);
 });
 </script>
 </body>
 </html>
-
