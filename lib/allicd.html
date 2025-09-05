@@ -5,32 +5,128 @@
   <title>謝爾夏｜證件一覽表</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://shierusha.github.io/school-battle/teachers/teachers-data.js"></script>
+
+  <link href="https://fonts.googleapis.com/css?family=Noto+Sans+TC:400,700&display=swap" rel="stylesheet">
   <style>
 body {
   font-family: 'Noto Sans TC', sans-serif;
   background: #f4f7fa;
   margin: 0;
   padding: 2rem;
+  background: url(https://shierusha.github.io/create-student/imgs/citybg.png) center center no-repeat;
+  background-size: cover;
+  min-height: 100vh;
+}
+h2 {
+  color: #143158;
+  text-align: center;
+  margin-bottom: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+.container {
+  max-width: 950px;
+  margin: auto;
+  background: white;
+  padding: 2rem;
+  border-radius: 1.3rem;
+  box-shadow: 0 2px 16px #0001;
+}
+.hr-blue {
+  width: 80%;
+  height: 4px;
+  background: #1767a0;
+  margin: 0 auto 2em auto;
+  border-radius: 2px;
+  opacity: 0.88;
 }
 .teacher-group { margin-bottom: 2.5em; }
-.group-title { font-weight: bold; font-size: 1.5em; margin: 1.5em 0 1em 0; color: #143158; letter-spacing: 0.08em; }
-.teacher-card-list { display: grid; grid-template-columns: repeat(2,1fr); gap: 1.2em 1em; }
-.teacher-card {
-  background: #eef4f5; border-radius: 1.1em; padding: 1.3em; display: flex; flex-direction: column; align-items: center;
-  box-shadow: 0 2px 8px #0001;
+.group-title {
+  font-weight: bold; font-size: 1.3em;
+  margin: 2em 0 1em 0;
+  color: #143158; letter-spacing: 0.08em;
+  border-bottom: 1.5px solid #1767a0;
+  padding-bottom: 0.4em;
+  background: #eef4f5;
+  border-radius: 0.4em 0.4em 0 0;
+  text-align:left;
+  padding-left:1.2em;
 }
-.avatar-img-canvas { width: 90px; height: 90px; border-radius: 0.7em; background: #e2e2e2; display:block; }
-.teacher-name { margin-top: 0.7em; font-weight: bold; font-size: 1.1em; color: #143158; text-align:center;}
-.btn-link { margin-top: 1em; padding: 0.4em 1.3em; font-size: 1em; border-radius: 0.5em; border:none; background:#346689; color:#fff; font-weight:600; cursor:pointer;}
-@media (max-width: 600px) {
+.teacher-card-list {
+  display: grid;
+  grid-template-columns: repeat(2,1fr);
+  gap: 1.5em 1em;
+  margin-bottom:1.5em;
+}
+.teacher-card {
+  background: #eef4f5;
+  border-radius: 1.1em;
+  padding: 1.3em;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-shadow: 0 2px 8px #0001;
+  border: 1.5px solid #e2e6ed;
+  transition: box-shadow .16s;
+}
+.teacher-card:hover {
+  box-shadow: 0 4px 16px #1767a044, 0 0 0 2.5px #34668933;
+}
+.avatar-img-canvas {
+  width: 90px;
+  height: 90px;
+  border-radius: 0.7em;
+  background: #e2e2e2;
+  display:block;
+  box-shadow: 0 2px 6px #0002;
+  border: 2px solid #dde6ec;
+}
+.teacher-name {
+  margin-top: 0.7em;
+  font-weight: bold;
+  font-size: 1.13em;
+  color: #143158;
+  text-align:center;
+  min-height:2.4em;
+  line-height:1.2em;
+  letter-spacing: 0.02em;
+}
+.btn-link {
+  margin-top: 1.2em;
+  padding: 0.5em 1.3em;
+  font-size: 1em;
+  border-radius: 0.5em;
+  border:none;
+  background:#346689;
+  color:#fff;
+  font-weight:600;
+  letter-spacing:0.09em;
+  cursor:pointer;
+  box-shadow:0 2px 8px #0001;
+  transition: background .13s;
+}
+.btn-link:hover { background: #1767a0; }
+@media (max-width: 700px) {
+  .container { padding: 1em; }
   .teacher-card-list { grid-template-columns: 1fr; }
 }
   </style>
 </head>
 <body>
-  <h2 style="text-align:center;color:#143158;">謝爾夏｜證件一覽表</h2>
-  <div id="teacher-list"></div>
+  <div class="container">
+    <h2>謝爾夏｜證件一覽表</h2>
+    <div class="hr-blue"></div>
+    <div id="teacher-list"></div>
+  </div>
 <script>
+// -------------- 自動補圖片完整路徑 --------------
+function getFullImgUrl(path) {
+  if (!path) return "https://fakeimg.pl/120x120?text=No+Photo";
+  if (/^https?:\/\//.test(path)) return path;
+  // 自動加 teachers/ 路徑
+  return "https://shierusha.github.io/school-battle/teachers/" + path.replace(/^\.?\//,'');
+}
+
 // --------- 分組分類邏輯 ---------
 function groupTeachers() {
   const teachers = window.teachers || {};
@@ -58,20 +154,14 @@ function getTopSquareFromImg(imgUrl, size=90, callback) {
   let img = new window.Image();
   img.crossOrigin = "anonymous";
   img.onload = function() {
-    // 決定正方形大小
     let cropSize = Math.min(img.width, img.height);
-    // 上到下取正方形，從頂端開始
     let sx = 0;
     let sy = 0;
-    if (img.width > img.height) sx = 0;
-    else sy = 0;
-
-    // 如果高度比寬多，還是取上方正方形
     let canvas = document.createElement('canvas');
     canvas.width = canvas.height = size;
     let ctx = canvas.getContext('2d');
     ctx.clearRect(0,0,size,size);
-    // drawImage: 原圖, 裁切x, 裁切y, 裁切w, 裁切h, 目標x, 目標y, 目標w, 目標h
+    // 只取圖片最上方的正方形部分
     ctx.drawImage(img, sx, sy, cropSize, cropSize, 0, 0, size, size);
     callback(canvas.toDataURL('image/png'));
   };
@@ -110,15 +200,15 @@ function renderTeachers(grouped) {
       const card = document.createElement('div');
       card.className = 'teacher-card';
 
-      // 先放一個空canvas
+      // canvas 頭像
       const avatarCanvas = document.createElement('canvas');
       avatarCanvas.width = avatarCanvas.height = 90;
       avatarCanvas.className = "avatar-img-canvas";
       card.appendChild(avatarCanvas);
 
-      // 裁切老師圖片
+      // 裁切老師圖片 (自動補全路徑)
       getTopSquareFromImg(
-        t.img || "https://fakeimg.pl/120x120?text=No+Photo",
+        getFullImgUrl(t.img),
         90,
         (dataUrl) => {
           const ctx = avatarCanvas.getContext('2d');
@@ -158,14 +248,13 @@ function getQueryParam(name) {
 }
 function filterByIdc(grouped, idcTitle) {
   if (!idcTitle) return grouped; // 全部顯示
-  // idcTitle 可能是"教師證", "公務員證"或其他title
   const g = {};
   if (idcTitle === "教師證" || idcTitle === "公務員證") {
     g[idcTitle] = grouped[idcTitle];
   } else if (grouped["其他"][idcTitle]) {
     g[idcTitle] = grouped["其他"][idcTitle];
   }
-  g["其他"] = {}; // 不要有多的
+  g["其他"] = {};
   return g;
 }
 
@@ -178,3 +267,4 @@ window.addEventListener("DOMContentLoaded", ()=>{
 </script>
 </body>
 </html>
+
