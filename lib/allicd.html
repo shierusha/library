@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <title>謝爾夏｜證件一覽表</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="teachers-data.js"></script>
+  <style>
+body {
+  font-family: 'Noto Sans TC', sans-serif;
+  background: #f4f7fa;
+  margin: 0;
+  padding: 2rem;
+}
+.teacher-group { margin-bottom: 2.5em; }
+.group-title { font-weight: bold; font-size: 1.5em; margin: 1.5em 0 1em 0; color: #143158; letter-spacing: 0.08em; }
+.teacher-card-list { display: grid; grid-template-columns: repeat(2,1fr); gap: 1.2em 1em; }
+.teacher-card {
+  background: #eef4f5; border-radius: 1.1em; padding: 1.3em; display: flex; flex-direction: column; align-items: center;
+  box-shadow: 0 2px 8px #0001;
+}
+.avatar-img-canvas { width: 90px; height: 90px; border-radius: 0.7em; background: #e2e2e2; display:block; }
+.teacher-name { margin-top: 0.7em; font-weight: bold; font-size: 1.1em; color: #143158; text-align:center;}
+.btn-link { margin-top: 1em; padding: 0.4em 1.3em; font-size: 1em; border-radius: 0.5em; border:none; background:#346689; color:#fff; font-weight:600; cursor:pointer;}
+@media (max-width: 600px) {
+  .teacher-card-list { grid-template-columns: 1fr; }
+}
+  </style>
+</head>
+<body>
+  <h2 style="text-align:center;color:#143158;">謝爾夏｜證件一覽表</h2>
+  <div id="teacher-list"></div>
+<script>
+// --------- 分組分類邏輯 ---------
+function groupTeachers() {
+  const teachers = window.teachers || {};
+  const groups = {
+    "教師證": [],
+    "公務員證": [],
+    "其他": {}
+  };
+  for (const [key, teacher] of Object.entries(teachers)) {
+    const title = teacher.title?.trim();
+    if (!title) {
+      groups["教師證"].push({...teacher, idc: key});
+    } else if (title === "公務員證") {
+      groups["公務員證"].push({...teacher, idc: key});
+    } else {
+      if (!groups["其他"][title]) groups["其他"][title] = [];
+      groups["其他"][title].push({...teacher, idc: key});
+    }
+  }
+  return groups;
+}
+
+// --------- 頭像canvas裁切(從最上方正方形) ---------
+function getTopSquareFromImg(imgUrl, size=90, callback) {
+  let img = new window.Image();
+  img.crossOrigin = "anonymous";
+  img.onload = function() {
+    // 決定正方形大小
+    let cropSize = Math.min(img.width, img.height);
+    // 上到下取正方形，從頂端開始
+    let sx = 0;
+    let sy = 0;
+    if (img.width > img.height) sx = 0;
+    else sy = 0;
+
+    // 如果高度比寬多，還是取上方正方形
+    let canvas = document.createElement('canvas');
+    canvas.width = canvas.height = size;
+    let ctx = canvas.getContext('2d');
+    ctx.clearRect(0,0,size,size);
+    // drawImage: 原圖, 裁切x, 裁切y, 裁切w, 裁切h, 目標x, 目標y, 目標w, 目標h
+    ctx.drawImage(img, sx, sy, cropSize, cropSize, 0, 0, size, size);
+    callback(canvas.toDataURL('image/png'));
+  };
+  img.onerror = ()=>callback("https://fakeimg.pl/90x90?text=No+Photo");
+  img.src = imgUrl;
+}
+
+// --------- 渲染 ---------
+function renderTeachers(grouped) {
+  const wrap = document.getElementById('teacher-list');
+  wrap.innerHTML = '';
+
+  // 分組順序：教師證 -> 其他title(字母順) -> 公務員證
+  const groupOrder = [
+    ["教師證", grouped["教師證"]],
+    ...Object.entries(grouped["其他"]).sort(),
+    ["公務員證", grouped["公務員證"]]
+  ];
+
+  for (const [gName, list] of groupOrder) {
+    if (!list || !list.length) continue;
+    // 組標題
+    const groupDiv = document.createElement('div');
+    groupDiv.className = 'teacher-group';
+
+    const titleDiv = document.createElement('div');
+    titleDiv.className = 'group-title';
+    titleDiv.textContent = "謝爾夏 | " + gName;
+    groupDiv.appendChild(titleDiv);
+
+    // 卡片們
+    const cardList = document.createElement('div');
+    cardList.className = 'teacher-card-list';
+
+    for (const t of list) {
+      const card = document.createElement('div');
+      card.className = 'teacher-card';
+
+      // 先放一個空canvas
+      const avatarCanvas = document.createElement('canvas');
+      avatarCanvas.width = avatarCanvas.height = 90;
+      avatarCanvas.className = "avatar-img-canvas";
+      card.appendChild(avatarCanvas);
+
+      // 裁切老師圖片
+      getTopSquareFromImg(
+        t.img || "https://fakeimg.pl/120x120?text=No+Photo",
+        90,
+        (dataUrl) => {
+          const ctx = avatarCanvas.getContext('2d');
+          let tmpImg = new window.Image();
+          tmpImg.onload = function() {
+            ctx.clearRect(0,0,90,90);
+            ctx.drawImage(tmpImg,0,0,90,90);
+          }
+          tmpImg.src = dataUrl;
+        }
+      );
+
+      // 姓名
+      const nameDiv = document.createElement('div');
+      nameDiv.className = 'teacher-name';
+      nameDiv.textContent = t.bigname || t.littlename || t.idc || '';
+      card.appendChild(nameDiv);
+
+      // 按鈕
+      const btn = document.createElement('button');
+      btn.className = 'btn-link';
+      btn.textContent = t.title?.trim() ? t.title : "教師證";
+      btn.onclick = ()=>window.open(`https://shierusha.github.io/school-battle/teachers/idcard?idc=${t.idc}`, '_blank');
+      card.appendChild(btn);
+
+      cardList.appendChild(card);
+    }
+    groupDiv.appendChild(cardList);
+    wrap.appendChild(groupDiv);
+  }
+}
+
+// ------- 支援網址過濾 ?idc=xxxx -------
+function getQueryParam(name) {
+  const url = new URL(window.location.href);
+  return url.searchParams.get(name);
+}
+function filterByIdc(grouped, idcTitle) {
+  if (!idcTitle) return grouped; // 全部顯示
+  // idcTitle 可能是"教師證", "公務員證"或其他title
+  const g = {};
+  if (idcTitle === "教師證" || idcTitle === "公務員證") {
+    g[idcTitle] = grouped[idcTitle];
+  } else if (grouped["其他"][idcTitle]) {
+    g[idcTitle] = grouped["其他"][idcTitle];
+  }
+  g["其他"] = {}; // 不要有多的
+  return g;
+}
+
+window.addEventListener("DOMContentLoaded", ()=>{
+  const grouped = groupTeachers();
+  const idc = getQueryParam('idc');
+  const showGroups = idc ? filterByIdc(grouped, idc) : grouped;
+  renderTeachers(showGroups);
+});
+</script>
+</body>
+</html>
