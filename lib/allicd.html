@@ -152,41 +152,20 @@ h2 {
     <!-- 這裡會被 JS 填入各分組、卡片 -->
   </div>
 <script>
-// 圖片路徑自動補全
+// 取得圖片完整路徑
 function getFullImgUrl(path) {
   if (!path) return "https://fakeimg.pl/120x120?text=No+Photo";
   if (/^https?:\/\//.test(path)) return path;
   return "https://shierusha.github.io/school-battle/teachers/" + path.replace(/^\.?\//,'');
 }
-// 分類
-function groupTeachers() {
-  const teachers = window.teachers || {};
-  const groups = {
-    "教師證": [],
-    "公務員證": [],
-    "其他": {}
-  };
-  for (const [key, teacher] of Object.entries(teachers)) {
-    const title = teacher.title?.trim();
-    if (!title) {
-      groups["教師證"].push({...teacher, idc: key});
-    } else if (title === "公務員證") {
-      groups["公務員證"].push({...teacher, idc: key});
-    } else {
-      if (!groups["其他"][title]) groups["其他"][title] = [];
-      groups["其他"][title].push({...teacher, idc: key});
-    }
-  }
-  return groups;
-}
-// 頭像canvas裁切(從最上方正方形)
+
+// canvas裁切圖片最上方正方形
 function getTopSquareFromImg(imgUrl, size=110, callback) {
   let img = new window.Image();
   img.crossOrigin = "anonymous";
   img.onload = function() {
     let cropSize = Math.min(img.width, img.height);
-    let sx = 0;
-    let sy = 0;
+    let sx = 0, sy = 0;
     let canvas = document.createElement('canvas');
     canvas.width = canvas.height = size;
     let ctx = canvas.getContext('2d');
@@ -197,18 +176,41 @@ function getTopSquareFromImg(imgUrl, size=110, callback) {
   img.onerror = ()=>callback("https://fakeimg.pl/110x110?text=No+Photo");
   img.src = imgUrl;
 }
-// 分組顯示
+
+// 分組，title=""歸為教師證，其它title全部自動分組
+function groupTeachers() {
+  const teachers = window.teachers || {};
+  const groups = {};
+  for (const [key, teacher] of Object.entries(teachers)) {
+    let title = teacher.title?.trim();
+    if (!title) title = "教師證";
+    if (!groups[title]) groups[title] = [];
+    groups[title].push({...teacher, idc: key});
+  }
+  return groups;
+}
+
+// 支援 ?idc=xxx 只顯示指定分組
+function getQueryParam(name) {
+  const url = new URL(window.location.href);
+  return url.searchParams.get(name);
+}
+function filterByIdc(groups, idcTitle) {
+  if (!idcTitle) return groups;
+  const g = {};
+  g[idcTitle] = groups[idcTitle] || [];
+  return g;
+}
+
+// 渲染老師卡片：教師證第一，其它自動排序，公務員證永遠最後
 function renderTeachers(groups) {
   const root = document.getElementById('teacher-list-root');
   root.innerHTML = '';
-  // 排序
-  const groupOrder = [
-    ["教師證", groups["教師證"]],
-    ...Object.entries(groups["其他"]).sort(),
-    ["公務員證", groups["公務員證"]]
-  ];
-  let first = true;
-  for (const [gName, list] of groupOrder) {
+  const titles = Object.keys(groups);
+  const middle = titles.filter(t => t !== "教師證" && t !== "公務員證").sort();
+  const order = ["教師證", ...middle, "公務員證"];
+  for (const gName of order) {
+    const list = groups[gName];
     if (!list || !list.length) continue;
     // 分組標題
     const h2 = document.createElement('h2');
@@ -256,9 +258,7 @@ function renderTeachers(groups) {
       // 姓名
       let infoDiv = document.createElement('div');
       infoDiv.className = "teacher-info";
-      infoDiv.innerHTML = `
-        <div class="teacher-name">${t.bigname || t.littlename || t.idc || ''}</div>
-      `;
+      infoDiv.innerHTML = `<div class="teacher-name">${t.bigname || t.littlename || t.idc || ''}</div>`;
       right.appendChild(infoDiv);
       // 按鈕
       let btnGroup = document.createElement('div');
@@ -276,34 +276,17 @@ function renderTeachers(groups) {
       wrap.appendChild(card);
     }
     root.appendChild(wrap);
-    first = false;
   }
-}
-// 支援網址過濾 ?idc=xxx
-function getQueryParam(name) {
-  const url = new URL(window.location.href);
-  return url.searchParams.get(name);
-}
-function filterByIdc(groups, idcTitle) {
-  if (!idcTitle) return groups;
-  const g = {};
-  if (idcTitle === "教師證") {
-    g["教師證"] = groups["教師證"];
-  } else if (groups["其他"][idcTitle]) {
-    g[idcTitle] = groups["其他"][idcTitle];
-  } else {
-    g[idcTitle] = []; // 沒有這組給空
-  }
-  g["其他"] = {};
-  return g;
 }
 
+// 啟動
 window.addEventListener("DOMContentLoaded", ()=>{
   const groups = groupTeachers();
   const idc = getQueryParam('idc');
   const showGroups = idc ? filterByIdc(groups, idc) : groups;
   renderTeachers(showGroups);
 });
+
 </script>
 </body>
 </html>
