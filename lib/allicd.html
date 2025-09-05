@@ -56,6 +56,10 @@ h2 {
   display: flex;
   flex-direction: column;
   align-items: stretch;
+   max-width: 400px;
+    width: 80%;
+    margin: 0 auto;
+    min-width: 310px;
 }
 /* 切一半橫排 */
 .card-row {
@@ -126,13 +130,18 @@ h2 {
   transition: background .15s;
 }
 .btn-link:hover { background: #346689; }
-@media (max-width: 700px) {
+@media (max-width: 900px) {
   .container { padding: 1em; }
   .teacher-list { grid-template-columns: 1fr; }
 }
 @media (max-width: 375px) {
   .teacher-list { grid-template-columns: 1fr; }
-  .teacher-card { padding: 1.2em 0.7em 1em 0.7em; }
+  .teacher-card {
+        padding: 1.2em 0.7em 1em 0.7em;
+        max-width: 200px;
+        margin: 0 auto;
+      min-width:100px;
+    }
   .card-row { flex-direction: column; }
   .card-left, .card-right { padding: 0; border: none; }
 }
