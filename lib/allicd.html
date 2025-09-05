@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8">
-  <title>謝爾夏｜教師證</title>
+  <title>謝爾夏｜證件一覽表</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://shierusha.github.io/school-battle/teachers/teachers-data.js"></script>
   <link href="https://fonts.googleapis.com/css?family=Noto+Sans+TC:400,700&display=swap" rel="stylesheet">
@@ -46,7 +46,6 @@ h2 {
   grid-template-columns: repeat(2, 1fr);
   gap: 2.3rem 1.3rem;
   margin-top: 1.5em;
-  justify-content: center;
 }
 .teacher-card {
   border-radius: 1.1em;
@@ -57,12 +56,8 @@ h2 {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  max-width: 260px;
-  width: 100%;
-  margin: 0 auto;
 }
-
-/* 卡片內容橫排 */
+/* 切一半橫排 */
 .card-row {
   display: flex;
   width: 100%;
@@ -82,7 +77,6 @@ h2 {
 .card-right {
   padding-left: 1em;
 }
-
 /* 頭像與資訊 */
 .avatar-frame {
   width: 110px; height: 110px;
@@ -132,39 +126,13 @@ h2 {
   transition: background .15s;
 }
 .btn-link:hover { background: #346689; }
-
-/* 700px 以下：卡片每列兩個，每個卡片寬170px，上下直排 */
 @media (max-width: 700px) {
   .container { padding: 1em; }
-  .teacher-list {
-    grid-template-columns: repeat(2, 170px);
-    gap: 1.5rem 0.5rem;
-    justify-content: center;
-  }
-  .teacher-card {
-    max-width: 170px;
-    width: 100%;
-    margin: 0 auto;
-    padding: 1.1em 0.8em 1em 0.8em;
-  }
-  .avatar-frame {
-    width: 70px; height: 70px;
-    margin-bottom: 0.7em;
-  }
-  .avatar-img-canvas {
-    width: 70px; height: 70px;
-  }
+  .teacher-list { grid-template-columns: 1fr; }
 }
-
-/* 375px 以下：單欄直排 */
 @media (max-width: 375px) {
-  .teacher-list {
-    grid-template-columns: 1fr;
-  }
-  .teacher-card {
-    max-width: 95vw;
-    width: 100%;
-  }
+  .teacher-list { grid-template-columns: 1fr; }
+  .teacher-card { padding: 1.2em 0.7em 1em 0.7em; }
   .card-row { flex-direction: column; }
   .card-left, .card-right { padding: 0; border: none; }
 }
@@ -172,7 +140,7 @@ h2 {
 </head>
 <body>
   <div class="container" id="teacher-list-root">
-    <!-- JS 會自動產生分組標題與卡片 -->
+    <!-- 這裡會被 JS 填入各分組、卡片 -->
   </div>
 <script>
 // 圖片路徑自動補全
@@ -202,7 +170,7 @@ function groupTeachers() {
   }
   return groups;
 }
-// canvas頭像（最上正方形）
+// 頭像canvas裁切(從最上方正方形)
 function getTopSquareFromImg(imgUrl, size=110, callback) {
   let img = new window.Image();
   img.crossOrigin = "anonymous";
@@ -255,20 +223,20 @@ function renderTeachers(groups) {
       let avatarFrame = document.createElement('div');
       avatarFrame.className = "avatar-frame";
       let avatarCanvas = document.createElement('canvas');
-      avatarCanvas.width = avatarCanvas.height = window.innerWidth <= 700 ? 70 : 110;
+      avatarCanvas.width = avatarCanvas.height = 110;
       avatarCanvas.className = "avatar-img-canvas";
       avatarFrame.appendChild(avatarCanvas);
       left.appendChild(avatarFrame);
       // 裁切頭像
       getTopSquareFromImg(
         getFullImgUrl(t.img),
-        window.innerWidth <= 700 ? 70 : 110,
+        110,
         (dataUrl) => {
           const ctx = avatarCanvas.getContext('2d');
           let tmpImg = new window.Image();
           tmpImg.onload = function() {
-            ctx.clearRect(0,0,avatarCanvas.width,avatarCanvas.height);
-            ctx.drawImage(tmpImg,0,0,avatarCanvas.width,avatarCanvas.height);
+            ctx.clearRect(0,0,110,110);
+            ctx.drawImage(tmpImg,0,0,110,110);
           }
           tmpImg.src = dataUrl;
         }
@@ -323,10 +291,6 @@ window.addEventListener("DOMContentLoaded", ()=>{
   const idc = getQueryParam('idc');
   const showGroups = idc ? filterByIdc(groups, idc) : groups;
   renderTeachers(showGroups);
-});
-// 手機畫面resize時 canvas自動適應大小（可選）
-window.addEventListener("resize", ()=>{
-  // 可以自動刷新，但不強制
 });
 </script>
 </body>
