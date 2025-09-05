@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <title>謝爾夏｜技能效果表</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css?family=Noto+Sans+TC:400,700&display=swap" rel="stylesheet" />
+  <style>
+    :root { --name-w: auto; } /* 由 JS 動態設定第一欄寬 */
+
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+      background: url(https://shierusha.github.io/create-student/imgs/citybg.png) center center no-repeat;
+      background-size: cover;
+      margin: 0;
+      padding: 2rem;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 1100px;
+      margin: auto;
+      background: #fff;
+      padding: 1.4rem;
+      border-radius: 1.1rem;
+      box-shadow: 0 2px 16px #0001;
+    }
+    h2 {
+      color: #143158;
+      text-align: center;
+      margin: 0 0 .6rem 0;
+      font-weight: 700;
+      letter-spacing: 1px;
+    }
+    .hr-blue {
+      width: 80%;
+      height: 4px;
+      background: #1767a0;
+      margin: .6rem auto 1.2rem auto;
+      border-radius: 2px;
+      opacity: .88;
+    }
+
+    /* tabs */
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .6rem;
+      justify-content: center;
+      margin-bottom: 1rem;
+    }
+    .tab-btn {
+      border: none;
+      background: #e9f1f9;
+      color: #143158;
+      padding: .5rem .9rem;
+      border-radius: .6rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 1px 4px #0001;
+    }
+    .tab-btn.active { background: #1767a0; color: #fff; }
+
+    .section-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #1767a0;
+      margin: 1.2rem 0 .4rem 0;
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+    }
+    .section-title .badge {
+      background: #143158;
+      color: #fff;
+      font-size: .8rem;
+      padding: .1rem .45rem;
+      border-radius: .4rem;
+    }
+    .section-title .hint { color: #3a4b5f; font-size: .9rem; }
+
+    .table-wrap { overflow-x: hidden; } /* 不要水平捲動 */
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #f7fbff;
+      border-radius: .6rem;
+      overflow: hidden;
+      table-layout: auto; /* 讓欄寬由內容決定 */
+    }
+    thead { background: #ddebf7; }
+    th, td {
+      padding: .6rem .7rem;
+      text-align: left;       /* 靠左 */
+      vertical-align: middle; /* 上下置中 */
+      border-bottom: 1px solid #e6eef6;
+      line-height: 1.4;
+      white-space: normal;
+    }
+    th { font-weight: 700; color: #143158; }
+    tbody tr:hover { background: #eef6ff; }
+    .desc { color: #3a4b5f; font-size: .95rem;white-space: pre-wrap;  }
+    .muted { color: #3a4b5f; }
+    .empty { text-align: center; padding: 1rem; color: #6c7a8a; }
+
+    /* >700px：第一欄依最長名稱動態寬，其餘三欄維持兩字寬不換行，詳細吃剩餘寬 */
+    @media (min-width: 701px) {
+      th.col-name, td.col-name {
+        white-space: nowrap;
+        width: var(--name-w);   /* 例如 28ch，由 JS 設定 */
+      }
+      th.col-detail, td.col-detail { width: auto; } /* 詳細自動換行 */
+      th.col-target, td.col-target,
+      th.col-count,  td.col-count,
+      th.col-cd,     td.col-cd {
+        width: 6ch;            /* 約兩個中文字寬度 */
+        white-space: nowrap;
+      }
+    }
+
+    /* 手機卡片版（<=700px） */
+    @media (max-width: 700px) {
+      table { display: none; }
+      .cards { display: grid; gap: .8rem; }
+      .card {
+        background: #f7fbff;
+        border: 1px solid #e6eef6;
+        border-radius: .6rem;
+        padding: .6rem .75rem;
+        box-shadow: 0 1px 4px #0001;
+      }
+      .kv {
+        display: flex;
+        align-items: center;  /* 上下置中 */
+        gap: 1.6rem;
+        padding: .25rem 0;
+      }
+      .k {
+        width: 2em;                 /* 標題兩字寬 */
+        font-weight: 700;
+        color: #143158;
+        padding: .1rem .2rem;
+        border-radius: .25rem;
+        line-height: 1.2;
+        word-break: break-all;      /* 讓「技能效果」顯示為「技能／效果」 */
+        flex: 0 0 auto;
+        text-align: left;           /* 靠左 */
+      }
+      .v {
+        flex: 1 1 auto;
+        color: #3a4b5f;
+        text-align: left;
+        white-space: pre-wrap; 
+      }
+      .divider { height: 1px; background: #e6eef6; margin: .25rem 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>謝爾夏｜技能效果表</h2>
+    <div class="hr-blue"></div>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="attack">攻擊</button>
+      <button class="tab-btn" data-tab="tank">坦克</button>
+      <button class="tab-btn" data-tab="heal">恢復</button>
+      <button class="tab-btn" data-tab="buff">增益</button>
+      <button class="tab-btn" data-tab="debuff">妨礙</button>
+      <button class="tab-btn" data-tab="move">移動</button>
+    </div>
+
+    <div id="content"></div>
+  </div>
+
+  <script>
+    // ===== Supabase 連線 =====
+    const client = window.supabase.createClient(
+      'https://wfhwhvodgikpducrhgda.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmaHdodm9kZ2lrcGR1Y3JoZ2RhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgwMTAwNjEsImV4cCI6MjA2MzU4NjA2MX0.P6P-x4SxjiR4VdWH6VFgY_ktgMac_OzuI4Bl7HWskz8'
+    );
+
+    // ===== 類別白名單（排除客製化）=====
+    const EFFECT_GROUPS = {
+      attack: ['attack', 'attack_only'],
+      tank:   ['tank',   'tank_only'],
+      heal:   ['heal',   'heal_only'],
+      buff:   ['buff',   'buff_only'],
+      debuff: ['debuff', 'debuff_only']
+    };
+    const ALL_EFFECT_TYPES = Object.values(EFFECT_GROUPS).flat();
+
+    // ===== 中文對照 =====
+    const TAB_LABEL = { attack:'攻擊', tank:'坦克', heal:'恢復', buff:'增益', debuff:'妨礙', move:'移動' };
+    const ONLY_BADGE = {
+      attack_only: '專攻',
+      tank_only:   '專坦',
+      heal_only:   '專補',
+      buff_only:   '專增益',
+      debuff_only: '專妨礙'
+    };
+    const TARGET_MAP = { self:'自身', ally:'隊友', team:'我方', enemy:'敵方' };
+
+    // ===== 小工具 =====
+    const isMobile = () => window.matchMedia('(max-width: 700px)').matches;
+    const prettyTarget = v => v ? (TARGET_MAP[v] || v) : '-';
+    const prettyCount  = n => (n === 1 ? '單體' : (n == null ? '-' : String(n)));
+    const prettyCD     = n => (n == null ? '-' : n);
+
+    // 動態設定第一欄寬度（依當前列表最長名稱）
+    function setNameColumnWidth(rows, isMovement=false) {
+      const getName = r => (isMovement ? r.move_name : r.effect_name) || '';
+      const maxLen = rows.reduce((m, r) => Math.max(m, getName(r).length), 0);
+      const ch = Math.min(maxLen + 2, 50);  // 預留 2ch，最多 50ch
+      document.documentElement.style.setProperty('--name-w', ch + 'ch');
+    }
+
+    // ===== 取資料 =====
+    async function fetchEffectSkills() {
+      const { data, error } = await client
+        .from('skill_effects')
+        .select('effect_name, description, target_faction, max_targets, effect_type, extra_cd')
+        .in('effect_type', ALL_EFFECT_TYPES);
+      if (error) { console.error(error); return []; }
+      return (data || []).sort((a, b) =>
+        String(a.effect_name || '').localeCompare(String(b.effect_name || ''), 'zh-Hant', { numeric:true })
+      );
+    }
+
+    async function fetchMovementSkills() {
+      const { data, error } = await client
+        .from('movement_skills')
+        .select('move_name, description, target_faction, max_targets, range, extra_cd');
+      if (error) { console.error(error); return []; }
+      return (data || []).sort((a, b) =>
+        String(a.move_name || '').localeCompare(String(b.move_name || ''), 'zh-Hant', { numeric:true })
+      );
+    }
+
+    let EFFECT_CACHE = null;
+    let MOVE_CACHE = null;
+    async function ensureData() {
+      if (!EFFECT_CACHE) EFFECT_CACHE = await fetchEffectSkills();
+      if (!MOVE_CACHE) MOVE_CACHE = await fetchMovementSkills();
+    }
+
+    // ===== 桌機表格 =====
+    function renderTable(rows, isMovement=false) {
+      setNameColumnWidth(rows, isMovement); // 依當前資料調整第一欄寬
+
+      const tableWrap = document.createElement('div');
+      tableWrap.className = 'table-wrap';
+
+      const table = document.createElement('table');
+      const thead = document.createElement('thead');
+      const tbody = document.createElement('tbody');
+
+      thead.innerHTML = `
+        <tr>
+          <th class="col-name">技能效果</th>
+          <th class="col-detail">詳細</th>
+          <th class="col-target">對象</th>
+          <th class="col-count">人數</th>
+          <th class="col-cd">CD</th>
+        </tr>
+      `;
+
+      if (!rows || rows.length === 0) {
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = 5; td.className = 'empty'; td.textContent = '目前沒有可顯示的技能。';
+        tr.appendChild(td); tbody.appendChild(tr);
+      } else {
+        rows.forEach(r => {
+          const name = (isMovement ? r.move_name : r.effect_name) || '-';
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td class="col-name"><strong>${name}</strong></td>
+            <td class="col-detail desc">${r.description || '-'}</td>
+            <td class="col-target muted">${prettyTarget(r.target_faction)}</td>
+            <td class="col-count">${prettyCount(r.max_targets)}</td>
+            <td class="col-cd">${prettyCD(r.extra_cd)}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+
+      table.appendChild(thead);
+      table.appendChild(tbody);
+      tableWrap.appendChild(table);
+      return tableWrap;
+    }
+
+    // ===== 手機卡片（只有一欄標題，兩字寬自動換行）=====
+    function renderCards(rows, isMovement=false) {
+      const list = document.createElement('div');
+      list.className = 'cards';
+
+      if (!rows || rows.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'card';
+        empty.textContent = '目前沒有可顯示的技能。';
+        list.appendChild(empty);
+        return list;
+      }
+
+      rows.forEach(r => {
+        const name = (isMovement ? r.move_name : r.effect_name) || '-';
+const titleLabel = '技能效果';
+
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+          <div class="kv"><div class="k">${titleLabel}</div><div class="v"><strong>${name}</strong></div></div>
+          <div class="divider"></div>
+          <div class="kv"><div class="k">詳細</div><div class="v">${r.description || '-'}</div></div>
+          <div class="divider"></div>
+          <div class="kv"><div class="k">對象</div><div class="v">${prettyTarget(r.target_faction)}</div></div>
+          <div class="divider"></div>
+          <div class="kv"><div class="k">人數</div><div class="v">${prettyCount(r.max_targets)}</div></div>
+          <div class="divider"></div>
+          <div class="kv"><div class="k">ＣＤ</div><div class="v">${prettyCD(r.extra_cd)}</div></div>
+        `;
+        list.appendChild(card);
+      });
+
+      return list;
+    }
+
+    // ===== 區塊 =====
+    function renderSection(titleHTML, rows, isMovement=false) {
+      const wrap = document.createElement('div');
+
+      const h = document.createElement('div');
+      h.className = 'section-title';
+      h.innerHTML = titleHTML;
+      wrap.appendChild(h);
+
+      const block = isMobile() ? renderCards(rows, isMovement) : renderTable(rows, isMovement);
+      wrap.appendChild(block);
+      return wrap;
+    }
+
+    function renderTab(tabKey) {
+      const content = document.getElementById('content');
+      content.innerHTML = '';
+
+      if (tabKey === 'move') {
+        const sec = renderSection(`<span class="badge">移動</span>`, MOVE_CACHE, true);
+        content.appendChild(sec);
+        return;
+      }
+
+      const [normalType, onlyType] = EFFECT_GROUPS[tabKey];
+      const normals = EFFECT_CACHE.filter(x => x.effect_type === normalType);
+      const onlys   = EFFECT_CACHE.filter(x => x.effect_type === onlyType);
+
+      const secA = renderSection(`<span class="badge">${TAB_LABEL[tabKey]}</span>`, normals);
+
+      // 專職限定：徽章顯示 專攻／專坦／專補／專增益／專妨礙
+      const onlyBadge = ONLY_BADGE[onlyType] || '專屬';
+      const secB = renderSection(`<span class="badge">${onlyBadge}</span> <span class="hint">專職限定</span>`, onlys);
+
+      content.appendChild(secA);
+      content.appendChild(secB);
+    }
+
+    // Tabs 互動
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        await ensureData();
+        renderTab(btn.dataset.tab);
+      });
+    });
+
+    // 視窗尺寸改變：切換表格/卡片
+    window.addEventListener('resize', () => {
+      const active = document.querySelector('.tab-btn.active')?.dataset.tab || 'attack';
+      renderTab(active);
+    });
+
+    // 初始化
+    (async function init() {
+      await ensureData();
+      renderTab('attack');
+    })();
+  </script>
+</body>
+</html>
