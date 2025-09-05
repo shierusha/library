@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>管理後台｜活動與饅頭管理</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --bg:#0b1220; --panel:#111a2d; --muted:#9fb3d0; --accent:#2bd1ff; --danger:#ff6174; --ok:#5ad47a;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:var(--bg);color:#e9f2ff;font-family:'Noto Sans TC',sans-serif}
+    .container{max-width:1100px;margin:36px auto;padding:0 16px}
+    .card{background:var(--panel);border:1px solid #1f2a43;border-radius:14px;box-shadow:0 10px 30px #0006}
+    .tabs{display:flex;gap:8px;align-items:center;padding:10px;background:#0e1830;border-radius:12px;margin-bottom:16px}
+    .tabs button{appearance:none;border:1px solid #1f2a43;background:#132141;color:#cfe6ff;padding:10px 16px;border-radius:10px;cursor:pointer;font-weight:700}
+    .tabs button.active{background:#17305b;color:#fff;border-color:#2a4f98;box-shadow:0 0 0 2px #2a4f9822 inset}
+    .tabs .spacer{flex:1}
+    .badge{padding:6px 10px;border-radius:999px;background:#132141;border:1px solid #2a4365;color:#9fb3d0;font-size:12px}
+    .danger{color:#fff;background:linear-gradient(0deg,#ff7285,#ff5a70)}
+    .ok{background:linear-gradient(0deg,#66df95,#43c67a);color:#063}
+    .panel{padding:16px}
+    h2{margin:0 0 12px}
+
+    table{width:100%;border-collapse:collapse}
+    th,td{border-bottom:1px solid #1f2a43;padding:10px;vertical-align:middle}
+    th{color:#9fb3d0;text-align:left;font-weight:600}
+    tr:last-child td{border-bottom:none}
+
+    input,select{background:#0f1a33;border:1px solid #243a63;color:#e9f2ff;border-radius:8px;padding:8px 10px;font-size:14px;width:100%}
+    input:disabled{opacity:.7}
+    .row{display:flex;gap:12px;flex-wrap:wrap}
+    .row > *{flex:1}
+
+    .btn{appearance:none;border:1px solid #29446f;background:#102144;color:#cfe6ff;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:700}
+    .btn:hover{filter:brightness(1.1)}
+    .btn.primary{background:#1b3a73;border-color:#2a4f98;color:#fff}
+    .btn.ghost{background:transparent}
+    .btn.danger{background:#7d1422;border-color:#b32035}
+
+    .img-preview{width:72px;height:72px;border-radius:10px;object-fit:cover;border:1px solid #223a66;background:#091225}
+    .hint{color:#9fb3d0;font-size:12px}
+    .toolbar{display:flex;gap:8px;align-items:center;margin:8px 0 16px}
+    .center{display:flex;align-items:center;justify-content:center}
+    .empty{padding:18px;color:#9fb3d0;text-align:center}
+    .mono{font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace}
+    .mt8{margin-top:8px}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="tabs card">
+      <button class="tabBtn active" data-tab="events">活動管理</button>
+      <button class="tabBtn" data-tab="mantou">饅頭管理（限定）</button>
+      <div class="spacer"></div>
+      <span id="roleBadge" class="badge">檢查中…</span>
+      <button id="toPlayer" class="btn ghost">返回玩家中心</button>
+    </div>
+
+    <!-- 活動管理 -->
+    <div id="tab-events" class="card panel">
+      <div class="toolbar">
+        <button id="addEventBtn" class="btn primary">＋ 新增活動</button>
+        <span class="hint">時間以 <b>台北時間</b> 輸入，儲存時會自動轉為 UTC。</span>
+      </div>
+      <div style="overflow:auto">
+        <table id="eventsTable">
+          <thead>
+            <tr>
+              <th>預覽</th>
+              <th>活動名稱（key）</th>
+              <th>顯示名稱</th>
+              <th>DC 討論串 ID</th>
+              <th>開始（台北）</th>
+              <th>結束（台北）</th>
+              <th>圖片 URL</th>
+              <th style="width:160px">操作</th>
+            </tr>
+          </thead>
+          <tbody id="eventsTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 饅頭管理（限定） -->
+    <div id="tab-mantou" class="card panel" style="display:none">
+      <div class="row">
+        <div>
+          <label>選擇活動</label>
+          <select id="eventSelect"></select>
+        </div>
+        <div class="center">
+          <button id="addCharBtn" class="btn primary" disabled>＋ 新增限定饅頭</button>
+        </div>
+      </div>
+
+      <div class="mt8" style="overflow:auto">
+        <table>
+          <thead>
+            <tr>
+              <th>預覽</th>
+              <th>ID</th>
+              <th>名稱</th>
+              <th>圖片 URL</th>
+              <th style="width:160px">操作</th>
+            </tr>
+          </thead>
+          <tbody id="charsTbody"></tbody>
+        </table>
+        <div id="charsEmpty" class="empty" style="display:none">尚無資料</div>
+      </div>
+    </div>
+  </div>
+
+<script>
+/*****************
+  基本設定
+******************/
+const B_URL  = 'https://ogzpfrkwnqqaitytncla.supabase.co';
+const B_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nenBmcmt3bnFxYWl0eXRuY2xhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxODQzNzEsImV4cCI6MjA3MDc2MDM3MX0.Ls83xOXcKIW7FUcavr8_sOs37I18VGFWYNW3sNFRS24';
+const REDIRECT_PLAYER = 'https://shierusha.github.io/create-student/player';
+
+// 新增：非 ADMIN 直接登出並導回的頁面（可改成你自己的登出頁）
+const LOGOUT_URL = 'https://shierusha.github.io/login/login';
+
+// 新增：A 專案（主站）client，用來在這頁也能 signOut A
+const A_URL  = 'https://wfhwhvodgikpducrhgda.supabase.co';
+const A_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmaHdodm9kZ2lrcGR1Y3JoZ2RhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgwMTAwNjEsImV4cCI6MjA2MzU4NjA2MX0.P6P-x4SxjiR4VdWH6VFgY_ktgMac_OzuI4Bl7HWskz8';
+const aClient = window.supabase.createClient(A_URL, A_ANON);
+
+function forceLogoutAndRedirect(){
+  try { aClient.auth.signOut(); } catch(_){}
+  localStorage.removeItem('gacha_b_jwt');
+  localStorage.removeItem('gacha_b_jwt_exp');
+  localStorage.removeItem('gacha_b_user');
+  localStorage.removeItem('gacha_player_name');
+  localStorage.removeItem('gacha_app_role');
+  location.replace(LOGOUT_URL);
+}
+
+const token = localStorage.getItem('gacha_b_jwt') || '';
+const role  = (localStorage.getItem('gacha_app_role')||'').toUpperCase() || decodeRoleFromJWT(token);
+
+let sb = window.supabase.createClient(B_URL, B_ANON, {
+  global: { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+});
+const G = (t) => sb.schema('gacha').from(t);
+
+function decodeRoleFromJWT(t){
+  if(!t) return 'PLAYER';
+  try{
+    const seg = t.split('.')[1];
+    const json = JSON.parse(atob(seg.replace(/-/g,'+').replace(/_/g,'/')));
+    return (json.app_role||'PLAYER').toUpperCase();
+  }catch{ return 'PLAYER'; }
+}
+
+function guardAdmin(){
+  const badge = document.getElementById('roleBadge');
+  if (role !== 'ADMIN') {
+    // 非管理者：直接登出並導回登出頁
+    if (badge) { badge.textContent = '非管理員，正在登出…'; badge.classList.add('danger'); }
+    forceLogoutAndRedirect();
+    return false;
+  }
+  if (badge) { badge.textContent = 'ADMIN'; badge.classList.add('ok'); }
+  return true;
+}
+
+/*****************
+  Tabs
+******************/
+const tabBtns = document.querySelectorAll('.tabBtn');
+const tabPanels = {
+  events: document.getElementById('tab-events'),
+  mantou: document.getElementById('tab-mantou'),
+};
+
+tabBtns.forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    tabBtns.forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    for(const k in tabPanels){ tabPanels[k].style.display = 'none'; }
+    tabPanels[btn.dataset.tab].style.display = '';
+  });
+});
+
+document.getElementById('toPlayer').onclick = ()=> location.href = REDIRECT_PLAYER;
+
+/*****************
+  活動管理
+******************/
+const eventsTbody = document.getElementById('eventsTbody');
+const addEventBtn = document.getElementById('addEventBtn');
+
+function toLocalInputValue(iso){
+  if(!iso) return '';
+  const d = new Date(iso);
+  const off = d.getTimezoneOffset();
+  const local = new Date(d.getTime() - off*60000);
+  return local.toISOString().slice(0,16); // yyyy-MM-ddTHH:mm
+}
+function fromLocalInputToISO(v){
+  if(!v) return null;
+  const d = new Date(v); // 以當地時區解讀
+  return d.toISOString(); // 存 UTC
+}
+
+function eventRowView(ev){
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><img class="img-preview" src="${ev.image_url||''}" onerror="this.src='';"/></td>
+    <td class="mono">${ev.event_name}</td>
+    <td>${ev.display_name||''}</td>
+    <td class="mono">${ev.discord_thread_id||''}</td>
+    <td>${toLocalInputValue(ev.starts_at).replace('T',' ')}</td>
+    <td>${toLocalInputValue(ev.ends_at).replace('T',' ')}</td>
+    <td class="mono" style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${ev.image_url||''}</td>
+    <td>
+      <button class="btn" data-act="edit">編輯</button>
+      <button class="btn danger" data-act="del">刪除</button>
+    </td>`;
+  tr.querySelector('[data-act="edit"]').onclick = ()=> renderEventEditor(ev);
+  tr.querySelector('[data-act="del"]').onclick  = ()=> deleteEvent(ev.event_name);
+  return tr;
+}
+
+function renderEventEditor(ev){
+  const isNew = !ev;
+  const row = document.createElement('tr');
+  row.innerHTML = `
+    <td><img class="img-preview" id="ev_img_prev" src="${ev?.image_url||''}" onerror="this.src='';"/></td>
+    <td>${isNew?'<input id="ev_event_name" placeholder="活動 key（必填）"/>':`<span class="mono">${ev.event_name}</span>`}</td>
+    <td><input id="ev_display_name" placeholder="顯示名稱" value="${ev?.display_name||''}"></td>
+    <td><input id="ev_thread" placeholder="Discord Thread ID" value="${ev?.discord_thread_id||''}"></td>
+    <td><input id="ev_start" type="datetime-local" value="${toLocalInputValue(ev?.starts_at)}"></td>
+    <td><input id="ev_end" type="datetime-local" value="${toLocalInputValue(ev?.ends_at)}"></td>
+    <td><input id="ev_img" placeholder="https://..." value="${ev?.image_url||''}"></td>
+    <td>
+      <button class="btn primary" id="ev_save">儲存</button>
+      <button class="btn" id="ev_cancel">取消</button>
+    </td>`;
+
+  const imgInput = row.querySelector('#ev_img');
+  imgInput.addEventListener('input',()=>{
+    const p = row.querySelector('#ev_img_prev');
+    p.src = imgInput.value || '';
+  });
+
+  row.querySelector('#ev_cancel').onclick = refreshEvents;
+  row.querySelector('#ev_save').onclick = async ()=>{
+    if(role !== 'ADMIN'){ return alert('需要管理員權限'); }
+    const payload = {
+      event_name: isNew ? (row.querySelector('#ev_event_name').value||'').trim() : ev.event_name,
+      display_name: (row.querySelector('#ev_display_name').value||'').trim() || null,
+      discord_thread_id: (row.querySelector('#ev_thread').value||'').trim() || null,
+      starts_at: fromLocalInputToISO(row.querySelector('#ev_start').value),
+      ends_at:   fromLocalInputToISO(row.querySelector('#ev_end').value),
+      image_url: (row.querySelector('#ev_img').value||'').trim() || null,
+    };
+    if(!payload.event_name){ return alert('活動 key 必填'); }
+    if(!payload.starts_at || !payload.ends_at){ return alert('請填起迄時間'); }
+    try{
+      const { error } = await G('events').upsert(payload, { onConflict:'event_name' });
+      if(error){ console.error(error); return alert('儲存失敗：'+error.message); }
+      await refreshEvents();
+      alert('已儲存');
+    }catch(e){ alert('發生錯誤：'+e.message); }
+  };
+
+  eventsTbody.innerHTML = '';
+  eventsTbody.appendChild(row);
+}
+
+async function deleteEvent(event_name){
+  if(role !== 'ADMIN') return alert('需要管理員權限');
+  if(!confirm(`確定刪除活動「${event_name}」？`)) return;
+  const { error } = await G('events').delete().eq('event_name', event_name);
+  if(error){ console.error(error); return alert('刪除失敗：'+error.message); }
+  refreshEvents();
+}
+
+async function refreshEvents(){
+  const { data, error } = await G('events').select('*').order('starts_at');
+  eventsTbody.innerHTML = '';
+  if(error){ eventsTbody.innerHTML = `<tr><td colspan="8" class="empty">讀取失敗：${error.message}</td></tr>`; return; }
+  (data||[]).forEach(ev=> eventsTbody.appendChild(eventRowView(ev)) );
+}
+
+addEventBtn.onclick = ()=> renderEventEditor(null);
+
+/*****************
+  限定饅頭（limited_characters）
+******************/
+const eventSelect = document.getElementById('eventSelect');
+const addCharBtn  = document.getElementById('addCharBtn');
+const charsTbody  = document.getElementById('charsTbody');
+const charsEmpty  = document.getElementById('charsEmpty');
+
+async function loadEventOptions(){
+  const { data, error } = await G('events').select('event_name, display_name').order('starts_at');
+  eventSelect.innerHTML = '';
+  if(error){ eventSelect.innerHTML = '<option>讀取失敗</option>'; return; }
+  const optPlaceholder = document.createElement('option');
+  optPlaceholder.value = '';
+  optPlaceholder.textContent = '— 請選擇活動 —';
+  eventSelect.appendChild(optPlaceholder);
+  (data||[]).forEach(ev=>{
+    const o = document.createElement('option');
+    o.value = ev.event_name; o.textContent = ev.display_name || ev.event_name;
+    eventSelect.appendChild(o);
+  });
+}
+
+eventSelect.addEventListener('change', ()=>{
+  const ev = eventSelect.value;
+  addCharBtn.disabled = !ev;
+  if(ev) refreshChars(); else { charsTbody.innerHTML=''; charsEmpty.style.display=''; }
+});
+
+addCharBtn.onclick = ()=> renderCharEditor(null);
+
+function charRowView(r){
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><img class="img-preview" src="${r.image_url||''}" onerror="this.src='';"/></td>
+    <td class="mono">${r.id}</td>
+    <td>${r.name}</td>
+    <td class="mono" style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.image_url||''}</td>
+    <td>
+      <button class="btn" data-act="edit">編輯</button>
+      <button class="btn danger" data-act="del">刪除</button>
+    </td>`;
+  tr.querySelector('[data-act="edit"]').onclick = ()=> renderCharEditor(r);
+  tr.querySelector('[data-act="del"]').onclick  = ()=> deleteChar(r);
+  return tr;
+}
+
+function renderCharEditor(r){
+  if(!eventSelect.value) return alert('請先選活動');
+  const isNew = !r;
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><img class="img-preview" id="ch_img_prev" src="${r?.image_url||''}" onerror="this.src='';"/></td>
+    <td>${isNew?'<input id="ch_id" type="number" min="1" step="1" placeholder="ID（必填）">':`<span class="mono">${r.id}</span>`}</td>
+    <td><input id="ch_name" placeholder="名稱" value="${r?.name||''}"></td>
+    <td><input id="ch_img" placeholder="https://..." value="${r?.image_url||''}"></td>
+    <td>
+      <button class="btn primary" id="ch_save">儲存</button>
+      <button class="btn" id="ch_cancel">取消</button>
+    </td>`;
+
+  tr.querySelector('#ch_img').addEventListener('input',()=>{
+    tr.querySelector('#ch_img_prev').src = tr.querySelector('#ch_img').value || '';
+  });
+
+  tr.querySelector('#ch_cancel').onclick = refreshChars;
+  tr.querySelector('#ch_save').onclick = async ()=>{
+    if(role !== 'ADMIN'){ return alert('需要管理員權限'); }
+    const payload = {
+      id: isNew ? Number(tr.querySelector('#ch_id').value) : r.id,
+      event_name: eventSelect.value,
+      name: (tr.querySelector('#ch_name').value||'').trim(),
+      image_url: (tr.querySelector('#ch_img').value||'').trim() || null,
+    };
+    if(!payload.id || !payload.name){ return alert('ID / 名稱為必填'); }
+    try{
+      const { error } = await G('limited_characters').upsert(payload, { onConflict:'id' });
+      if(error){ console.error(error); return alert('儲存失敗：'+error.message); }
+      await refreshChars();
+      alert('已儲存');
+    }catch(e){ alert('發生錯誤：'+e.message); }
+  };
+
+  charsTbody.innerHTML = '';
+  charsTbody.appendChild(tr);
+  charsEmpty.style.display = 'none';
+}
+
+async function deleteChar(r){
+  if(role !== 'ADMIN') return alert('需要管理員權限');
+  if(!confirm(`確定刪除 #${r.id} ${r.name}？`)) return;
+  const { error } = await G('limited_characters').delete().eq('id', r.id);
+  if(error){ console.error(error); return alert('刪除失敗：'+error.message); }
+  refreshChars();
+}
+
+async function refreshChars(){
+  const ev = eventSelect.value; if(!ev) return;
+  const { data, error } = await G('limited_characters').select('id,name,image_url').eq('event_name', ev).order('id');
+  charsTbody.innerHTML = '';
+  if(error){ charsTbody.innerHTML = `<tr><td colspan="5" class="empty">讀取失敗：${error.message}</td></tr>`; return; }
+  if(!data || !data.length){ charsEmpty.style.display=''; return; }
+  charsEmpty.style.display='none';
+  data.forEach(r=> charsTbody.appendChild(charRowView(r)) );
+}
+
+/*****************
+  Boot
+******************/
+(async function init(){
+  // 先檢查是否有 B 的 token，沒有就直接導回
+  if(!token){ forceLogoutAndRedirect(); return; }
+  // 非 ADMIN 直接導回（guardAdmin 內會處理登出）
+  if(!guardAdmin()) return;
+
+  await refreshEvents();
+  await loadEventOptions();
+})();
+</script>
+</body>
+</html>
