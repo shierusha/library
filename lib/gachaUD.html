@@ -113,8 +113,8 @@
         <label>活動簡介（可空）
           <input id="ev-new-display" placeholder="例：咪咪喵喵咪喵">
         </label>
-        <label>Discord 討論串 ID
-          <input id="ev-new-dcid" type="number" placeholder="例：1409888757603106886">
+        <label>Discord 討論串 ID（文字）
+          <input id="ev-new-dcid" placeholder="例：1409888757603106886">
         </label>
       </div>
       <div class="row">
@@ -161,7 +161,7 @@
       </div>
 
       <div class="row-3">
-        <label>新增 / 修改：ID（小整數）
+        <label>新增 / 修改：ID（小整數，全域唯一）
           <input id="lim-new-id" type="number" min="1" placeholder="例：5">
         </label>
         <label>名稱
@@ -342,7 +342,7 @@ $$('.tab-btn').forEach(btn=>{
 });
 
 /* =========================
-   活動管理
+   活動管理（欄位：display_name, discord_thread_id, image_url）
 ========================= */
 const eventsTbody = $('#events-tbody');
 
@@ -351,15 +351,15 @@ function renderEventRow(ev){
 
   tr.innerHTML = `
     <td style="max-width:160px;">
-      ${ev.banner_url ? `<img src="${escapeHTML(ev.banner_url)}" alt="" style="max-width:150px;max-height:60px;object-fit:cover;border:1px solid #eef2fa;border-radius:6px;">` : '<span class="muted">（無）</span>'}
-      <div><input data-k="banner_url" value="${escapeHTML(ev.banner_url||'')}" placeholder="https://..." /></div>
+      ${ev.image_url ? `<img src="${escapeHTML(ev.image_url)}" alt="" style="max-width:150px;max-height:60px;object-fit:cover;border:1px solid #eef2fa;border-radius:6px;">` : '<span class="muted">（無）</span>'}
+      <div><input data-k="image_url" value="${escapeHTML(ev.image_url||'')}" placeholder="https://..." /></div>
     </td>
     <td>
       <div class="muted">原：<code>${escapeHTML(ev.event_name)}</code></div>
       <input data-k="event_name" value="${escapeHTML(ev.event_name)}" />
     </td>
     <td><input data-k="display_name" value="${escapeHTML(ev.display_name||'')}" placeholder="活動簡介（可空）" /></td>
-    <td><input data-k="dc_thread_id" type="number" value="${ev.dc_thread_id ?? ''}" placeholder="討論串 ID" /></td>
+    <td><input data-k="discord_thread_id" value="${escapeHTML(ev.discord_thread_id||'')}" placeholder="討論串 ID（文字）" /></td>
     <td><input data-k="starts_at" type="datetime-local" value="${fmtDTLocal(ev.starts_at)}" /></td>
     <td><input data-k="ends_at" type="datetime-local" value="${fmtDTLocal(ev.ends_at)}" /></td>
     <td>
@@ -369,24 +369,24 @@ function renderEventRow(ev){
   `;
 
   tr.querySelector('[data-act="save"]').addEventListener('click', async ()=>{
-    const newVals = {};
+    const vals = {};
     tr.querySelectorAll('input[data-k]').forEach(inp=>{
       const k = inp.dataset.k;
       let v = inp.value;
       if (k==='starts_at' || k==='ends_at') v = toISOFromLocalInput(v);
-      if (k==='dc_thread_id') v = v ? Number(v) : null;
-      newVals[k] = (v === '' ? null : v);
+      vals[k] = (v === '' ? null : v);
     });
 
-    // 允許改 event_name：用舊值當 where，更新含新 event_name
+    if (!vals.starts_at || !vals.ends_at) { alert('開始/結束時間不可為空'); return; }
+
     const oldName = ev.event_name;
     const payload = {
-      event_name: newVals.event_name || oldName,
-      display_name: newVals.display_name,
-      dc_thread_id: newVals.dc_thread_id,
-      starts_at: newVals.starts_at,
-      ends_at: newVals.ends_at,
-      banner_url: newVals.banner_url
+      event_name: vals.event_name || oldName,
+      display_name: vals.display_name,
+      discord_thread_id: vals.discord_thread_id,
+      starts_at: vals.starts_at,
+      ends_at: vals.ends_at,
+      image_url: vals.image_url
     };
     const { error } = await G('events').update(payload).eq('event_name', oldName);
     if (error) { alert('更新失敗：'+error.message); return; }
@@ -422,13 +422,17 @@ async function refreshEvents(){
 $('#btn-ev-add')?.addEventListener('click', async ()=>{
   const name = $('#ev-new-name').value.trim();
   if (!name) { alert('請填活動名稱'); return; }
+  const starts = toISOFromLocalInput($('#ev-new-start').value);
+  const ends   = toISOFromLocalInput($('#ev-new-end').value);
+  if (!starts || !ends){ alert('開始/結束時間不可為空'); return; }
+
   const payload = {
     event_name: name,
     display_name: $('#ev-new-display').value.trim() || null,
-    dc_thread_id: $('#ev-new-dcid').value ? Number($('#ev-new-dcid').value) : null,
-    starts_at: toISOFromLocalInput($('#ev-new-start').value) || null,
-    ends_at: toISOFromLocalInput($('#ev-new-end').value) || null,
-    banner_url: $('#ev-new-banner').value.trim() || null
+    discord_thread_id: ($('#ev-new-dcid').value || '').trim() || null,
+    starts_at: starts,
+    ends_at: ends,
+    image_url: $('#ev-new-banner').value.trim() || null
   };
   const { error } = await G('events').insert(payload);
   if (error) { alert('新增失敗：'+error.message); return; }
@@ -440,7 +444,7 @@ $('#btn-ev-add')?.addEventListener('click', async ()=>{
 });
 
 /* =========================
-   限定饅頭
+   限定饅頭（limited_characters：PK=id、FK(event_name)）
 ========================= */
 const limSel   = $('#lim-evsel');
 const limTbody = $('#limited-tbody');
@@ -511,14 +515,19 @@ $('#btn-lim-upsert')?.addEventListener('click', async ()=>{
   const name = $('#lim-new-name').value.trim();
   const img  = $('#lim-new-img').value.trim() || null;
   if (!id || !name){ alert('請填 ID 與 名稱'); return; }
-  const { error } = await G('limited_characters').upsert({ id, event_name: ev, name, image_url: img }, { onConflict: 'id,event_name' });
+
+  // 依你的 schema：PK(id) → onConflict 'id'
+  const { error } = await G('limited_characters').upsert(
+    { id, event_name: ev, name, image_url: img },
+    { onConflict: 'id' }
+  );
   if (error) { alert('新增/覆蓋失敗：'+error.message); return; }
   $('#lim-new-id').value=''; $('#lim-new-name').value=''; $('#lim-new-img').value='';
   await refreshLimited();
 });
 
 /* =========================
-   普通 / 隱藏饅頭
+   普通 / 隱藏饅頭（都有 image_url）
 ========================= */
 const norTbody = $('#normal-tbody');
 const hidTbody = $('#hidden-tbody');
