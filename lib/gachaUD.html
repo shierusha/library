@@ -105,29 +105,28 @@
 
     <!-- 活動管理 -->
     <div class="section" id="sec-events" hidden>
-      <div class="tip">說明：<span class="warn">活動名稱可改名</span>（已設計為 <code>ON UPDATE CASCADE</code>），改名會連動限定/持有記錄。時間以瀏覽器本地時間填寫（你在台北）。</div>
 
       <div class="row-3">
         <label>活動名稱（唯一，不可重複）
-          <input id="ev-new-name" placeholder="例：中秋特別池">
+          <input id="ev-new-name" placeholder="例：四月一日貓尋 全員貓貓池">
         </label>
         <label>活動簡介（可空）
-          <input id="ev-new-display" placeholder="例：中秋烤肉限定！">
+          <input id="ev-new-display" placeholder="例：咪咪喵喵咪喵">
         </label>
-        <label>Discord 討論串 ID（數字）
+        <label>Discord 討論串 ID
           <input id="ev-new-dcid" type="number" placeholder="例：1409888757603106886">
         </label>
       </div>
       <div class="row">
-        <label>開始時間（datetime-local）
+        <label>開始時間
           <input id="ev-new-start" type="datetime-local">
         </label>
-        <label>結束時間（datetime-local）
+        <label>結束時間
           <input id="ev-new-end" type="datetime-local">
         </label>
       </div>
       <div class="row-1">
-        <label>活動圖（banner_url，可空）
+        <label>活動圖（url，可空）
           <input id="ev-new-banner" placeholder="https://...">
         </label>
       </div>
@@ -156,18 +155,17 @@
     <!-- 限定饅頭 -->
     <div class="section" id="sec-limited" hidden>
       <div class="row">
-        <label>選擇活動（以活動名稱關聯）
+        <label>選擇活動
           <select id="lim-evsel"></select>
         </label>
-        <div class="tip">提示：活動名稱改名會自動連動。</div>
       </div>
 
       <div class="row-3">
         <label>新增 / 修改：ID（小整數）
-          <input id="lim-new-id" type="number" min="1" placeholder="例：101">
+          <input id="lim-new-id" type="number" min="1" placeholder="例：5">
         </label>
         <label>名稱
-          <input id="lim-new-name" placeholder="例：香香中秋饅頭">
+          <input id="lim-new-name" placeholder="例：貓貓本貓饅頭">
         </label>
         <label>圖片 URL（可空）
           <input id="lim-new-img" placeholder="https://...">
