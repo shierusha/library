@@ -1,1 +1,50 @@
 # library
+
+---
+<html lang="zh-Hant"><head>
+  <meta charset="UTF-8">
+  <title>謝爾夏|基本版型</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://fonts.googleapis.com/css?family=Noto+Sans+TC:400,700&amp;display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+      background: url(https://shierusha.github.io/create-student/imgs/citybg.png) center/cover fixed no-repeat;
+      margin: 0;
+      padding: 2rem;
+    }
+    .container {
+      max-width: 1100px;
+      margin: auto;
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 2px 16px #0001;
+      padding: 1.6rem 1.4rem 2rem;
+      backdrop-filter: saturate(140%) blur(2px);
+    }
+    h1 {
+      margin: .2rem 0 0;
+      color: #143158;
+      text-align: center;
+      letter-spacing: .04em;
+    }
+    .hr {
+      height: 4px;
+      width: 78%;
+      background: #1767a0;
+      margin: .6rem auto 1.6rem;
+      border-radius: 2px;
+      opacity: .9;
+    }
+    .right {
+      color: #0f2d52;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 id="pageTitle">謝爾夏|這裡是標題</h1>
+    <div class="hr"></div>
+    <span class="right">這裡放我要的功能</span>
+  </div>
+</body></html>
