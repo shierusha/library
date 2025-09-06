@@ -4,85 +4,74 @@
   <meta charset="UTF-8">
   <title>謝爾夏｜扭蛋管理</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link href="https://fonts.googleapis.com/css?family=Noto+Sans+TC:400,700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css?family=Noto+SansTC:400,700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    body {
-      font-family: 'Noto Sans TC', sans-serif;
-      background: url(https://shierusha.github.io/create-student/imgs/citybg.png) center/cover fixed no-repeat;
-      margin: 0;
-      padding: 2rem;
-      color: #0f2d52;
+    body{
+      font-family:'Noto Sans TC',sans-serif;
+      background:url(https://shierusha.github.io/create-student/imgs/citybg.png) center/cover fixed no-repeat;
+      margin:0;padding:2rem;color:#0f2d52;
     }
-    .container {
-      max-width: 1100px;
-      margin: auto;
-      background: #fff;
-      border-radius: 16px;
-      box-shadow: 0 2px 16px #0001;
-      padding: 1.6rem 1.4rem 2rem;
-      backdrop-filter: saturate(140%) blur(2px);
-      position: relative;
+    .container{max-width:1100px;margin:auto;background:#fff;border-radius:16px;box-shadow:0 2px 16px #0001;padding:1.6rem 1.4rem 2rem;position:relative}
+    h1{margin:.2rem 0 0;color:#143158;text-align:center;letter-spacing:.04em}
+    .hr{height:4px;width:78%;background:#1767a0;margin:.6rem auto 1rem;border-radius:2px;opacity:.9}
+
+    .tabs{display:flex;gap:.6rem;flex-wrap:wrap;justify-content:center;margin:.2rem 0 1rem}
+    .tab-btn{border:none;border-radius:999px;padding:.5rem 1rem;background:#e9f1f9;color:#143158;font-weight:700;cursor:pointer}
+    .tab-btn.active{background:#1767a0;color:#fff}
+
+    .toolbar{display:flex;justify-content:flex-end;gap:.5rem;margin:.2rem 0 1rem}
+    .delete-toggle-btn{background:#eef2fa;color:#1d4076;border:none;border-radius:2em;padding:.55em 1.2em;font-weight:700;cursor:pointer;transition:.18s}
+    .delete-toggle-btn:hover,.delete-toggle-btn:focus{background:#1767a0;color:#fff}
+    .delete-toggle-btn.active{background:#f66464;color:#fff}
+
+    .row,.row-1,.row-3{display:grid;gap:.8rem;margin:.7rem 0}
+    .row{grid-template-columns:1fr 1fr}
+    .row-1{grid-template-columns:1fr}
+    .row-3{grid-template-columns:1fr 1fr 1fr}
+    @media(max-width:800px){.row,.row-3{grid-template-columns:1fr}}
+    label{display:flex;flex-direction:column;font-size:.92rem;color:#3a4b5f}
+    input,select{padding:.55rem .6rem;border:1px solid #c8d6ea;border-radius:.5rem;font-size:1rem}
+    input[type="number"]{width:100%}
+    .muted{color:#6b7c90;font-size:.95rem}
+
+    table{width:100%;border-collapse:collapse;margin-top:.6rem}
+    th,td{padding:.5rem .6rem;border-bottom:1px solid #eef2fa;text-align:left;vertical-align:top}
+    thead th{background:#f2f6fb;color:#143158}
+    tbody tr:hover{background:#f7fbff}
+    .btn{border:none;border-radius:.45rem;padding:.35rem .7rem;cursor:pointer;font-weight:700;background:#1767a0;color:#fff;margin-right:.25rem}
+    .btn.gray{background:#98a6b8}
+    .btn.green{background:#4e892a}
+    .btn.red{background:#f66464}
+    .btn-del{background:#f66464;display:none}
+    .btn-del.show{display:inline-block}
+
+    .back-wrap{display:flex;justify-content:flex-end;margin-top:1.2rem}
+    .back-btn{border:none;border-radius:999px;padding:.6rem 1.1rem;font-weight:700;background:#e9f1f9;color:#143158;cursor:pointer}
+    .back-btn:hover{background:#1767a0;color:#fff}
+    .section{margin-top:1.2rem}
+
+    /* 活動管理：右側 2x3 佈局 */
+    .ev-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.7rem}
+    .ev-actions{display:flex;align-items:center;gap:.4rem}
+    @media(max-width:900px){.ev-grid{grid-template-columns:1fr}}
+
+    /* 活動圖預覽 */
+    .thumb-wrap{display:flex;flex-direction:column;align-items:center;gap:.5rem}
+    .thumb{
+      width:120px;height:120px;border:1px solid #e6eef6;border-radius:.6rem;
+      background:#f3f6fb center/cover no-repeat;overflow:hidden
     }
-    h1 { margin: .2rem 0 0; color: #143158; text-align: center; letter-spacing: .04em; }
-    .hr { height: 4px; width: 78%; background: #1767a0; margin: .6rem auto 1.0rem; border-radius: 2px; opacity: .9; }
+    .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+    .thumb.empty{background:#eef3f9}
+    .thumb-tip{font-size:.85rem;color:#6b7c90}
 
-    /* tabs */
-    .tabs { display: flex; gap: .6rem; flex-wrap: wrap; justify-content: center; margin: .2rem 0 1rem; }
-    .tab-btn {
-      border: none; border-radius: 999px; padding: .5rem 1rem;
-      background: #e9f1f9; color: #143158; font-weight: 700; cursor: pointer;
-    }
-    .tab-btn.active { background: #1767a0; color: #fff; }
-
-    /* toolbar（右上角） */
-    .toolbar { display:flex; justify-content:flex-end; gap:.5rem; margin: .2rem 0 1rem; }
-    .delete-toggle-btn {
-      background:#eef2fa; color:#1d4076; border:none; border-radius:2em;
-      padding:.55em 1.2em; font-weight:700; cursor:pointer; transition:.18s;
-    }
-    .delete-toggle-btn:hover, .delete-toggle-btn:focus { background:#1767a0; color:#fff; }
-    .delete-toggle-btn.active { background:#f66464; color:#fff; }
-
-    /* forms / table */
-    .row { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem; margin: .7rem 0; }
-    .row-1 { display: grid; grid-template-columns: 1fr; gap: .8rem; margin: .7rem 0; }
-    .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: .8rem; margin: .7rem 0; }
-    @media (max-width: 800px){ .row, .row-3 { grid-template-columns: 1fr; } }
-    label { display:flex; flex-direction:column; font-size:.92rem; color:#3a4b5f; }
-    input, select { padding:.55rem .6rem; border:1px solid #c8d6ea; border-radius:.5rem; font-size:1rem; }
-    input[type="number"] { width: 100%; }
-    .muted { color:#6b7c90; font-size:.95rem; }
-
-    table { width:100%; border-collapse: collapse; margin-top:.6rem; }
-    th, td { padding:.5rem .6rem; border-bottom:1px solid #eef2fa; text-align:left; }
-    thead th { background:#f2f6fb; color:#143158; }
-    tbody tr:hover { background:#f7fbff; }
-    .btn {
-      border:none; border-radius:.45rem; padding:.35rem .7rem; cursor:pointer; font-weight:700;
-      background:#1767a0; color:#fff; margin-right:.25rem;
-    }
-    .btn.gray { background:#98a6b8; }
-    .btn.green { background:#4e892a; }
-    .btn.red { background:#f66464; }
-
-    /* 刪除鍵預設隱藏，啟用刪除時才顯示 */
-    .btn-del { background:#f66464; display:none; }
-    .btn-del.show { display:inline-block; }
-
-    /* bottom-right back */
-    .back-wrap {
-      display:flex; justify-content:flex-end; margin-top: 1.2rem;
-    }
-    .back-btn {
-      border:none; border-radius: 999px; padding:.6rem 1.1rem; font-weight:700;
-      background:#e9f1f9; color:#143158; cursor:pointer;
-    }
-    .back-btn:hover { background:#1767a0; color:#fff; }
-
-    .section { margin-top: 1.2rem; }
-    .tip { font-size:.9rem; color:#6b7c90; }
-    .warn { color:#b32020; font-weight:700; }
+    /* URL小視窗（統一用） */
+    .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:999;justify-content:center;align-items:center}
+    .modal{background:#fff;border-radius:.8rem;box-shadow:0 6px 24px #0006;min-width:280px;max-width:92vw;padding:1rem 1rem 1.1rem}
+    .modal h3{margin:.2rem 0 0.8rem;color:#143158}
+    .modal .row-1{margin:.4rem 0}
+    .modal .btn{margin-top:.4rem}
   </style>
 </head>
 <body>
@@ -90,12 +79,10 @@
     <h1>扭蛋管理</h1>
     <div class="hr"></div>
 
-    <!-- 右上工具列 -->
     <div class="toolbar">
       <button id="delete-toggle-btn" class="delete-toggle-btn" type="button">啟用刪除</button>
     </div>
 
-    <!-- Tabs（依 hash 高亮） -->
     <div class="tabs">
       <button class="tab-btn" data-tab="events">活動管理</button>
       <button class="tab-btn" data-tab="limited">限定饅頭</button>
@@ -105,7 +92,7 @@
 
     <!-- 活動管理 -->
     <div class="section" id="sec-events" hidden>
-
+      <!-- 新增區 -->
       <div class="row-3">
         <label>活動名稱（唯一，不可重複）
           <input id="ev-new-name" placeholder="例：四月一日貓尋 全員貓貓池">
@@ -126,28 +113,18 @@
         </label>
       </div>
       <div class="row-1">
-        <label>活動圖（url，可空）
-          <input id="ev-new-banner" placeholder="https://...">
-        </label>
-      </div>
-      <div>
         <button class="btn green" id="btn-ev-add">新增活動</button>
       </div>
 
       <table>
         <thead>
           <tr>
-            <th>活動圖</th>
-            <th>活動名稱</th>
-            <th>活動簡介</th>
-            <th>DC Thread ID</th>
-            <th>開始</th>
-            <th>結束</th>
-            <th>操作</th>
+            <th style="width:160px">活動圖</th>
+            <th>內容</th>
           </tr>
         </thead>
         <tbody id="events-tbody">
-          <tr><td colspan="7" class="muted">載入中…</td></tr>
+          <tr><td colspan="2" class="muted">載入中…</td></tr>
         </tbody>
       </table>
     </div>
@@ -171,22 +148,11 @@
           <input id="lim-new-img" placeholder="https://...">
         </label>
       </div>
-      <div>
-        <button class="btn green" id="btn-lim-upsert">新增 / 覆蓋</button>
-      </div>
+      <div><button class="btn green" id="btn-lim-upsert">新增 / 覆蓋</button></div>
 
       <table>
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>名稱</th>
-            <th>圖片</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody id="limited-tbody">
-          <tr><td colspan="4" class="muted">請先選活動</td></tr>
-        </tbody>
+        <thead><tr><th>ID</th><th>名稱</th><th>圖片</th><th>操作</th></tr></thead>
+        <tbody id="limited-tbody"><tr><td colspan="4" class="muted">請先選活動</td></tr></tbody>
       </table>
     </div>
 
@@ -203,9 +169,7 @@
           <input id="nor-new-img" placeholder="https://...">
         </label>
       </div>
-      <div>
-        <button class="btn green" id="btn-nor-upsert">新增 / 覆蓋</button>
-      </div>
+      <div><button class="btn green" id="btn-nor-upsert">新增 / 覆蓋</button></div>
 
       <table>
         <thead><tr><th>ID</th><th>名稱</th><th>圖片</th><th>操作</th></tr></thead>
@@ -226,9 +190,7 @@
           <input id="hid-new-img" placeholder="https://...">
         </label>
       </div>
-      <div>
-        <button class="btn green" id="btn-hid-upsert">新增 / 覆蓋</button>
-      </div>
+      <div><button class="btn green" id="btn-hid-upsert">新增 / 覆蓋</button></div>
 
       <table>
         <thead><tr><th>ID</th><th>名稱</th><th>圖片</th><th>操作</th></tr></thead>
@@ -236,9 +198,22 @@
       </table>
     </div>
 
-    <!-- 右下角返回 -->
     <div class="back-wrap">
       <button class="back-btn" onclick="location.href='https://shierusha.github.io/create-student/player'">返回管理者首頁</button>
+    </div>
+  </div>
+
+  <!-- URL 輸入小視窗（通用） -->
+  <div id="url-modal" class="modal-bg">
+    <div class="modal">
+      <h3>設定圖片網址</h3>
+      <div class="row-1">
+        <input id="url-input" placeholder="https://..." />
+      </div>
+      <div class="row-1">
+        <button class="btn" id="url-save">儲存</button>
+        <button class="btn gray" id="url-cancel">取消</button>
+      </div>
     </div>
   </div>
 
@@ -253,11 +228,9 @@ const B_TOKEN     = localStorage.getItem('gacha_b_jwt') || '';
 const B_TOKEN_EXP = Number(localStorage.getItem('gacha_b_jwt_exp') || 0);
 const APP_ROLE    = localStorage.getItem('gacha_app_role') || 'PLAYER';
 
-function decodeJWT(t){
-  if(!t) return null;
-  const pad = s => s + '='.repeat((4 - s.length % 4) % 4);
-  try { return JSON.parse(atob(pad(t.split('.')[1]).replace(/-/g,'+').replace(/_/g,'/'))); }
-  catch { return null; }
+function decodeJWT(t){ if(!t) return null;
+  const pad=s=>s+'='.repeat((4 - s.length % 4) % 4);
+  try{ return JSON.parse(atob(pad(t.split('.')[1]).replace(/-/g,'+').replace(/_/g,'/')));}catch{ return null;}
 }
 const payload = decodeJWT(B_TOKEN);
 const user = B_TOKEN && payload ? { id: payload.sub } : null;
@@ -268,7 +241,6 @@ let sb = window.supabase.createClient(B_URL, B_ANON, {
 if (B_TOKEN) sb.realtime.setAuth(B_TOKEN);
 const G = (t) => sb.schema('gacha').from(t);
 
-// 嚴格限制：必須是 ADMIN 且 B 簽有效
 (function guard(){
   const now = Math.floor(Date.now()/1000);
   if (!user || !B_TOKEN || (B_TOKEN_EXP && now >= B_TOKEN_EXP) || APP_ROLE !== 'ADMIN') {
@@ -282,17 +254,13 @@ const G = (t) => sb.schema('gacha').from(t);
 ========================= */
 const $  = (s, r=document)=>r.querySelector(s);
 const $$ = (s, r=document)=>[...r.querySelectorAll(s)];
-const fmtDTLocal = (iso)=>{ // 轉成 input[type=datetime-local] value
+const fmtDTLocal = (iso)=>{
   if(!iso) return '';
   const d = new Date(iso);
   const pad = n=>String(n).padStart(2,'0');
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
-const toISOFromLocalInput = (val)=>{ // 將本地 datetime-local 轉 ISO（含時區）
-  if(!val) return null;
-  const d = new Date(val);
-  return d.toISOString();
-};
+const toISOFromLocalInput = (val)=>{ if(!val) return null; const d=new Date(val); return d.toISOString(); };
 function escapeHTML(s){ return String(s||'').replace(/[&<>"']/g,c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
 
 /* =========================
@@ -302,20 +270,12 @@ let deleteMode = false;
 function applyDeleteModeUI(){
   $$('.btn-del').forEach(btn=>btn.classList.toggle('show', deleteMode));
   const tgl = $('#delete-toggle-btn');
-  if (tgl){
-    tgl.classList.toggle('active', deleteMode);
-    tgl.textContent = deleteMode ? '停用刪除' : '啟用刪除';
-  }
+  if (tgl){ tgl.classList.toggle('active', deleteMode); tgl.textContent = deleteMode ? '停用刪除' : '啟用刪除'; }
 }
-function bindDeleteToggle(){
-  $('#delete-toggle-btn')?.addEventListener('click', ()=>{
-    deleteMode = !deleteMode;
-    applyDeleteModeUI();
-  });
-}
+$('#delete-toggle-btn')?.addEventListener('click', ()=>{ deleteMode=!deleteMode; applyDeleteModeUI(); });
 
 /* =========================
-   Tabs（hash 深連結）
+   Tabs（hash）
 ========================= */
 const sections = {
   events:  $('#sec-events'),
@@ -331,75 +291,120 @@ function setActiveTab(tab){
   });
   if (location.hash !== '#tab='+tab) history.replaceState(null,'','#tab='+tab);
 }
-function currentTabFromHash(){
-  const m = location.hash.match(/#tab=(\w+)/);
-  const t = m?.[1] || 'events';
-  return sections[t] ? t : 'events';
-}
+function currentTabFromHash(){ const m = location.hash.match(/#tab=(\w+)/); const t = m?.[1] || 'events'; return sections[t] ? t : 'events'; }
 window.addEventListener('hashchange', ()=> setActiveTab(currentTabFromHash()));
-$$('.tab-btn').forEach(btn=>{
-  btn.addEventListener('click', ()=> setActiveTab(btn.dataset.tab));
-});
+$$('.tab-btn').forEach(btn=>btn.addEventListener('click', ()=> setActiveTab(btn.dataset.tab)));
 
 /* =========================
-   活動管理（欄位：display_name, discord_thread_id, image_url）
+   URL Modal（通用）
+========================= */
+let urlModalCb = null;
+function openUrlModal(initial='', cb){
+  $('#url-input').value = initial || '';
+  urlModalCb = cb || null;
+  $('#url-modal').style.display = 'flex';
+  $('#url-input').focus();
+}
+function closeUrlModal(){
+  $('#url-modal').style.display = 'none';
+  urlModalCb = null;
+}
+$('#url-save').addEventListener('click', ()=>{ const v=$('#url-input').value.trim(); if(urlModalCb) urlModalCb(v); closeUrlModal(); });
+$('#url-cancel').addEventListener('click', closeUrlModal);
+$('#url-modal').addEventListener('click', (e)=>{ if(e.target.id==='url-modal') closeUrlModal(); });
+
+/* =========================
+   活動管理（兩列三欄 + 圖片預覽+按鈕）
 ========================= */
 const eventsTbody = $('#events-tbody');
 
 function renderEventRow(ev){
   const tr = document.createElement('tr');
 
-  tr.innerHTML = `
-    <td style="max-width:160px;">
-      ${ev.image_url ? `<img src="${escapeHTML(ev.image_url)}" alt="" style="max-width:150px;max-height:60px;object-fit:cover;border:1px solid #eef2fa;border-radius:6px;">` : '<span class="muted">（無）</span>'}
-      <div><input data-k="image_url" value="${escapeHTML(ev.image_url||'')}" placeholder="https://..." /></div>
-    </td>
-    <td>
-      <div class="muted">原：<code>${escapeHTML(ev.event_name)}</code></div>
-      <input data-k="event_name" value="${escapeHTML(ev.event_name)}" />
-    </td>
-    <td><input data-k="display_name" value="${escapeHTML(ev.display_name||'')}" placeholder="活動簡介（可空）" /></td>
-    <td><input data-k="discord_thread_id" value="${escapeHTML(ev.discord_thread_id||'')}" placeholder="討論串 ID（文字）" /></td>
-    <td><input data-k="starts_at" type="datetime-local" value="${fmtDTLocal(ev.starts_at)}" /></td>
-    <td><input data-k="ends_at" type="datetime-local" value="${fmtDTLocal(ev.ends_at)}" /></td>
-    <td>
-      <button class="btn green" data-act="save">儲存</button>
-      <button class="btn-del" data-act="del">刪除</button>
-    </td>
+  // 左：方形預覽 + 設定圖片
+  const leftTd = document.createElement('td');
+  leftTd.innerHTML = `
+    <div class="thumb-wrap">
+      <div class="thumb ${ev.image_url ? '' : 'empty'}" data-thumb></div>
+      <button class="btn gray" data-setimg>設定圖片</button>
+      <div class="thumb-tip">預覽 120×120（裁切顯示）</div>
+    </div>
   `;
+  tr.appendChild(leftTd);
 
-  tr.querySelector('[data-act="save"]').addEventListener('click', async ()=>{
-    const vals = {};
-    tr.querySelectorAll('input[data-k]').forEach(inp=>{
-      const k = inp.dataset.k;
-      let v = inp.value;
-      if (k==='starts_at' || k==='ends_at') v = toISOFromLocalInput(v);
-      vals[k] = (v === '' ? null : v);
+  // 設定背景圖
+  const thumb = leftTd.querySelector('[data-thumb]');
+  if (ev.image_url){
+    const img = document.createElement('img');
+    img.src = ev.image_url; img.alt='活動圖';
+    thumb.appendChild(img);
+  }
+
+  leftTd.querySelector('[data-setimg]').addEventListener('click', ()=>{
+    openUrlModal(ev.image_url || '', async (url)=>{
+      const { error } = await G('events').update({ image_url: url || null }).eq('event_name', ev.event_name);
+      if (error){ alert('設定失敗：'+error.message); return; }
+      await refreshEvents(); // 重新渲染預覽
     });
+  });
 
-    if (!vals.starts_at || !vals.ends_at) { alert('開始/結束時間不可為空'); return; }
+  // 右：2x3 格
+  const rightTd = document.createElement('td');
+  rightTd.innerHTML = `
+    <div class="ev-grid">
+      <label>活動名稱
+        <input data-k="event_name" value="${escapeHTML(ev.event_name)}">
+      </label>
+      <label>開始時間
+        <input data-k="starts_at" type="datetime-local" value="${fmtDTLocal(ev.starts_at)}">
+      </label>
+      <label>DC Thread ID
+        <input data-k="discord_thread_id" value="${escapeHTML(ev.discord_thread_id||'')}">
+      </label>
 
+      <label>活動簡介
+        <input data-k="display_name" value="${escapeHTML(ev.display_name||'')}" placeholder="可空">
+      </label>
+      <label>結束時間
+        <input data-k="ends_at" type="datetime-local" value="${fmtDTLocal(ev.ends_at)}">
+      </label>
+      <div class="ev-actions">
+        <button class="btn green" data-act="save">儲存</button>
+        <button class="btn-del" data-act="del">刪除</button>
+      </div>
+    </div>
+  `;
+  tr.appendChild(rightTd);
+
+  // 綁定儲存/刪除
+  rightTd.querySelector('[data-act="save"]').addEventListener('click', async ()=>{
+    const vals = {};
+    rightTd.querySelectorAll('input[data-k]').forEach(inp=>{
+      const k=inp.dataset.k; let v=inp.value;
+      if (k==='starts_at' || k==='ends_at') v = toISOFromLocalInput(v);
+      vals[k] = v===''?null:v;
+    });
+    if (!vals.starts_at || !vals.ends_at){ alert('開始/結束時間不可為空'); return; }
     const oldName = ev.event_name;
     const payload = {
       event_name: vals.event_name || oldName,
       display_name: vals.display_name,
       discord_thread_id: vals.discord_thread_id,
       starts_at: vals.starts_at,
-      ends_at: vals.ends_at,
-      image_url: vals.image_url
+      ends_at: vals.ends_at
     };
     const { error } = await G('events').update(payload).eq('event_name', oldName);
-    if (error) { alert('更新失敗：'+error.message); return; }
-    await refreshEvents(); await loadEventOptions(); // 連動下拉
+    if (error){ alert('更新失敗：'+error.message); return; }
+    await refreshEvents();
     alert('已更新');
   });
 
-  tr.querySelector('[data-act="del"]').addEventListener('click', async ()=>{
+  rightTd.querySelector('[data-act="del"]').addEventListener('click', async ()=>{
     if (!deleteMode) return;
     if (!confirm(`刪除活動「${ev.event_name}」？（不會連動刪限定與持有）`)) return;
     const { error } = await G('events').delete().eq('event_name', ev.event_name);
-    if (error) { alert('刪除失敗：'+error.message); return; }
-    await refreshEvents(); await loadEventOptions();
+    if (error){ alert('刪除失敗：'+error.message); return; }
+    await refreshEvents();
   });
 
   return tr;
@@ -408,43 +413,35 @@ function renderEventRow(ev){
 async function refreshEvents(){
   const { data, error } = await G('events').select('*').order('starts_at');
   eventsTbody.innerHTML = '';
-  if (error) {
-    eventsTbody.innerHTML = `<tr><td colspan="7" class="muted">讀取失敗：${escapeHTML(error.message)}</td></tr>`;
-    applyDeleteModeUI(); return;
-  }
-  (data||[]).forEach(ev => eventsTbody.appendChild(renderEventRow(ev)));
-  if (!data || data.length===0){
-    eventsTbody.innerHTML = `<tr><td colspan="7" class="muted">尚無活動，請先新增。</td></tr>`;
-  }
+  if (error){ eventsTbody.innerHTML = `<tr><td colspan="2" class="muted">讀取失敗：${escapeHTML(error.message)}</td></tr>`; applyDeleteModeUI(); return; }
+  (data||[]).forEach(ev=> eventsTbody.appendChild(renderEventRow(ev)));
+  if (!data || data.length===0) eventsTbody.innerHTML = `<tr><td colspan="2" class="muted">尚無活動，請先新增。</td></tr>`;
   applyDeleteModeUI();
 }
 
 $('#btn-ev-add')?.addEventListener('click', async ()=>{
   const name = $('#ev-new-name').value.trim();
-  if (!name) { alert('請填活動名稱'); return; }
+  if (!name){ alert('請填活動名稱'); return; }
   const starts = toISOFromLocalInput($('#ev-new-start').value);
   const ends   = toISOFromLocalInput($('#ev-new-end').value);
   if (!starts || !ends){ alert('開始/結束時間不可為空'); return; }
-
   const payload = {
     event_name: name,
     display_name: $('#ev-new-display').value.trim() || null,
     discord_thread_id: ($('#ev-new-dcid').value || '').trim() || null,
     starts_at: starts,
-    ends_at: ends,
-    image_url: $('#ev-new-banner').value.trim() || null
+    ends_at: ends
   };
   const { error } = await G('events').insert(payload);
-  if (error) { alert('新增失敗：'+error.message); return; }
-  // 清空
+  if (error){ alert('新增失敗：'+error.message); return; }
   $('#ev-new-name').value=''; $('#ev-new-display').value=''; $('#ev-new-dcid').value='';
-  $('#ev-new-start').value=''; $('#ev-new-end').value=''; $('#ev-new-banner').value='';
+  $('#ev-new-start').value=''; $('#ev-new-end').value='';
   await refreshEvents(); await loadEventOptions();
   alert('新增成功');
 });
 
 /* =========================
-   限定饅頭（limited_characters：PK=id、FK(event_name)）
+   限定饅頭
 ========================= */
 const limSel   = $('#lim-evsel');
 const limTbody = $('#limited-tbody');
@@ -453,16 +450,15 @@ async function loadEventOptions(selected){
   const { data } = await G('events').select('event_name').order('starts_at');
   limSel.innerHTML = '<option value="">（請選擇活動）</option>';
   (data||[]).forEach(r=>{
-    const opt = document.createElement('option');
-    opt.value = r.event_name; opt.textContent = r.event_name;
-    if (selected && selected===r.event_name) opt.selected = true;
+    const opt=document.createElement('option');
+    opt.value=r.event_name; opt.textContent=r.event_name;
+    if (selected && selected===r.event_name) opt.selected=true;
     limSel.appendChild(opt);
   });
 }
-
 function renderLimitedRow(r){
-  const tr = document.createElement('tr');
-  tr.innerHTML = `
+  const tr=document.createElement('tr');
+  tr.innerHTML=`
     <td>${r.id}</td>
     <td><input data-k="name" value="${escapeHTML(r.name||'')}" placeholder="名稱"></td>
     <td>
@@ -472,69 +468,55 @@ function renderLimitedRow(r){
     <td>
       <button class="btn" data-act="save">儲存</button>
       <button class="btn-del" data-act="del">刪除</button>
-    </td>
-  `;
-
-  tr.querySelector('[data-act="save"]').addEventListener('click', async ()=>{
+    </td>`;
+  tr.querySelector('[data-act="save"]').addEventListener('click',async ()=>{
     const name = tr.querySelector('input[data-k="name"]').value.trim();
     const img  = tr.querySelector('input[data-k="image_url"]').value.trim() || null;
     const { error } = await G('limited_characters').update({ name, image_url: img }).eq('id', r.id).eq('event_name', r.event_name);
-    if (error) { alert('更新失敗：'+error.message); return; }
-    await refreshLimited();
-    alert('已更新');
+    if (error){ alert('更新失敗：'+error.message); return; }
+    await refreshLimited(); alert('已更新');
   });
-
-  tr.querySelector('[data-act="del"]').addEventListener('click', async ()=>{
-    if (!deleteMode) return;
-    if (!confirm(`刪除限定饅頭 #${r.id}「${r.name}」？`)) return;
+  tr.querySelector('[data-act="del"]').addEventListener('click',async ()=>{
+    if(!deleteMode) return;
+    if(!confirm(`刪除限定饅頭 #${r.id}「${r.name}」？`)) return;
     const { error } = await G('limited_characters').delete().eq('id', r.id).eq('event_name', r.event_name);
-    if (error) { alert('刪除失敗：'+error.message); return; }
+    if (error){ alert('刪除失敗：'+error.message); return; }
     await refreshLimited();
   });
-
   return tr;
 }
-
 async function refreshLimited(){
-  const ev = limSel.value;
-  if (!ev) { limTbody.innerHTML = `<tr><td colspan="4" class="muted">請先選活動</td></tr>`; applyDeleteModeUI(); return; }
+  const ev=limSel.value;
+  if(!ev){ limTbody.innerHTML=`<tr><td colspan="4" class="muted">請先選活動</td></tr>`; applyDeleteModeUI(); return; }
   const { data, error } = await G('limited_characters').select('*').eq('event_name', ev).order('id');
-  limTbody.innerHTML = '';
-  if (error) { limTbody.innerHTML = `<tr><td colspan="4" class="muted">讀取失敗：${escapeHTML(error.message)}</td></tr>`; applyDeleteModeUI(); return; }
-  (data||[]).forEach(r=> limTbody.appendChild(renderLimitedRow(r)));
-  if (!data || data.length===0) limTbody.innerHTML = `<tr><td colspan="4" class="muted">此活動尚無限定饅頭。</td></tr>`;
+  limTbody.innerHTML='';
+  if(error){ limTbody.innerHTML=`<tr><td colspan="4" class="muted">讀取失敗：${escapeHTML(error.message)}</td></tr>`; applyDeleteModeUI(); return; }
+  (data||[]).forEach(r=>limTbody.appendChild(renderLimitedRow(r)));
+  if(!data || data.length===0) limTbody.innerHTML=`<tr><td colspan="4" class="muted">此活動尚無限定饅頭。</td></tr>`;
   applyDeleteModeUI();
 }
-
 $('#lim-evsel')?.addEventListener('change', refreshLimited);
-
-$('#btn-lim-upsert')?.addEventListener('click', async ()=>{
-  const ev = limSel.value;
-  if (!ev) { alert('請先選活動'); return; }
-  const id = Number($('#lim-new-id').value);
-  const name = $('#lim-new-name').value.trim();
-  const img  = $('#lim-new-img').value.trim() || null;
-  if (!id || !name){ alert('請填 ID 與 名稱'); return; }
-
-  // 依你的 schema：PK(id) → onConflict 'id'
-  const { error } = await G('limited_characters').upsert(
-    { id, event_name: ev, name, image_url: img },
-    { onConflict: 'id' }
-  );
-  if (error) { alert('新增/覆蓋失敗：'+error.message); return; }
+$('#btn-lim-upsert')?.addEventListener('click',async ()=>{
+  const ev=limSel.value; if(!ev){ alert('請先選活動'); return; }
+  const id=Number($('#lim-new-id').value);
+  const name=$('#lim-new-name').value.trim();
+  const img=$('#lim-new-img').value.trim()||null;
+  if(!id||!name){ alert('請填 ID 與 名稱'); return; }
+  const { error } = await G('limited_characters').upsert({ id, event_name: ev, name, image_url: img }, { onConflict:'id' });
+  if(error){ alert('新增/覆蓋失敗：'+error.message); return; }
   $('#lim-new-id').value=''; $('#lim-new-name').value=''; $('#lim-new-img').value='';
   await refreshLimited();
 });
 
 /* =========================
-   普通 / 隱藏饅頭（都有 image_url）
+   普通 / 隱藏饅頭
 ========================= */
-const norTbody = $('#normal-tbody');
-const hidTbody = $('#hidden-tbody');
+const norTbody=$('#normal-tbody');
+const hidTbody=$('#hidden-tbody');
 
 function renderSimpleRow(r, tableKey){
-  const tr = document.createElement('tr');
-  tr.innerHTML = `
+  const tr=document.createElement('tr');
+  tr.innerHTML=`
     <td>${r.id}</td>
     <td><input data-k="name" value="${escapeHTML(r.name||'')}" placeholder="名稱"></td>
     <td>
@@ -544,92 +526,57 @@ function renderSimpleRow(r, tableKey){
     <td>
       <button class="btn" data-act="save">儲存</button>
       <button class="btn-del" data-act="del">刪除</button>
-    </td>
-  `;
-
-  const table = tableKey==='normal' ? 'normal_characters' : 'hidden_characters';
-
-  tr.querySelector('[data-act="save"]').addEventListener('click', async ()=>{
-    const name = tr.querySelector('input[data-k="name"]').value.trim();
-    const img  = tr.querySelector('input[data-k="image_url"]').value.trim() || null;
+    </td>`;
+  const table = tableKey==='normal'?'normal_characters':'hidden_characters';
+  tr.querySelector('[data-act="save"]').addEventListener('click',async ()=>{
+    const name=tr.querySelector('input[data-k="name"]').value.trim();
+    const img =tr.querySelector('input[data-k="image_url"]').value.trim()||null;
     const { error } = await G(table).update({ name, image_url: img }).eq('id', r.id);
-    if (error) { alert('更新失敗：'+error.message); return; }
-    if (tableKey==='normal') await refreshNormal(); else await refreshHidden();
+    if(error){ alert('更新失敗：'+error.message); return; }
+    if(tableKey==='normal') await refreshNormal(); else await refreshHidden();
     alert('已更新');
   });
-
-  tr.querySelector('[data-act="del"]').addEventListener('click', async ()=>{
-    if (!deleteMode) return;
-    if (!confirm(`刪除 ${tableKey==='normal'?'普通':'隱藏'}饅頭 #${r.id}「${r.name}」？`)) return;
+  tr.querySelector('[data-act="del"]').addEventListener('click',async ()=>{
+    if(!deleteMode) return;
+    if(!confirm(`刪除 ${tableKey==='normal'?'普通':'隱藏'}饅頭 #${r.id}「${r.name}」？`)) return;
     const { error } = await G(table).delete().eq('id', r.id);
-    if (error) { alert('刪除失敗：'+error.message); return; }
-    if (tableKey==='normal') await refreshNormal(); else await refreshHidden();
+    if(error){ alert('刪除失敗：'+error.message); return; }
+    if(tableKey==='normal') await refreshNormal(); else await refreshHidden();
   });
-
   return tr;
 }
-
 async function refreshNormal(){
   const { data, error } = await G('normal_characters').select('*').order('id');
-  norTbody.innerHTML = '';
-  if (error) { norTbody.innerHTML = `<tr><td colspan="4" class="muted">讀取失敗：${escapeHTML(error.message)}</td></tr>`; applyDeleteModeUI(); return; }
-  (data||[]).forEach(r=> norTbody.appendChild(renderSimpleRow(r, 'normal')));
-  if (!data || data.length===0) norTbody.innerHTML = `<tr><td colspan="4" class="muted">尚無資料，請新增。</td></tr>`;
+  norTbody.innerHTML='';
+  if(error){ norTbody.innerHTML=`<tr><td colspan="4" class="muted">讀取失敗：${escapeHTML(error.message)}</td></tr>`; applyDeleteModeUI(); return; }
+  (data||[]).forEach(r=>norTbody.appendChild(renderSimpleRow(r,'normal')));
+  if(!data || data.length===0) norTbody.innerHTML=`<tr><td colspan="4" class="muted">尚無資料，請新增。</td></tr>`;
   applyDeleteModeUI();
 }
 async function refreshHidden(){
   const { data, error } = await G('hidden_characters').select('*').order('id');
-  hidTbody.innerHTML = '';
-  if (error) { hidTbody.innerHTML = `<tr><td colspan="4" class="muted">讀取失敗：${escapeHTML(error.message)}</td></tr>`; applyDeleteModeUI(); return; }
-  (data||[]).forEach(r=> hidTbody.appendChild(renderSimpleRow(r, 'hidden')));
-  if (!data || data.length===0) hidTbody.innerHTML = `<tr><td colspan="4" class="muted">尚無資料，請新增。</td></tr>`;
+  hidTbody.innerHTML='';
+  if(error){ hidTbody.innerHTML=`<tr><td colspan="4" class="muted">讀取失敗：${escapeHTML(error.message)}</td></tr>`; applyDeleteModeUI(); return; }
+  (data||[]).forEach(r=>hidTbody.appendChild(renderSimpleRow(r,'hidden')));
+  if(!data || data.length===0) hidTbody.innerHTML=`<tr><td colspan="4" class="muted">尚無資料，請新增。</td></tr>`;
   applyDeleteModeUI();
 }
-
-$('#btn-nor-upsert')?.addEventListener('click', async ()=>{
-  const id = Number($('#nor-new-id').value);
-  const name = $('#nor-new-name').value.trim();
-  const img  = $('#nor-new-img').value.trim() || null;
-  if (!id || !name){ alert('請填 ID 與 名稱'); return; }
-  const { error } = await G('normal_characters').upsert({ id, name, image_url: img }, { onConflict: 'id' });
-  if (error) { alert('新增/覆蓋失敗：'+error.message); return; }
-  $('#nor-new-id').value=''; $('#nor-new-name').value=''; $('#nor-new-img').value='';
-  await refreshNormal();
-});
-$('#btn-hid-upsert')?.addEventListener('click', async ()=>{
-  const id = Number($('#hid-new-id').value);
-  const name = $('#hid-new-name').value.trim();
-  const img  = $('#hid-new-img').value.trim() || null;
-  if (!id || !name){ alert('請填 ID 與 名稱'); return; }
-  const { error } = await G('hidden_characters').upsert({ id, name, image_url: img }, { onConflict: 'id' });
-  if (error) { alert('新增/覆蓋失敗：'+error.message); return; }
-  $('#hid-new-id').value=''; $('#hid-new-name').value=''; $('#hid-new-img').value='';
-  await refreshHidden();
-});
 
 /* =========================
    啟動
 ========================= */
 (async function init(){
-  // Tabs
   setActiveTab(currentTabFromHash());
-
-  // 刪除安全模式
-  bindDeleteToggle();
   applyDeleteModeUI();
 
-  // 資料
   await refreshEvents();
   await loadEventOptions();
   await refreshNormal();
   await refreshHidden();
 
-  // 若 URL 有預選活動（?ev=name）
-  const usp = new URLSearchParams(location.search);
-  const evq = usp.get('ev');
+  const usp=new URLSearchParams(location.search);
+  const evq=usp.get('ev');
   if (evq){ await loadEventOptions(evq); await refreshLimited(); }
-
-  // 切到 tab=limited 就自動讀一次
   if (currentTabFromHash()==='limited') await refreshLimited();
 })();
 </script>
