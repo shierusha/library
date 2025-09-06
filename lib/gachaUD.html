@@ -43,6 +43,7 @@
     .btn.gray{background:#98a6b8}
     .btn.green{background:#4e892a}
     .btn.red{background:#f66464}
+    .btn.wide{width:100%}
     .btn-del{background:#f66464;display:none}
     .btn-del.show{display:inline-block}
 
@@ -113,7 +114,7 @@
         </label>
       </div>
       <div class="row-1">
-        <button class="btn green" id="btn-ev-add">新增活動</button>
+        <button class="btn green wide" id="btn-ev-add">新增活動</button>
       </div>
 
       <table>
@@ -138,7 +139,7 @@
       </div>
 
       <div class="row-3">
-        <label>新增 / 修改：ID（小整數，全域唯一）
+        <label>新增：ID（小整數，全域唯一）
           <input id="lim-new-id" type="number" min="1" placeholder="例：5">
         </label>
         <label>名稱
@@ -148,7 +149,9 @@
           <input id="lim-new-img" placeholder="https://...">
         </label>
       </div>
-      <div><button class="btn green" id="btn-lim-upsert">新增 / 覆蓋</button></div>
+      <div class="row-1">
+        <button class="btn green wide" id="btn-lim-insert">新增限定饅頭</button>
+      </div>
 
       <table>
         <thead><tr><th>ID</th><th>名稱</th><th>圖片</th><th>操作</th></tr></thead>
@@ -159,7 +162,7 @@
     <!-- 普通饅頭 -->
     <div class="section" id="sec-normal" hidden>
       <div class="row-3">
-        <label>新增 / 修改：ID（小整數）
+        <label>新增：ID（小整數）
           <input id="nor-new-id" type="number" min="1" placeholder="例：1">
         </label>
         <label>名稱
@@ -169,7 +172,9 @@
           <input id="nor-new-img" placeholder="https://...">
         </label>
       </div>
-      <div><button class="btn green" id="btn-nor-upsert">新增 / 覆蓋</button></div>
+      <div class="row-1">
+        <button class="btn green wide" id="btn-nor-insert">新增普通饅頭</button>
+      </div>
 
       <table>
         <thead><tr><th>ID</th><th>名稱</th><th>圖片</th><th>操作</th></tr></thead>
@@ -180,7 +185,7 @@
     <!-- 隱藏饅頭 -->
     <div class="section" id="sec-hidden" hidden>
       <div class="row-3">
-        <label>新增 / 修改：ID（小整數）
+        <label>新增：ID（小整數）
           <input id="hid-new-id" type="number" min="1" placeholder="例：901">
         </label>
         <label>名稱
@@ -190,7 +195,9 @@
           <input id="hid-new-img" placeholder="https://...">
         </label>
       </div>
-      <div><button class="btn green" id="btn-hid-upsert">新增 / 覆蓋</button></div>
+      <div class="row-1">
+        <button class="btn green wide" id="btn-hid-insert">新增隱藏饅頭</button>
+      </div>
 
       <table>
         <thead><tr><th>ID</th><th>名稱</th><th>圖片</th><th>操作</th></tr></thead>
@@ -327,27 +334,27 @@ function renderEventRow(ev){
     <div class="thumb-wrap">
       <div class="thumb ${ev.image_url ? '' : 'empty'}" data-thumb></div>
       <button class="btn gray" data-setimg>設定圖片</button>
+      <div class="thumb-tip">預覽 120×120（裁切顯示）</div>
     </div>
   `;
   tr.appendChild(leftTd);
 
-  // 設定背景圖
+  // 預覽
   const thumb = leftTd.querySelector('[data-thumb]');
   if (ev.image_url){
     const img = document.createElement('img');
     img.src = ev.image_url; img.alt='活動圖';
     thumb.appendChild(img);
   }
-
   leftTd.querySelector('[data-setimg]').addEventListener('click', ()=>{
     openUrlModal(ev.image_url || '', async (url)=>{
       const { error } = await G('events').update({ image_url: url || null }).eq('event_name', ev.event_name);
       if (error){ alert('設定失敗：'+error.message); return; }
-      await refreshEvents(); // 重新渲染預覽
+      await refreshEvents();
     });
   });
 
-  // 右：2x3 格
+  // 右：2x3
   const rightTd = document.createElement('td');
   rightTd.innerHTML = `
     <div class="ev-grid">
@@ -375,7 +382,7 @@ function renderEventRow(ev){
   `;
   tr.appendChild(rightTd);
 
-  // 綁定儲存/刪除
+  // 事件
   rightTd.querySelector('[data-act="save"]').addEventListener('click', async ()=>{
     const vals = {};
     rightTd.querySelectorAll('input[data-k]').forEach(inp=>{
@@ -440,7 +447,7 @@ $('#btn-ev-add')?.addEventListener('click', async ()=>{
 });
 
 /* =========================
-   限定饅頭
+   限定饅頭（只新增 + 可刪）
 ========================= */
 const limSel   = $('#lim-evsel');
 const limTbody = $('#limited-tbody');
@@ -495,20 +502,22 @@ async function refreshLimited(){
   applyDeleteModeUI();
 }
 $('#lim-evsel')?.addEventListener('change', refreshLimited);
-$('#btn-lim-upsert')?.addEventListener('click',async ()=>{
+
+// 改成「只新增」
+$('#btn-lim-insert')?.addEventListener('click',async ()=>{
   const ev=limSel.value; if(!ev){ alert('請先選活動'); return; }
   const id=Number($('#lim-new-id').value);
   const name=$('#lim-new-name').value.trim();
   const img=$('#lim-new-img').value.trim()||null;
   if(!id||!name){ alert('請填 ID 與 名稱'); return; }
-  const { error } = await G('limited_characters').upsert({ id, event_name: ev, name, image_url: img }, { onConflict:'id' });
-  if(error){ alert('新增/覆蓋失敗：'+error.message); return; }
+  const { error } = await G('limited_characters').insert({ id, event_name: ev, name, image_url: img });
+  if(error){ alert('新增失敗：'+error.message + '（注意：ID 為全域唯一，不能重複）'); return; }
   $('#lim-new-id').value=''; $('#lim-new-name').value=''; $('#lim-new-img').value='';
   await refreshLimited();
 });
 
 /* =========================
-   普通 / 隱藏饅頭
+   普通 / 隱藏饅頭（只新增 + 可刪）
 ========================= */
 const norTbody=$('#normal-tbody');
 const hidTbody=$('#hidden-tbody');
@@ -560,6 +569,29 @@ async function refreshHidden(){
   if(!data || data.length===0) hidTbody.innerHTML=`<tr><td colspan="4" class="muted">尚無資料，請新增。</td></tr>`;
   applyDeleteModeUI();
 }
+
+// 改成「只新增」
+$('#btn-nor-insert')?.addEventListener('click',async ()=>{
+  const id=Number($('#nor-new-id').value);
+  const name=$('#nor-new-name').value.trim();
+  const img=$('#nor-new-img').value.trim()||null;
+  if(!id||!name){ alert('請填 ID 與 名稱'); return; }
+  const { error } = await G('normal_characters').insert({ id, name, image_url: img });
+  if(error){ alert('新增失敗：'+error.message + '（ID 不可重複）'); return; }
+  $('#nor-new-id').value=''; $('#nor-new-name').value=''; $('#nor-new-img').value='';
+  await refreshNormal();
+});
+
+$('#btn-hid-insert')?.addEventListener('click',async ()=>{
+  const id=Number($('#hid-new-id').value);
+  const name=$('#hid-new-name').value.trim();
+  const img=$('#hid-new-img').value.trim()||null;
+  if(!id||!name){ alert('請填 ID 與 名稱'); return; }
+  const { error } = await G('hidden_characters').insert({ id, name, image_url: img });
+  if(error){ alert('新增失敗：'+error.message + '（ID 不可重複）'); return; }
+  $('#hid-new-id').value=''; $('#hid-new-name').value=''; $('#hid-new-img').value='';
+  await refreshHidden();
+});
 
 /* =========================
    啟動
