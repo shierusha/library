@@ -539,9 +539,12 @@ async function getCounter(){
     .eq('player_id', user.id).single();
   return data || { total_draws: 0, next_pity: 50, max_draws: 0 };
 }
-async function setCounter(total_draws, next_pity){
-  await G('counters').upsert({ player_id: user.id, total_draws, next_pity }, { onConflict: 'player_id' });
+// 只更新 next_pity；total_draws 交給 DB 觸發器自動算
+async function setCounter(_total_draws, next_pity) {
+  await G('counters')
+    .upsert({ player_id: user.id, next_pity }, { onConflict: 'player_id' });
 }
+
 async function refreshUIFromCounter(){
   const c = await getCounter();
   if (drawCounterEl) drawCounterEl.textContent = c.total_draws;
