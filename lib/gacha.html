@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <title>謝爾夏｜抽數贈送 / 舊饅頭回流</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://fonts.googleapis.com/css?family=Noto+Sans+TC:400,700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body { font-family: 'Noto Sans TC', sans-serif; background: url(https://shierusha.github.io/create-student/imgs/citybg.png) center/cover fixed no-repeat; margin: 0; padding: 2rem; color: #0f2d52; }
+    .container { max-width: 1100px; margin: auto; background: #fff; border-radius: 16px; box-shadow: 0 2px 16px #0001; padding: 1.6rem 1.4rem 2rem; backdrop-filter: saturate(140%) blur(2px); }
+    h1 { margin: .2rem 0 0; color: #143158; text-align: center; letter-spacing: .04em; }
+    .hr { height: 4px; width: 78%; background: #1767a0; margin: .6rem auto 1.0rem; border-radius: 2px; opacity: .9; }
+
+    /* tabs */
+    .tabs { display:flex; gap:.6rem; flex-wrap:wrap; justify-content:center; margin: .2rem 0 1rem; }
+    .tab-btn { border:none; border-radius:999px; padding:.5rem 1rem; background:#e9f1f9; color:#143158; font-weight:700; cursor:pointer; }
+    .tab-btn.active { background:#1767a0; color:#fff; }
+
+    .toolbar { display:flex; justify-content:space-between; align-items:center; margin:.4rem 0 1rem; gap:.6rem; flex-wrap:wrap; }
+    .btn { border:none; border-radius:.55rem; padding:.5rem .9rem; font-weight:700; cursor:pointer; }
+    .btn.blue { background:#1767a0; color:#fff; }
+    .btn.gray { background:#98a6b8; color:#fff; }
+    .btn.red { background:#f66464; color:#fff; }
+    .btn.green { background:#4e892a; color:#fff; }
+    .muted { color:#6b7c90; font-size:.95rem; }
+
+    table { width:100%; border-collapse: collapse; margin-top:.6rem; }
+    th, td { padding:.5rem .6rem; border-bottom:1px solid #eef2fa; text-align:left; }
+    thead th { background:#f2f6fb; color:#143158; }
+    tbody tr:hover { background:#f7fbff; }
+    input[type="number"], input[type="text"], select { padding:.45rem .6rem; border:1px solid #c8d6ea; border-radius:.45rem; font-size:1rem; width:100%; box-sizing:border-box; }
+
+    .section { margin-top: 1.2rem; }
+    .row { display:grid; grid-template-columns: 1fr 1fr; gap:.8rem; margin:.7rem 0; }
+    .row-3 { display:grid; grid-template-columns: 1fr 1fr 1fr; gap:.8rem; margin:.7rem 0; }
+    .row-1 { display:grid; grid-template-columns: 1fr; gap:.8rem; margin:.7rem 0; }
+    @media (max-width: 840px) { .row, .row-3 { grid-template-columns:1fr; } }
+
+    .right-bottom { display:flex; justify-content:flex-end; margin-top:1.2rem; }
+    .thumb { max-width: 120px; max-height: 70px; object-fit: cover; border:1px solid #eef2fa; border-radius:6px; }
+
+    /* modal */
+    .modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,.25); justify-content:center; align-items:center; z-index:1000; }
+    .modal { background:#fff; border-radius:12px; box-shadow:0 4px 24px #0004; max-width:92vw; width:380px; padding:1rem 1rem 1.2rem; }
+    .modal h3{ margin:.2rem 0 1rem; color:#143158; text-align:center; }
+    .modal .row-1 input { width:100%; }
+    .modal .actions { display:flex; justify-content:flex-end; gap:.6rem; margin-top:.8rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>抽數贈送 / 舊饅頭回流</h1>
+    <div class="hr"></div>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="grant">抽數</button>
+      <button class="tab-btn" data-tab="reflow">舊饅頭回流</button>
+    </div>
+
+    <!-- ========== 分頁：抽數 ========== -->
+    <div id="sec-grant" class="section">
+      <div class="toolbar">
+        <div class="muted" id="grant-msg">載入中…</div>
+        <div style="display:flex; gap:.5rem; align-items:center;">
+          <button class="btn blue" id="btn-all-grant">全員送抽</button>
+          <button class="btn gray" onclick="location.href='https://shierusha.github.io/create-student/player'">返回管理者首頁</button>
+        </div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th style="width:30%;">玩家名稱</th>
+            <th style="width:20%;">已抽數量</th>
+            <th style="width:20%;">可抽總數（可改）</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="grant-tbody">
+          <tr><td colspan="4" class="muted">載入中…</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ========== 分頁：舊饅頭回流 ========== -->
+    <div id="sec-reflow" class="section" hidden>
+      <div class="row-3">
+        <label>選擇活動
+          <select id="rf-event"></select>
+        </label>
+        <label>選擇玩家
+          <select id="rf-player"></select>
+        </label>
+        <label>選擇饅頭（該活動限定）
+          <select id="rf-bun"></select>
+        </label>
+      </div>
+      <div class="row-3">
+        <label>數量
+          <input id="rf-qty" type="number" min="1" value="1" />
+        </label>
+        <div></div><div></div>
+      </div>
+      <div>
+        <button class="btn green" id="btn-rf-save">儲存</button>
+        <span class="muted" id="rf-msg"></span>
+      </div>
+
+      <div class="section">
+        <div class="muted">備註：會直接增加 <code>owned_characters.count</code> 的數量，若超過該玩家 <code>max_draws</code>，會被資料庫（觸發器）擋下。</div>
+      </div>
+    </div>
+
+    <div class="right-bottom">
+      <button class="btn gray" onclick="location.href='https://shierusha.github.io/create-student/player'">返回管理者首頁</button>
+    </div>
+  </div>
+
+  <!-- ====== Modal：送抽 ====== -->
+  <div class="modal-bg" id="grant-modal">
+    <div class="modal">
+      <h3 id="grant-modal-title">送抽</h3>
+      <div class="row-1">
+        <label>贈送抽數（整數）
+          <input id="grant-input" type="number" min="1" value="1" />
+        </label>
+      </div>
+      <div class="actions">
+        <button class="btn gray" id="grant-cancel">取消</button>
+        <button class="btn blue" id="grant-submit">送出</button>
+      </div>
+      <div class="muted" id="grant-modal-msg"></div>
+    </div>
+  </div>
+
+<script>
+/* ===============================
+   1) 兩邊 Supabase 初始化
+================================ */
+const A_URL  = 'https://wfhwhvodgikpducrhgda.supabase.co';
+const A_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmaHdodm9kZ2lrcGR1Y3JoZ2RhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgwMTAwNjEsImV4cCI6MjA2MzU4NjA2MX0.P6P-x4SxjiR4VdWH6VFgY_ktgMac_OzuI4Bl7HWskz8';
+
+const B_URL  = 'https://ogzpfrkwnqqaitytncla.supabase.co';
+const B_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nenBmcmt3bnFxYWl0eXRuY2xhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxODQzNzEsImV4cCI6MjA3MDc2MDM3MX0.Ls83xOXcKIW7FUcavr8_sOs37I18VGFWYNW3sNFRS24';
+
+const EXCHANGE_URL = B_URL + '/functions/v1/exchange-token'; // 用 A 的 access_token 換 B 的短簽
+
+const A = window.supabase.createClient(A_URL, A_ANON);
+let   B = null; // 交換到 B 的 token 後再建立
+
+function decodeJWT(t){
+  if(!t) return null;
+  const pad = s => s + '='.repeat((4 - s.length % 4) % 4);
+  try { return JSON.parse(atob(pad(t.split('.')[1]).replace(/-/g,'+').replace(/_/g,'/'))); }
+  catch { return null; }
+}
+
+/* ===============================
+   2) 權限守門：A 要 admin；拿 B 短簽
+================================ */
+async function ensureAuth() {
+  const { data: { user }, error } = await A.auth.getUser();
+  if (error || !user) { alert('請先登入（A）'); location.href='https://shierusha.github.io/login/login'; return false; }
+
+  // 讀 A 的 players.role 確認 admin
+  const { data: me, error: e2 } = await A.from('players').select('player_id,username,role').eq('email', user.email).single();
+  if (e2 || !me || me.role !== 'admin') { alert('你不是管理員，無法使用此頁'); location.href='https://shierusha.github.io/create-student/player'; return false; }
+
+  // 換 B token（短簽）
+  const { data: sess } = await A.auth.getSession();
+  const tok = sess?.session?.access_token;
+  if (!tok) { alert('A Session 失效，請重新登入'); location.href='https://shierusha.github.io/login/login'; return false; }
+
+  const resp = await fetch(EXCHANGE_URL, {
+    method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ token: tok })
+  });
+  const j = await resp.json();
+  if (!resp.ok || !j?.token) {
+    console.error('exchange-token failed', j);
+    alert('B 短簽交換失敗'); return false;
+  }
+  // 記下，並建立 B client（帶 Authorization）
+  localStorage.setItem('gacha_b_jwt', j.token);
+  localStorage.setItem('gacha_b_jwt_exp', String(j.exp || 0));
+  localStorage.setItem('gacha_app_role', j.role || 'ADMIN'); // 你的 exchange 建議把 app_role 寫進 claim
+  B = window.supabase.createClient(B_URL, B_ANON, { global: { headers: { Authorization: 'Bearer '+j.token } } });
+  return true;
+}
+
+/* ===============================
+   3) 小工具
+================================ */
+const $  = (s, r=document)=>r.querySelector(s);
+const $$ = (s, r=document)=>[...r.querySelectorAll(s)];
+function setMsg(el, msg, ok=true){ if(el) el.innerHTML = msg ? `<span style="color:${ok?'#1767a0':'#c72323'}">${msg}</span>` : ''; }
+
+/* ===============================
+   4) 分頁切換
+================================ */
+function setActiveTab(tab){
+  const tabs = $$('.tab-btn');
+  tabs.forEach(b=> b.classList.toggle('active', b.dataset.tab===tab));
+  $('#sec-grant').hidden  = (tab!=='grant');
+  $('#sec-reflow').hidden = (tab!=='reflow');
+  history.replaceState(null, '', '#tab='+tab);
+}
+function initTabs(){
+  $$('.tab-btn').forEach(btn=> btn.addEventListener('click', ()=> setActiveTab(btn.dataset.tab)));
+  const m = location.hash.match(/#tab=(\w+)/); setActiveTab(m?.[1] || 'grant');
+}
+
+/* ===============================
+   5) 分頁：抽數
+   - 讀 A players（名稱）
+   - 讀 B gacha.counters（total_draws/max_draws）
+================================ */
+let PLAYERS = [];            // A: [{player_id, username, email}]
+let COUNTERS = [];           // B: [{player_id, total_draws, max_draws}]
+let PLAYER_MAP = new Map();  // player_id -> {username, email}
+
+async function loadPlayers(){
+  const { data, error } = await A.from('players').select('player_id,username,email').order('username', { ascending: true });
+  if (error) throw new Error(error.message);
+  PLAYERS = data || [];
+  PLAYER_MAP = new Map(PLAYERS.map(p=>[p.player_id, p]));
+}
+async function loadCounters(){
+  const { data, error } = await B.schema('gacha').from('counters')
+    .select('player_id,total_draws,max_draws')
+    .order('total_draws', { ascending:false });
+  if (error) throw new Error(error.message);
+  COUNTERS = data || [];
+}
+
+function rowName(p){
+  if (!p) return '(未知)';
+  if (p.username && p.username.trim()) return p.username.trim();
+  if (p.email) return String(p.email).split('@')[0];
+  return '(未命名)';
+}
+
+function renderGrantTable(){
+  const tbody = $('#grant-tbody');
+  if (!COUNTERS.length){
+    tbody.innerHTML = `<tr><td colspan="4" class="muted">目前尚無資料。</td></tr>`;
+    return;
+  }
+  let html = '';
+  COUNTERS.forEach(c=>{
+    const p = PLAYER_MAP.get(c.player_id);
+    const nm = rowName(p);
+    html += `
+      <tr data-pid="${c.player_id}">
+        <td>${nm}</td>
+        <td>${c.total_draws ?? 0}</td>
+        <td><input class="inp-max" type="number" min="0" value="${c.max_draws ?? 1000}" /></td>
+        <td>
+          <button class="btn blue btn-grant" type="button">單獨送抽</button>
+          <button class="btn green btn-save" type="button">儲存</button>
+        </td>
+      </tr>`;
+  });
+  tbody.innerHTML = html;
+
+  // 綁事件
+  $$('.btn-save', tbody).forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const tr = btn.closest('tr'); const pid = tr.dataset.pid;
+      const val = Number(tr.querySelector('.inp-max').value) || 0;
+      try{
+        // upsert counters（PK: player_id）
+        const { error } = await B.schema('gacha').from('counters')
+          .upsert({ player_id: pid, max_draws: val }, { onConflict: 'player_id' });
+        if (error) throw error;
+        setMsg($('#grant-msg'), '已儲存。', true);
+        await loadCounters(); renderGrantTable();
+      }catch(e){ setMsg($('#grant-msg'), '儲存失敗：'+(e.message||e), false); }
+    });
+  });
+
+  $$('.btn-grant', tbody).forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const tr = btn.closest('tr'); const pid = tr.dataset.pid;
+      openGrantModal({ mode:'single', pid });
+    });
+  });
+}
+
+/* 全員送抽 / 單獨送抽 Modal */
+function openGrantModal({ mode, pid=null }){
+  $('#grant-modal').style.display = 'flex';
+  $('#grant-input').value = 1;
+  $('#grant-modal-msg').textContent = '';
+  $('#grant-modal-title').textContent = (mode==='single' ? '單獨送抽' : '全員送抽');
+  $('#grant-submit').onclick = async ()=>{
+    const n = Math.floor(Number($('#grant-input').value)||0);
+    if (n<=0){ $('#grant-modal-msg').textContent = '請輸入正整數'; return; }
+    $('#grant-submit').disabled = true;
+    try{
+      if (mode==='single'){
+        // 讀目前 max_draws
+        const { data: row, error } = await B.schema('gacha').from('counters')
+          .select('max_draws').eq('player_id', pid).single();
+        let base = 1000;
+        if (!error && row) base = row.max_draws ?? 1000;
+        const { error: e2 } = await B.schema('gacha').from('counters')
+          .upsert({ player_id: pid, max_draws: base + n }, { onConflict: 'player_id' });
+        if (e2) throw e2;
+      } else {
+        // 全員送抽：把所有有 counter 的人加 n
+        // 取一輪最新列表
+        await loadCounters();
+        for (const c of COUNTERS){
+          const newMax = (c.max_draws ?? 1000) + n;
+          const { error: e3 } = await B.schema('gacha').from('counters')
+            .update({ max_draws: newMax }).eq('player_id', c.player_id);
+          if (e3) throw e3;
+        }
+      }
+      $('#grant-modal').style.display='none';
+      setMsg($('#grant-msg'), '送抽完成。', true);
+      await loadCounters(); renderGrantTable();
+    }catch(e){
+      $('#grant-modal-msg').textContent = '送抽失敗：'+(e.message||e);
+    }finally{ $('#grant-submit').disabled = false; }
+  };
+}
+$('#grant-cancel').onclick = ()=> { $('#grant-modal').style.display='none'; };
+
+/* ===============================
+   6) 分頁：舊饅頭回流
+================================ */
+async function loadEvents(){
+  const sel = $('#rf-event');
+  sel.innerHTML = '<option value="">（請選擇活動）</option>';
+  const { data, error } = await B.schema('gacha').from('events')
+    .select('event_name, display_name, image_url')
+    .order('starts_at', { ascending:true });
+  if (error){ setMsg($('#rf-msg'), '活動讀取失敗：'+error.message, false); return; }
+  (data||[]).forEach(ev=>{
+    const o = document.createElement('option');
+    o.value = ev.event_name;
+    o.textContent = ev.event_name;
+    sel.appendChild(o);
+  });
+}
+async function loadPlayersForSelect(){
+  const sel = $('#rf-player');
+  sel.innerHTML = '<option value="">（請選擇玩家）</option>';
+  (PLAYERS||[]).forEach(p=>{
+    const o = document.createElement('option');
+    o.value = p.player_id;
+    o.textContent = rowName(p);
+    sel.appendChild(o);
+  });
+}
+async function loadBunsForEvent(){
+  const ev = $('#rf-event').value;
+  const sel = $('#rf-bun');
+  sel.innerHTML = '<option value="">（請選擇饅頭）</option>';
+  if (!ev) return;
+  const { data, error } = await B.schema('gacha').from('limited_characters')
+    .select('id,name,image_url').eq('event_name', ev).order('id');
+  if (error){ setMsg($('#rf-msg'), '饅頭讀取失敗：'+error.message, false); return; }
+  (data||[]).forEach(r=>{
+    const o = document.createElement('option');
+    o.value = String(r.id);
+    o.textContent = `#${r.id} ${r.name||''}`;
+    sel.appendChild(o);
+  });
+}
+$('#rf-event').addEventListener('change', loadBunsForEvent);
+
+$('#btn-rf-save').addEventListener('click', async ()=>{
+  const ev  = $('#rf-event').value;
+  const pid = $('#rf-player').value;
+  const cid = Number($('#rf-bun').value);
+  const qty = Math.floor(Number($('#rf-qty').value)||0);
+  if (!ev || !pid || !cid || qty<=0){ setMsg($('#rf-msg'), '請完整選擇與輸入數量（>0）', false); return; }
+
+  setMsg($('#rf-msg'), '儲存中…', true);
+  try{
+    // 用 upsert + 自己計算「加總」
+    const { data: prev } = await B.schema('gacha').from('owned_characters')
+      .select('count').eq('player_id', pid)
+      .eq('rarity','limited').eq('event_name', ev).eq('character_id', cid).single();
+
+    const newCount = (prev?.count || 0) + qty;
+
+    const { error } = await B.schema('gacha').from('owned_characters')
+      .upsert({
+        player_id: pid,
+        rarity: 'limited',
+        event_name: ev,
+        character_id: cid,
+        count: newCount
+      }, { onConflict: 'player_id,rarity,event_name,character_id' });
+
+    if (error) throw error;
+
+    // 這裡不直接動 counters，因為你有 AFTER trigger 會自動同步 total_draws
+    setMsg($('#rf-msg'), '已儲存（若超過上限會被資料庫拒絕）。', true);
+    // 順便刷新抽數分頁資料
+    await loadCounters(); renderGrantTable();
+  }catch(e){
+    setMsg($('#rf-msg'), '儲存失敗：'+(e.message||e), false);
+  }
+});
+
+/* ===============================
+   7) 啟動
+================================ */
+(async function init(){
+  initTabs();
+  const ok = await ensureAuth(); if (!ok) return;
+
+  try{
+    await loadPlayers();
+    await loadCounters();
+    setMsg($('#grant-msg'), '');
+    renderGrantTable();
+
+    await loadEvents();
+    await loadPlayersForSelect();
+    await loadBunsForEvent(); // 若預先選活動（之後可擴充）
+  }catch(e){
+    setMsg($('#grant-msg'), '讀取失敗：'+(e.message||e), false);
+  }
+
+  // 全員送抽
+  $('#btn-all-grant').addEventListener('click', ()=> openGrantModal({ mode:'all' }));
+})();
+</script>
+</body>
+</html>
