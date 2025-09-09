@@ -227,7 +227,7 @@
           }
 
           update();
-          state.v *= 0.92;
+          state.v *= 0.5;
           state.raf = requestAnimationFrame(step);
         };
         state.raf = requestAnimationFrame(step);
@@ -267,7 +267,7 @@
         update();
 
         const now = Date.now();
-        state.v = (e.clientX - state.lastX) / Math.max(1, (now - state.lastT));
+state.v = ((e.clientX - state.lastX) / Math.max(1, (now - state.lastT))) * 0.7;
         state.lastX = e.clientX; state.lastT = now;
       });
 
