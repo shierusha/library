@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8" />
-  <title>謝爾夏｜抽數贈送 / 舊饅頭回流</title>
+  <title>謝爾夏｜抽數贈送 / 限定饅頭贈送</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link href="https://fonts.googleapis.com/css?family=Noto+Sans+TC:400,700&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -96,12 +96,22 @@
           <select id="rf-bun"></select>
         </label>
       </div>
-      <div class="row-3">
-        <label>數量
-          <input id="rf-qty" type="number" min="1" value="1" />
-        </label>
-        <div></div><div></div>
-      </div>
+    <div class="row-3">
+  <label>數量
+    <input id="rf-qty" type="number" min="1" value="1" />
+  </label>
+
+  <div>
+    <label>目前持有（該玩家 / 該饅頭）</label>
+    <div id="rf-owned" class="muted">—</div>
+  </div>
+
+  <div>
+    <label>預覽</label>
+    <img id="rf-thumb" class="thumb" alt="" />
+  </div>
+</div>
+
       <div>
         <button class="btn green" id="btn-rf-save">儲存</button>
         <span class="muted" id="rf-msg"></span>
@@ -331,6 +341,7 @@ $('#grant-cancel').onclick = ()=> { $('#grant-modal').style.display='none'; };
 /* ===============================
    6) 分頁：舊饅頭回流
 ================================ */
+
 async function loadEvents(){
   const sel = $('#rf-event');
   sel.innerHTML = '<option value="">（請選擇活動）</option>';
@@ -359,18 +370,29 @@ async function loadBunsForEvent(){
   const ev = $('#rf-event').value;
   const sel = $('#rf-bun');
   sel.innerHTML = '<option value="">（請選擇饅頭）</option>';
-  if (!ev) return;
+  LIM_CACHE = [];
+  if (!ev) { refreshOwnedPreview(); return; }
+
   const { data, error } = await B.schema('gacha').from('limited_characters')
     .select('id,name,image_url').eq('event_name', ev).order('id');
+
   if (error){ setMsg($('#rf-msg'), '饅頭讀取失敗：'+error.message, false); return; }
-  (data||[]).forEach(r=>{
+  LIM_CACHE = data || [];
+
+  LIM_CACHE.forEach(r=>{
     const o = document.createElement('option');
     o.value = String(r.id);
     o.textContent = `#${r.id} ${r.name||''}`;
     sel.appendChild(o);
   });
+
+  // 事件切換後先清空持有顯示，再試著更新（若三選都齊）
+  refreshOwnedPreview();
 }
+
 $('#rf-event').addEventListener('change', loadBunsForEvent);
+$('#rf-player').addEventListener('change', refreshOwnedPreview);
+$('#rf-bun').addEventListener('change', refreshOwnedPreview);
 
 $('#btn-rf-save').addEventListener('click', async ()=>{
   const ev  = $('#rf-event').value;
@@ -402,11 +424,59 @@ $('#btn-rf-save').addEventListener('click', async ()=>{
     // 這裡不直接動 counters，因為你有 AFTER trigger 會自動同步 total_draws
     setMsg($('#rf-msg'), '已儲存（若超過上限會被資料庫拒絕）。', true);
     // 順便刷新抽數分頁資料
+    
     await loadCounters(); renderGrantTable();
+    await refreshOwnedPreview();
+
   }catch(e){
     setMsg($('#rf-msg'), '儲存失敗：'+(e.message||e), false);
   }
 });
+
+
+  // 當前活動的限定饅頭快取（用來找圖片＆名稱）
+let LIM_CACHE = []; // [{id,name,image_url}...]
+
+async function refreshOwnedPreview(){
+  const ev  = $('#rf-event').value;
+  const pid = $('#rf-player').value;
+  const cid = Number($('#rf-bun').value);
+
+  // 預覽圖片（用 LIM_CACHE）
+  const bun = LIM_CACHE.find(x => x.id === cid);
+  const thumb = $('#rf-thumb');
+  if (bun?.image_url) {
+    thumb.src = bun.image_url;
+    thumb.style.display = '';
+  } else {
+    thumb.removeAttribute('src');
+    thumb.style.display = 'none';
+  }
+
+  // 三個都選了才查數量
+  if (!ev || !pid || !cid) {
+    $('#rf-owned').textContent = '—';
+    return;
+  }
+
+  try {
+    const { data, error } = await B
+      .schema('gacha').from('owned_characters')
+      .select('count')
+      .eq('player_id', pid)
+      .eq('rarity', 'limited')
+      .eq('event_name', ev)
+      .eq('character_id', cid)
+      .limit(1);
+
+    if (error) throw error;
+    const owned = (data && data.length) ? (data[0].count || 0) : 0;
+    $('#rf-owned').textContent = String(owned);
+  } catch (e) {
+    $('#rf-owned').textContent = '讀取失敗';
+    console.error(e);
+  }
+}
 
 /* ===============================
    7) 啟動
