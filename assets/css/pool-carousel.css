@@ -1,7 +1,4 @@
-/* ============================================
-   新增：返回箭頭（滿版黃色向左箭頭）
-   你的 .back 已用百分比定位，這裡只畫圖案
-============================================ */
+/* ============ Back Arrow（滿版黃色向左箭頭） ============ */
 .back::before{
   content:"";
   position:absolute; inset:0;
@@ -12,70 +9,57 @@
   filter: drop-shadow(0 2px 6px rgba(0,0,0,.45));
 }
 
-/* ============================================
-   新增：倫波（選池）Carousel
-   - 完整百分比 + 絕對定位
-   - 一次只顯示「當前卡片」，切換時才短暫顯示第二張
-   - 圖片 object-fit: contain 保留完整圖面比例
-============================================ */
-.pool-carousel{
-  position:absolute;
-  left:8%; right:8%;
-  top:8%; bottom:22%;
-  z-index:8;
-  overflow:hidden;
-  user-select:none;
+/* ============ Pool Selector Carousel ============ */
+.pool-carousel {
+  position:absolute; inset: 12% 8% 22% 8%;
+  display:block; overflow:hidden; user-select:none;
   touch-action: pan-y;
+  z-index: 8;
 }
-.pool-track{
-  position:absolute; inset:0;
-}
+.pool-track { position:relative; width:100%; height:100%; }
 
-/* 卡片：預設隱形，只有 .center 或 .transition 才顯示 */
-.pool-card{
-  position:absolute; left:50%; top:50%;
-  width:64%; height:56%;
+.pool-card {
+  position:absolute; top:50%; left:50%;
   transform: translate(-50%,-50%);
-  border-radius:2%;
-  overflow:hidden;
-  visibility:hidden;
-  opacity:0;
-  pointer-events:none;
-  background: linear-gradient(135deg,#0f1d55,#15397a);
-  border: .5% solid rgba(83,226,255,.27);
-  box-shadow: 0 0 24px rgba(0,0,0,.22);
-  transition: transform .40s cubic-bezier(.22,.8,.25,1), opacity .28s;
+  width: 64%; max-width: 680px; aspect-ratio: 16/7;
+  border-radius: 16px; overflow:hidden; cursor:grab;
+  box-shadow: 0 10px 30px rgba(0,0,0,.35);
+  transition: transform .5s cubic-bezier(.7,1.7,.6,1), opacity .36s;
+  opacity: .35; pointer-events: none; will-change: transform, opacity;
+  background: linear-gradient(135deg, #0f1d55, #15397a);
+  border: 2px solid #53e2ff44;
 }
-.pool-card.center,
-.pool-card.transitioning{
-  visibility:visible;
-  opacity:1;
-  pointer-events:auto;
-}
-.pool-card img{
-  position:absolute; inset:0;
-  width:100%; height:100%;
-  object-fit: contain; /* 保留完整圖面 */
-  background: rgba(0,0,0,.25);
+.pool-card.center { opacity: 1; pointer-events: auto; cursor: grab; }
+
+.pool-card img.banner {
+  position:absolute; inset:0; width:100%; height:100%;
+  object-fit: contain; /* 保留完整圖面比例 */
+  background:#000; /* 信箱色避免透明 */
+  display:block;
+  filter: saturate(1.05) contrast(1.02);
 }
 
-/* 非活動期間：灰色濾鏡遮罩（禁抽由 JS 設 disabled flag） */
-.pool-card .disabled-mask{
-  position:absolute; inset:0;
-  background: rgba(0,0,0,.35);
-  display:none;
+.pool-card .title {
+  position:absolute; left:3%; top:6%;
+  color:#fff; font-weight:800; text-shadow:0 2px 10px #000c;
+  letter-spacing:.04em;
 }
-.pool-card.disabled .disabled-mask{ display:block; }
-
-/* 拖曳中關閉 transition，避免追手感 */
-.pool-carousel.dragging .pool-card.center{
-  transition: none !important;
+.pool-card .desc {
+  position:absolute; left:3%; right:3%; bottom:6%;
+  color:#eaf7ff; text-shadow:0 2px 8px #000c;
 }
 
-/* ============================================
-   新增：持有榜按鈕外觀（沿用你背包風格）
-   - 容器尺寸仍由你 HTML 的百分比 inline 控制
-============================================ */
+/* 放大/位移層疊感 */
+.pool-card[data-dist="0"] { transform: translate(-50%,-50%) scale(1.06); z-index: 5; }
+.pool-card[data-dist="1"], .pool-card[data-dist="-1"] { z-index:4; }
+.pool-card[data-dist="2"], .pool-card[data-dist="-2"] { z-index:3; }
+
+/* 拖曳中 */
+.pool-carousel.dragging .pool-card { transition: none !important; cursor: grabbing; }
+
+
+
+/* ============ 持有榜按鈕外觀（像背包） ============ */
 #poolLink{
   display:flex;
   align-items:center;
@@ -91,5 +75,4 @@
 #poolLink:hover{
   background: #1eb5e5cc;
   box-shadow: 0 0 18px #53e2ffdd, 0 0 36px #1eb5e5aa inset;
-  text-decoration:none;
 }
