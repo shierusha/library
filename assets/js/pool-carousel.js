@@ -1,25 +1,7 @@
-/* ============ Pool Selector Carousel 外掛模組 ============
-
-使用方式（本頁已完成初始化）：
-
-PoolCarousel.init({
-  mount: document.getElementById('gacha-results'),
-  nameEl: document.getElementById('poolNameSlot'),
-  descEl: document.getElementById('poolDescSlot'),
-  linkEl: document.getElementById('poolLinkSlot'),
-  pools: [
-    // 由 gacha.html 依 DB 建立（name=event_name、desc=display_name）
-  ],
-  onChange: (pool) => { window.CURRENT_POOL = pool; }
-});
-
-*/
+/* ============ Pool Selector Carousel 外掛模組 ============ */
 (function(){
   const LS_KEY = 'gacha_selected_pool_v2';
-
   const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
-
-  // 常駐時 lim= 空值；其他 lim= event_name
   const buildLink = (key) =>
     `https://shierusha.github.io/library/lib/getgacha.html?lim=${(!key || key === '常駐') ? '' : encodeURIComponent(key)}`;
 
@@ -49,12 +31,13 @@ PoolCarousel.init({
 
       const state = this._state = {
         root: container, track, nameEl, descEl, linkEl, onChange,
-        pools: pools.length ? pools : [{key:'常駐', name:'常駐', desc:'一般池（含隱藏機率）', banner:'', active:true, threadId:null}],
+        pools: pools.length ? pools : [{key:'常駐', name:'常駼', desc:'一般池', banner:'', active:true, threadId:null}],
         cards: [],
-        pos: 0, isDrag:false, startX:0, startPos:0, lastX:0, lastT:0, v:0, raf:0, _lastIndex: -1
+        pos: 0, isDrag:false, startX:0, startPos:0, lastX:0, lastT:0, v:0, raf:0, _lastIndex: -1,
+        pointerId: null
       };
 
-      // 復原上次選擇（key=event_name）
+      // 復原上次選擇
       try {
         const saved = JSON.parse(localStorage.getItem(LS_KEY));
         if (saved) {
@@ -81,17 +64,16 @@ PoolCarousel.init({
 
         const t = document.createElement('div');
         t.className = 'title auto-resize';
-        t.textContent = p.name; // event_name 顯示於標題
+        t.textContent = p.name;
         card.appendChild(t);
 
         const d = document.createElement('div');
         d.className = 'desc auto-resize';
-        d.textContent = p.desc || ''; // display_name 當簡介（不顯示時間）
+        d.textContent = p.desc || '';
         card.appendChild(d);
 
-        // 未開放角標
         const tag = document.createElement('div');
-        tag.className = 'disabled-tag auto-resize';
+        tag.className = 'disabled-tag';
         tag.textContent = '未開放';
         tag.style.display = p.active ? 'none' : 'flex';
         card.appendChild(tag);
@@ -107,7 +89,7 @@ PoolCarousel.init({
       const update = (center = state.pos) => {
         const N = state.pools.length;
         const W = container.clientWidth;
-        const baseX = Math.max(W * 0.09, Math.min(W * 0.18, W/4)); // 自適應橫向間距
+        const baseX = Math.max(W * 0.09, Math.min(W * 0.18, W/4));
         state.cards.forEach((card, i) => {
           let dist = i - center;
           if (dist > N/2) dist -= N;
@@ -123,7 +105,6 @@ PoolCarousel.init({
           card.setAttribute('data-dist', String(Math.round(dist)));
         });
 
-        // 更新 slots & 持有榜連結
         const cur = api.getCurrent();
         if (state.nameEl) state.nameEl.textContent = cur?.name || '';
         if (state.descEl) state.descEl.textContent = cur?.desc || '';
@@ -133,14 +114,10 @@ PoolCarousel.init({
           state.linkEl.title = `前往持有榜`;
         }
 
-        // 自動縮字
-        if (window.resizeAllTexts) window.resizeAllTexts();
-
-        // onChange
-        if (state._lastIndex !== Math.round(center)) {
+        if (typeof state.onChange === 'function' && state._lastIndex !== Math.round(center)) {
           state._lastIndex = Math.round(center);
           try { localStorage.setItem(LS_KEY, JSON.stringify(cur?.key || '常駐')); } catch {}
-          if (typeof state.onChange === 'function') state.onChange(cur);
+          state.onChange(cur);
         }
       };
 
@@ -148,6 +125,21 @@ PoolCarousel.init({
         if (!state.raf) return;
         cancelAnimationFrame(state.raf);
         state.raf = 0;
+      };
+      const endDrag = (e) => {
+        if (!state.isDrag) return;
+        state.isDrag = false;
+        container.classList.remove('dragging');
+        if (state.pointerId != null) {
+          try { container.releasePointerCapture(state.pointerId); } catch {}
+          state.pointerId = null;
+        }
+        const now = Date.now();
+        const dt = Math.max(1, now - state.lastT);
+        const dx = (e && typeof e.clientX === 'number') ? (e.clientX - state.lastX) : 0;
+        state.v = dx / dt;
+        if (Math.abs(state.v) > 0.01) startMomentum();
+        else { state.pos = Math.round(state.pos); update(); }
       };
       const startMomentum = () => {
         endMomentum();
@@ -169,10 +161,11 @@ PoolCarousel.init({
         state.raf = requestAnimationFrame(step);
       };
 
-      // 指標事件（滑鼠/觸控）
+      // 指標事件（滑鼠/觸控）── 修正「滑鼠離開還跟著動」
       container.addEventListener('pointerdown', (e) => {
         state.isDrag = true;
-        container.setPointerCapture(e.pointerId);
+        state.pointerId = e.pointerId;
+        try { container.setPointerCapture(e.pointerId); } catch {}
         state.startX = e.clientX;
         state.startPos = state.pos;
         state.lastX = e.clientX;
@@ -182,6 +175,8 @@ PoolCarousel.init({
         container.classList.add('dragging');
       });
       container.addEventListener('pointermove', (e) => {
+        // 若鬆開了按鍵（buttons=0），強制結束拖曳
+        if (state.isDrag && e.buttons === 0) { endDrag(e); return; }
         if (!state.isDrag) return;
         const dx = e.clientX - state.startX;
         state.pos = state.startPos - dx / 160;
@@ -194,15 +189,13 @@ PoolCarousel.init({
         state.v = (e.clientX - state.lastX) / (now - state.lastT);
         state.lastX = e.clientX; state.lastT = now;
       });
-      container.addEventListener('pointerup', (e) => {
-        if (!state.isDrag) return;
-        state.isDrag = false;
-        container.releasePointerCapture(e.pointerId);
-        container.classList.remove('dragging');
-        state.v = (e.clientX - state.lastX) / Math.max(1, (Date.now()-state.lastT));
-        if (Math.abs(state.v) > 0.01) startMomentum();
-        else { state.pos = Math.round(state.pos); update(); }
+      container.addEventListener('pointerup', (e) => { endDrag(e); });
+      container.addEventListener('pointercancel', (e) => { endDrag(e); });
+      container.addEventListener('pointerleave', (e) => {
+        // 若滑出容器仍在拖曳且未按著滑鼠，結束拖曳
+        if (state.isDrag && e.buttons === 0) endDrag(e);
       });
+      window.addEventListener('blur', (e)=>{ endDrag(e); }); // 視窗失焦也結束
 
       // 鍵盤
       container.tabIndex = 0;
@@ -211,11 +204,12 @@ PoolCarousel.init({
         if (e.key === 'ArrowRight') { state.pos = Math.round(state.pos) + 1; if (state.pos >= state.pools.length) state.pos -= state.pools.length; update(); }
       });
 
-      // 持有榜按鈕
+      // 持有榜按鈕：改由主頁開 modal（這裡只更新 href）
       if (state.linkEl) {
         state.linkEl.addEventListener('click', ()=>{
+          // 主頁已綁定 openPoolBoard()
           const href = state.linkEl.dataset.href || buildLink('常駐');
-          window.open(href, '_blank');
+          state.linkEl.dataset.href = href;
         });
       }
 
