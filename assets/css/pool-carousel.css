@@ -1,6 +1,6 @@
 /* ============================================
    新增：返回箭頭（滿版黃色向左箭頭）
-   你的 .back 本來就有 inline 定位；這裡只畫圖案
+   你的 .back 已用百分比定位，這裡只畫圖案
 ============================================ */
 .back::before{
   content:"";
@@ -15,7 +15,8 @@
 /* ============================================
    新增：倫波（選池）Carousel
    - 完整百分比 + 絕對定位
-   - 圖片 object-fit: contain 保留完整比例
+   - 一次只顯示「當前卡片」，切換時才短暫顯示第二張
+   - 圖片 object-fit: contain 保留完整圖面比例
 ============================================ */
 .pool-carousel{
   position:absolute;
@@ -29,20 +30,28 @@
 .pool-track{
   position:absolute; inset:0;
 }
+
+/* 卡片：預設隱形，只有 .center 或 .transition 才顯示 */
 .pool-card{
   position:absolute; left:50%; top:50%;
-  transform: translate(-50%,-50%);
   width:64%; height:56%;
+  transform: translate(-50%,-50%);
   border-radius:2%;
   overflow:hidden;
-  opacity:.35;
-  transition: transform .5s cubic-bezier(.7,1.7,.6,1), opacity .36s;
+  visibility:hidden;
+  opacity:0;
   pointer-events:none;
   background: linear-gradient(135deg,#0f1d55,#15397a);
   border: .5% solid rgba(83,226,255,.27);
   box-shadow: 0 0 24px rgba(0,0,0,.22);
+  transition: transform .40s cubic-bezier(.22,.8,.25,1), opacity .28s;
 }
-.pool-card.center{ opacity:1; pointer-events:auto; }
+.pool-card.center,
+.pool-card.transitioning{
+  visibility:visible;
+  opacity:1;
+  pointer-events:auto;
+}
 .pool-card img{
   position:absolute; inset:0;
   width:100%; height:100%;
@@ -50,17 +59,37 @@
   background: rgba(0,0,0,.25);
 }
 
-/* 非活動期間：灰色濾鏡遮罩 + 禁抽（由 JS 設定 _forceDisabled） */
+/* 非活動期間：灰色濾鏡遮罩（禁抽由 JS 設 disabled flag） */
 .pool-card .disabled-mask{
   position:absolute; inset:0;
   background: rgba(0,0,0,.35);
-  backdrop-filter: grayscale(100%);
   display:none;
 }
 .pool-card.disabled .disabled-mask{ display:block; }
 
-.pool-carousel.dragging .pool-card{ transition:none !important; }
+/* 拖曳中關閉 transition，避免追手感 */
+.pool-carousel.dragging .pool-card.center{
+  transition: none !important;
+}
 
-/* 持有榜 hover 小提示（不動你原樣式） */
-#poolLink{ cursor:pointer; }
-#poolLink:hover{ text-decoration: underline; }
+/* ============================================
+   新增：持有榜按鈕外觀（沿用你背包風格）
+   - 容器尺寸仍由你 HTML 的百分比 inline 控制
+============================================ */
+#poolLink{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background: rgb(13 27 77 / 82%);
+  border: 2px solid #1eb5e5;
+  border-radius: 8px;
+  box-shadow: 0 0 8px #53e2ff88, 0 0 16px #1eb5e577 inset;
+  cursor:pointer;
+  text-shadow: 0 1px 4px rgba(0,0,0,.5);
+  user-select:none;
+}
+#poolLink:hover{
+  background: #1eb5e5cc;
+  box-shadow: 0 0 18px #53e2ffdd, 0 0 36px #1eb5e5aa inset;
+  text-decoration:none;
+}
