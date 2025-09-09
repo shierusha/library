@@ -1,230 +1,210 @@
-/* ============ Pool Selector Carousel 外掛模組 ============ */
 (function(){
-  const LS_KEY = 'gacha_selected_pool_v2';
-  const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
-  const buildLink = (key) =>
-    `https://shierusha.github.io/library/lib/getgacha.html?lim=${(!key || key === '常駐') ? '' : encodeURIComponent(key)}`;
+  const mount      = document.getElementById('gacha-results');
+  const poolNameEl = document.getElementById('poolName');
+  const poolDescEl = document.getElementById('poolDesc');
+  const poolLinkEl = document.getElementById('poolLink');
+  const backEl     = document.getElementById('btnBack');
 
-  const api = {
-    _state: null,
+  if (!mount) return;
 
-    getCurrent(){ return this._state?.pools?.[Math.round(this._state.pos)%this._state.pools.length]; },
-    getCurrentKey(){ return this.getCurrent()?.key || '常駐'; },
+  // 建立倫波容器
+  const car   = document.createElement('div');
+  car.className = 'pool-carousel';
+  const track = document.createElement('div');
+  track.className = 'pool-track';
+  car.appendChild(track);
+  mount.appendChild(car);
 
-    hide(){ this._state?.root && (this._state.root.style.display = 'none'); },
-    show(){ this._state?.root && (this._state.root.style.display = 'block'); },
+  const resultsContainer = document.getElementById('gacha-results');
+  const btnSingle = document.getElementById('btn-single');
+  const btnTen    = document.getElementById('btn-ten');
 
-    init(opts){
-      const {
-        mount, nameEl, descEl, linkEl,
-        pools = [],
-        onChange = null
-      } = (opts||{});
+  const S = { cards:[], pools:[], pos:0, dragging:false, sx:0, sp:0, lastX:0, lastT:0, v:0, raf:0 };
 
-      if (!mount) throw new Error('[PoolCarousel] mount 容器必填');
-      const container = document.createElement('div');
-      container.className = 'pool-carousel';
-      const track = document.createElement('div');
-      track.className = 'pool-track';
-      container.appendChild(track);
-      mount.appendChild(container);
+  // 初始化當前池
+  window.CURRENT_POOL = { key:'常駐', name:'常駐', desc:'', banner:'', threadId:null, active:true };
 
-      const state = this._state = {
-        root: container, track, nameEl, descEl, linkEl, onChange,
-        pools: pools.length ? pools : [{key:'常駐', name:'常駼', desc:'一般池', banner:'', active:true, threadId:null}],
-        cards: [],
-        pos: 0, isDrag:false, startX:0, startPos:0, lastX:0, lastT:0, v:0, raf:0, _lastIndex: -1,
-        pointerId: null
-      };
+  // 讀活動
+  (async function loadPools(){
+    const ev = await G('events').select('event_name,display_name,starts_at,ends_at,image_url,discord_thread_id').order('starts_at', {ascending:true});
+    const rows = Array.isArray(ev.data) ? ev.data : [];
+    const now  = Date.now();
 
-      // 復原上次選擇
-      try {
-        const saved = JSON.parse(localStorage.getItem(LS_KEY));
-        if (saved) {
-          const i = state.pools.findIndex(p => p.key === saved);
-          if (i >= 0) state.pos = i;
-        }
-      } catch {}
+    // 常駐
+    const base = rows.find(r=>r.event_name==='常駐') || null;
+    S.pools.push({
+      key:'常駐', name:'常駐',
+      desc: base?.display_name || '一般池（含隱藏機率）',
+      banner: base?.image_url || '',
+      threadId: base?.discord_thread_id || null,
+      active: true
+    });
 
-      // 建卡
-      state.pools.forEach((p, i) => {
-        const card = document.createElement('div');
-        card.className = 'pool-card';
-        card.setAttribute('data-index', i);
-
-        if (p.banner) {
-          const img = document.createElement('img');
-          img.className = 'banner';
-          img.src = p.banner;
-          img.alt = p.name;
-          img.loading = 'lazy';
-          img.decoding = 'async';
-          card.appendChild(img);
-        }
-
-        const t = document.createElement('div');
-        t.className = 'title auto-resize';
-        t.textContent = p.name;
-        card.appendChild(t);
-
-        const d = document.createElement('div');
-        d.className = 'desc auto-resize';
-        d.textContent = p.desc || '';
-        card.appendChild(d);
-
-        const tag = document.createElement('div');
-        tag.className = 'disabled-tag';
-        tag.textContent = '未開放';
-        tag.style.display = p.active ? 'none' : 'flex';
-        card.appendChild(tag);
-
-        if (!p.active && p.key !== '常駐') {
-          card.classList.add('disabled');
-        }
-
-        state.track.appendChild(card);
-        state.cards.push(card);
+    // 其他活動
+    rows.filter(r=>r.event_name!=='常駐').forEach(r=>{
+      const st = new Date(r.starts_at).getTime();
+      const ed = new Date(r.ends_at).getTime();
+      S.pools.push({
+        key: r.event_name,
+        name: r.event_name,
+        desc: r.display_name || '',
+        banner: r.image_url || '',
+        threadId: r.discord_thread_id || null,
+        active: (now>=st && now<=ed)
       });
+    });
 
-      const update = (center = state.pos) => {
-        const N = state.pools.length;
-        const W = container.clientWidth;
-        const baseX = Math.max(W * 0.09, Math.min(W * 0.18, W/4));
-        state.cards.forEach((card, i) => {
-          let dist = i - center;
-          if (dist > N/2) dist -= N;
-          if (dist < -N/2) dist += N;
+    build();
+    update();
+  })();
 
-          const tx = dist * baseX;
-          const scale = Math.abs(dist) < .4 ? 1.06 : 0.88;
-          const op = 1 - .25 * Math.abs(dist);
+  function build(){
+    // 卡片
+    S.pools.forEach((p,i)=>{
+      const card = document.createElement('div');
+      card.className = 'pool-card' + (p.active ? '' : ' disabled');
 
-          card.style.transform = `translate(-50%,-50%) translateX(${tx}px) scale(${scale})`;
-          card.style.opacity = String(clamp(op, .3, 1));
-          card.classList.toggle('center', Math.abs(dist) < .4);
-          card.setAttribute('data-dist', String(Math.round(dist)));
-        });
+      const img = document.createElement('img');
+      img.src = p.banner || '';
+      img.alt = p.name;
+      card.appendChild(img);
 
-        const cur = api.getCurrent();
-        if (state.nameEl) state.nameEl.textContent = cur?.name || '';
-        if (state.descEl) state.descEl.textContent = cur?.desc || '';
-        if (state.linkEl) {
-          const href = buildLink(cur?.key || '常駐');
-          state.linkEl.dataset.href = href;
-          state.linkEl.title = `前往持有榜`;
-        }
+      const mask = document.createElement('div');
+      mask.className = 'disabled-mask';
+      card.appendChild(mask);
 
-        if (typeof state.onChange === 'function' && state._lastIndex !== Math.round(center)) {
-          state._lastIndex = Math.round(center);
-          try { localStorage.setItem(LS_KEY, JSON.stringify(cur?.key || '常駐')); } catch {}
-          state.onChange(cur);
-        }
-      };
+      track.appendChild(card);
+      S.cards.push(card);
+    });
 
-      const endMomentum = () => {
-        if (!state.raf) return;
-        cancelAnimationFrame(state.raf);
-        state.raf = 0;
-      };
-      const endDrag = (e) => {
-        if (!state.isDrag) return;
-        state.isDrag = false;
-        container.classList.remove('dragging');
-        if (state.pointerId != null) {
-          try { container.releasePointerCapture(state.pointerId); } catch {}
-          state.pointerId = null;
-        }
-        const now = Date.now();
-        const dt = Math.max(1, now - state.lastT);
-        const dx = (e && typeof e.clientX === 'number') ? (e.clientX - state.lastX) : 0;
-        state.v = dx / dt;
-        if (Math.abs(state.v) > 0.01) startMomentum();
-        else { state.pos = Math.round(state.pos); update(); }
-      };
-      const startMomentum = () => {
-        endMomentum();
-        const step = () => {
-          if (Math.abs(state.v) < 0.02) {
-            state.v = 0;
-            state.pos = Math.round(state.pos);
-            update();
-            return;
-          }
-          state.pos -= state.v;
-          const N = state.pools.length;
-          if (state.pos < 0) state.pos += N;
-          if (state.pos >= N) state.pos -= N;
-          update();
-          state.v *= 0.92;
-          state.raf = requestAnimationFrame(step);
-        };
-        state.raf = requestAnimationFrame(step);
-      };
-
-      // 指標事件（滑鼠/觸控）── 修正「滑鼠離開還跟著動」
-      container.addEventListener('pointerdown', (e) => {
-        state.isDrag = true;
-        state.pointerId = e.pointerId;
-        try { container.setPointerCapture(e.pointerId); } catch {}
-        state.startX = e.clientX;
-        state.startPos = state.pos;
-        state.lastX = e.clientX;
-        state.lastT = Date.now();
-        state.v = 0;
-        endMomentum();
-        container.classList.add('dragging');
-      });
-      container.addEventListener('pointermove', (e) => {
-        // 若鬆開了按鍵（buttons=0），強制結束拖曳
-        if (state.isDrag && e.buttons === 0) { endDrag(e); return; }
-        if (!state.isDrag) return;
-        const dx = e.clientX - state.startX;
-        state.pos = state.startPos - dx / 160;
-        const N = state.pools.length;
-        if (state.pos < 0) state.pos += N;
-        if (state.pos >= N) state.pos -= N;
-        update();
-
-        const now = Date.now();
-        state.v = (e.clientX - state.lastX) / (now - state.lastT);
-        state.lastX = e.clientX; state.lastT = now;
-      });
-      container.addEventListener('pointerup', (e) => { endDrag(e); });
-      container.addEventListener('pointercancel', (e) => { endDrag(e); });
-      container.addEventListener('pointerleave', (e) => {
-        // 若滑出容器仍在拖曳且未按著滑鼠，結束拖曳
-        if (state.isDrag && e.buttons === 0) endDrag(e);
-      });
-      window.addEventListener('blur', (e)=>{ endDrag(e); }); // 視窗失焦也結束
-
-      // 鍵盤
-      container.tabIndex = 0;
-      container.addEventListener('keydown', (e)=>{
-        if (e.key === 'ArrowLeft')  { state.pos = Math.round(state.pos) - 1; if (state.pos < 0) state.pos += state.pools.length; update(); }
-        if (e.key === 'ArrowRight') { state.pos = Math.round(state.pos) + 1; if (state.pos >= state.pools.length) state.pos -= state.pools.length; update(); }
-      });
-
-      // 持有榜按鈕：改由主頁開 modal（這裡只更新 href）
-      if (state.linkEl) {
-        state.linkEl.addEventListener('click', ()=>{
-          // 主頁已綁定 openPoolBoard()
-          const href = state.linkEl.dataset.href || buildLink('常駐');
-          state.linkEl.dataset.href = href;
-        });
-      }
-
-      update();
-      window.addEventListener('resize', () => update());
-
-      api.update = update;
-      api.selectByKey = (key) => {
-        const i = state.pools.findIndex(p => p.key === key);
-        if (i >= 0) { state.pos = i; update(); }
-      };
-
-      return api;
+    // 滑鼠拖曳（照你書本倫波：mouse + window 監聽 + 慣性）
+    car.addEventListener('mousedown', e=>{
+      S.dragging = true; S.sx = e.clientX; S.sp = S.pos;
+      S.lastX = e.clientX; S.lastT = Date.now(); S.v = 0;
+      car.classList.add('dragging');
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp, { once:true });
+    });
+    function onMove(e){
+      if (!S.dragging) return;
+      const dx = e.clientX - S.sx;
+      S.pos = S.sp - dx / 160;
+      wrap(); update();
+      const now = Date.now();
+      S.v = (e.clientX - S.lastX)/(now - S.lastT);
+      S.lastX = e.clientX; S.lastT = now;
     }
-  };
+    function onUp(){
+      S.dragging = false; car.classList.remove('dragging'); momentum();
+      window.removeEventListener('mousemove', onMove);
+    }
+    car.addEventListener('mouseleave', ()=>{ if (S.dragging) { S.dragging=false; car.classList.remove('dragging'); momentum(); }});
+    window.addEventListener('blur', ()=>{ if (S.dragging) { S.dragging=false; car.classList.remove('dragging'); momentum(); }});
 
-  window.PoolCarousel = api;
+    // 觸控
+    car.addEventListener('touchstart', e=>{
+      if (e.touches.length>1) return;
+      const t = e.touches[0];
+      S.dragging=true; S.sx=t.clientX; S.sp=S.pos;
+      S.lastX=t.clientX; S.lastT=Date.now(); S.v=0;
+      car.classList.add('dragging');
+    }, {passive:true});
+    car.addEventListener('touchmove', e=>{
+      if (!S.dragging) return;
+      const t = e.touches[0];
+      const dx = t.clientX - S.sx;
+      S.pos = S.sp - dx / 160;
+      wrap(); update();
+      const now = Date.now();
+      S.v = (t.clientX - S.lastX)/(now - S.lastT);
+      S.lastX = t.clientX; S.lastT = now;
+    }, {passive:true});
+    car.addEventListener('touchend', ()=>{
+      if (!S.dragging) return;
+      S.dragging=false; car.classList.remove('dragging'); momentum();
+    }, {passive:true});
+
+    // 持有榜
+    poolLinkEl?.addEventListener('click', ()=>{
+      const k = window.CURRENT_POOL?.key || '常駐';
+      const href = `https://shierusha.github.io/library/lib/getgacha.html?lim=${k==='常駐' ? '' : encodeURIComponent(k)}`;
+      document.getElementById('info-modal').style.display = 'flex';
+      const infoTitle  = document.getElementById('info-modal-title');
+      const infoBody   = document.getElementById('info-modal-body');
+      if (infoTitle) infoTitle.textContent = '持有榜';
+      if (infoBody)  infoBody.innerHTML = `<div style="width:100%;height:100%;"><iframe src="${href}" style="width:100%;height:100%;border:0;"></iframe></div>`;
+    });
+
+    // 返回鍵
+    backEl?.addEventListener('click', ()=>{
+      const hasResults = document.querySelectorAll('.gacha-row').length > 0;
+      if (hasResults){
+        const rc = document.getElementById('gacha-results');
+        if (rc){ rc.classList.remove('single'); rc.innerHTML=''; }
+        showCarousel();
+      } else {
+        location.href = typeof REDIRECT_PLAYER === 'string' ? REDIRECT_PLAYER : '/';
+      }
+    });
+
+    // 抽卡結果出現時 → 隱藏倫波；清空時 → 顯示倫波
+    new MutationObserver(()=>{
+      const hasResults = document.querySelectorAll('.gacha-row').length > 0;
+      car.style.display = hasResults ? 'none' : 'block';
+    }).observe(resultsContainer, { childList:true, subtree:true });
+
+    window.addEventListener('resize', update);
+  }
+
+  function wrap(){
+    const N = S.pools.length;
+    if (S.pos<0) S.pos += N;
+    if (S.pos>=N) S.pos -= N;
+  }
+
+  function update(center=S.pos){
+    const N = S.pools.length;
+    const W = car.clientWidth;
+    const baseX = Math.max(W*0.09, Math.min(W*0.18, W/4));
+
+    S.cards.forEach((card,i)=>{
+      let d = i - center;
+      if (d > N/2) d -= N;
+      if (d < -N/2) d += N;
+      const tx = d * baseX;
+      const scale = Math.abs(d)<.4 ? 1.06 : 0.88;
+      const op = Math.max(.3, 1 - .25*Math.abs(d));
+      card.style.transform = `translate(-50%,-50%) translateX(${tx}px) scale(${scale})`;
+      card.style.opacity = String(op);
+      card.classList.toggle('center', Math.abs(d)<.4);
+    });
+
+    // 當前池
+    const idx = ((Math.round(center) % N) + N) % N;
+    const cur = S.pools[idx];
+    window.CURRENT_POOL = cur;
+
+    if (poolNameEl) poolNameEl.textContent = cur?.name || '';
+    if (poolDescEl) poolDescEl.textContent = cur?.desc || '';
+
+    // 非活動期間 → 禁抽（不改你的 canDraw 流程，只用 disabled）
+    const active = cur?.active !== false || cur?.key === '常駐';
+    btnSingle && (btnSingle._forceDisabled = !active);
+    btnTen    && (btnTen._forceDisabled    = !active);
+    if (typeof enforceLandscape === 'function') enforceLandscape();
+  }
+
+  function momentum(){
+    cancelAnimationFrame(S.raf);
+    const step = ()=>{
+      if (Math.abs(S.v) < 0.02){
+        S.v = 0; S.pos = Math.round(S.pos); update(); return;
+      }
+      S.pos -= S.v; wrap(); update(); S.v *= 0.92;
+      S.raf = requestAnimationFrame(step);
+    };
+    S.raf = requestAnimationFrame(step);
+  }
+
+  function showCarousel(){ car.style.display = 'block'; }
 })();
