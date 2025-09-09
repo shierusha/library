@@ -1,13 +1,17 @@
-/* ============ Back Arrow（滿版黃色向左箭頭，可點） ============ */
+/* ============ Back Arrow（改成 ➭，由 JS 設定大小，左右翻轉） ============ */
 /* .back 的位置與大小用你的 inline 百分比控制，這裡只畫圖案 */
 .back::before{
-  content:"";
+  content:"➭";
   position:absolute; inset:0;
-  background:
-    url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 80"><polygon points="60,10 10,40 60,70" fill="%23ffd54f"/><rect x="55" y="30" width="95" height="20" rx="10" fill="%23ffd54f"/></svg>')
-    center/contain no-repeat;
+  display:flex; align-items:center; justify-content:center;
+  font-size: var(--arrow-size, 48px); /* JS 會設定這個變數 */
+  line-height: 1;
+  color: #ffd54f;
+  transform: scaleX(-1); /* 左右翻轉 */
   pointer-events:none;
-  filter: drop-shadow(0 2px 6px rgba(0,0,0,.45));
+  text-shadow: 0 2px 6px rgba(0,0,0,.45);
+  font-weight: 900;
+  font-family: 'Noto Sans TC', 'Segoe UI Symbol', 'Apple Color Emoji', 'Noto Color Emoji', system-ui, sans-serif;
 }
 
 /* ============ Pool Selector Carousel ============ */
@@ -64,7 +68,6 @@
 
 /* 拖曳中 */
 .pool-carousel.dragging .pool-card { transition: none !important; cursor: grabbing; }
-
 
 /* ============ 持有榜按鈕外觀（像背包） ============ */
 #poolLink{
