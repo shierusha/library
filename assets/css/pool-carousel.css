@@ -1,87 +1,66 @@
-/* ============ Pool Selector Carousel 外掛 ============ */
-.pool-carousel {
-  position: absolute;
-  left: 8%; right: 8%;
-  top: 12%; bottom: 22%;
-  display: block;
-  overflow: hidden;
-  user-select: none;
+/* ============================================
+   新增：返回箭頭（滿版黃色向左箭頭）
+   你的 .back 本來就有 inline 定位；這裡只畫圖案
+============================================ */
+.back::before{
+  content:"";
+  position:absolute; inset:0;
+  background:
+    url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 80"><polygon points="60,10 10,40 60,70" fill="%23ffd54f"/><rect x="55" y="30" width="95" height="20" rx="10" fill="%23ffd54f"/></svg>')
+    center/contain no-repeat;
+  pointer-events:none;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,.45));
+}
+
+/* ============================================
+   新增：倫波（選池）Carousel
+   - 完整百分比 + 絕對定位
+   - 圖片 object-fit: contain 保留完整比例
+============================================ */
+.pool-carousel{
+  position:absolute;
+  left:8%; right:8%;
+  top:8%; bottom:22%;
+  z-index:8;
+  overflow:hidden;
+  user-select:none;
   touch-action: pan-y;
-  z-index: 8;
 }
-.pool-track {
-  position: absolute;
-  left: 0%; right: 0%;
-  top: 0%; bottom: 0%;
+.pool-track{
+  position:absolute; inset:0;
 }
-/* 卡片：百分比尺寸 */
-.pool-card {
-  position: absolute;
-  left: 50%; top: 50%;
+.pool-card{
+  position:absolute; left:50%; top:50%;
   transform: translate(-50%,-50%);
-  width: 64%;
-  height: 50%;
-  border-radius: 2%;
-  overflow: hidden;
-  cursor: grab;
-  transition: transform .50s cubic-bezier(.7,1.7,.6,1), opacity .36s;
-  opacity: .35;
-  pointer-events: none;
-  background: linear-gradient(135deg, #0f1d55, #15397a);
-  border: 0.5% solid rgba(83,226,255,0.27);
+  width:64%; height:56%;
+  border-radius:2%;
+  overflow:hidden;
+  opacity:.35;
+  transition: transform .5s cubic-bezier(.7,1.7,.6,1), opacity .36s;
+  pointer-events:none;
+  background: linear-gradient(135deg,#0f1d55,#15397a);
+  border: .5% solid rgba(83,226,255,.27);
+  box-shadow: 0 0 24px rgba(0,0,0,.22);
 }
-.pool-card.center { opacity: 1; pointer-events: auto; cursor: grab; }
-
-/* 圖片完整比例顯示（不裁切） */
-.pool-card img.banner {
-  position: absolute; left: 0%; top: 0%;
-  width: 100%; height: 100%;
-  object-fit: contain;
-  object-position: center center;
-  background: rgba(0,0,0,0.25);
-  display: block;
+.pool-card.center{ opacity:1; pointer-events:auto; }
+.pool-card img{
+  position:absolute; inset:0;
+  width:100%; height:100%;
+  object-fit: contain; /* 保留完整圖面 */
+  background: rgba(0,0,0,.25);
 }
 
-/* 文字（加 auto-resize 由主頁控制字級） */
-.pool-card .title {
-  position: absolute; left: 3%; top: 6%;
-  width: 60%; height: 16%;
-  color:#fff; font-weight: 800; letter-spacing: .04em;
-  text-shadow: 0 0.8% 3% rgba(0,0,0,0.75);
+/* 非活動期間：灰色濾鏡遮罩 + 禁抽（由 JS 設定 _forceDisabled） */
+.pool-card .disabled-mask{
+  position:absolute; inset:0;
+  background: rgba(0,0,0,.35);
+  backdrop-filter: grayscale(100%);
+  display:none;
 }
-.pool-card .desc {
-  position: absolute; left: 3%; right: 3%; bottom: 6%;
-  height: 22%;
-  color:#eaf7ff;
-  text-shadow: 0 0.8% 3% rgba(0,0,0,0.75);
-}
+.pool-card.disabled .disabled-mask{ display:block; }
 
-/* 堆疊感 */
-.pool-card[data-dist="0"] { transform: translate(-50%,-50%) scale(1.06); z-index: 5; }
-.pool-card[data-dist="1"], .pool-card[data-dist="-1"] { z-index:4; }
-.pool-card[data-dist="2"], .pool-card[data-dist="-2"] { z-index:3; }
+.pool-carousel.dragging .pool-card{ transition:none !important; }
 
-/* 拖曳中 */
-.pool-carousel.dragging .pool-card { transition: none !important; cursor: grabbing; }
-
-/* 未開放：灰階 + 亮度降低 + 角標 */
-.pool-card.disabled { filter: grayscale(100%) brightness(0.65); }
-.pool-card .disabled-tag {
-  position: absolute; right: 3%; top: 5%;
-  width: 18%; height: 12%;
-  display: flex; align-items: center; justify-content: center;
-  color: #fff;
-  background: rgba(0,0,0,0.45);
-  border: 0.5% solid rgba(255,255,255,0.6);
-  border-radius: 8%;
-  text-shadow: 0 0.8% 3% rgba(0,0,0,0.75);
-  pointer-events: none;
-}
-
-/* RWD 仍用百分比 */
-@media (max-width: 991px) {
-  .pool-card { width: 78%; height: 54%; }
-}
-@media (max-width: 767px) {
-  .pool-card { width: 88%; height: 58%; }
-}
+/* 持有榜 hover 小提示（不動你原樣式） */
+#poolLink{ cursor:pointer; }
+#poolLink:hover{ text-decoration: underline; }
