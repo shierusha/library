@@ -97,9 +97,9 @@
         </label>
       </div>
     <div class="row-3">
-  <label>數量
-    <input id="rf-qty" type="number" min="1" value="1" />
-  </label>
+<label>數量（正數＝贈送；負數＝回收）
+  <input id="rf-qty" type="number" step="1" min="-5" value="1" />
+</label>
 
   <div>
     <label>目前持有（該玩家 / 該饅頭）</label>
@@ -309,24 +309,22 @@ function openGrantModal({ mode, pid=null }){
     $('#grant-submit').disabled = true;
     try{
       if (mode==='single'){
-        // 讀目前 max_draws
-        const { data: row, error } = await B.schema('gacha').from('counters')
-          .select('max_draws').eq('player_id', pid).single();
-        let base = 1000;
-        if (!error && row) base = row.max_draws ?? 1000;
+       const { data: row } = await B.schema('gacha').from('counters').select('max_draws').eq('player_id', pid).maybeSingle();
+       const base = row?.max_draws ?? 10;  // 沒紀錄時的備援值也統一改為 10（保險）
         const { error: e2 } = await B.schema('gacha').from('counters')
           .upsert({ player_id: pid, max_draws: base + n }, { onConflict: 'player_id' });
         if (e2) throw e2;
       } else {
-        // 全員送抽：把所有有 counter 的人加 n
-        // 取一輪最新列表
-        await loadCounters();
-        for (const c of COUNTERS){
-          const newMax = (c.max_draws ?? 1000) + n;
-          const { error: e3 } = await B.schema('gacha').from('counters')
-            .update({ max_draws: newMax }).eq('player_id', c.player_id);
-          if (e3) throw e3;
-        }
+// 全員送抽：只對「已有 counters 紀錄」的人調整，不建立新 row
+       await loadCounters(); // 先抓最新 counters
+       for (const c of COUNTERS){
+         const newMax = (c.max_draws ?? 10) + n; // 備援 10（理論上已有 row 就會有值）
+         const { error: e3 } = await B.schema('gacha').from('counters')
+           .update({ max_draws: newMax })
+           .eq('player_id', c.player_id);
+         if (e3) throw e3;
+       }
+    
       }
       $('#grant-modal').style.display='none';
       setMsg($('#grant-msg'), '送抽完成。', true);
