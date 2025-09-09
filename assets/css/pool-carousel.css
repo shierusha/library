@@ -65,9 +65,6 @@
 /* 拖曳中 */
 .pool-carousel.dragging .pool-card { transition: none !important; cursor: grabbing; }
 
-/* 小尺寸 */
-@media (max-width: 991px) { .pool-card { width: 78%; } }
-@media (max-width: 767px) { .pool-card { width: 88%; } }
 
 /* ============ 持有榜按鈕外觀（像背包） ============ */
 #poolLink{
@@ -81,6 +78,7 @@
   cursor:pointer;
   text-shadow: 0 1px 4px rgba(0,0,0,.5);
   user-select:none;
+  Z-INDEX: 12;
 }
 #poolLink:hover{
   background: #1eb5e5cc;
