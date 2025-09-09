@@ -1,4 +1,5 @@
-/* ============ Back Arrow（滿版黃色向左箭頭） ============ */
+/* ============ Back Arrow（滿版黃色向左箭頭，可點） ============ */
+/* .back 的位置與大小用你的 inline 百分比控制，這裡只畫圖案 */
 .back::before{
   content:"";
   position:absolute; inset:0;
@@ -14,7 +15,7 @@
   position:absolute; inset: 12% 8% 22% 8%;
   display:block; overflow:hidden; user-select:none;
   touch-action: pan-y;
-  z-index: 8;
+  z-index: 8; /* 結果球(9)下、HUD(30)下 */
 }
 .pool-track { position:relative; width:100%; height:100%; }
 
@@ -34,11 +35,18 @@
 .pool-card img.banner {
   position:absolute; inset:0; width:100%; height:100%;
   object-fit: contain; /* 保留完整圖面比例 */
-  background:#000; /* 信箱色避免透明 */
+  background:#000;
   display:block;
   filter: saturate(1.05) contrast(1.02);
 }
 
+/* 非活動期間：灰遮罩（禁抽按鈕由主頁 JS 控） */
+.pool-card.disabled::after{
+  content:""; position:absolute; inset:0;
+  background: rgba(0,0,0,.45);
+}
+
+/* 標題/簡介（字級交給 .auto-resize） */
 .pool-card .title {
   position:absolute; left:3%; top:6%;
   color:#fff; font-weight:800; text-shadow:0 2px 10px #000c;
@@ -49,7 +57,7 @@
   color:#eaf7ff; text-shadow:0 2px 8px #000c;
 }
 
-/* 放大/位移層疊感 */
+/* 堆疊感 */
 .pool-card[data-dist="0"] { transform: translate(-50%,-50%) scale(1.06); z-index: 5; }
 .pool-card[data-dist="1"], .pool-card[data-dist="-1"] { z-index:4; }
 .pool-card[data-dist="2"], .pool-card[data-dist="-2"] { z-index:3; }
@@ -57,7 +65,9 @@
 /* 拖曳中 */
 .pool-carousel.dragging .pool-card { transition: none !important; cursor: grabbing; }
 
-
+/* 小尺寸 */
+@media (max-width: 991px) { .pool-card { width: 78%; } }
+@media (max-width: 767px) { .pool-card { width: 88%; } }
 
 /* ============ 持有榜按鈕外觀（像背包） ============ */
 #poolLink{
@@ -67,7 +77,7 @@
   background: rgb(13 27 77 / 82%);
   border: 2px solid #1eb5e5;
   border-radius: 8px;
-  box-shadow: 0 0 8px #53e2ff88, 0 0 16px #1eb5e577 inset;
+  box-shadow: 0 0 8px #53e2ff88, 0 0 16px #1eb5e5aa inset;
   cursor:pointer;
   text-shadow: 0 1px 4px rgba(0,0,0,.5);
   user-select:none;
