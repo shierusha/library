@@ -1,0 +1,90 @@
+/* ============ Pool Selector Carousel 外掛 ============ */
+/* 主要容器：百分比定位，置在 gacha-results 裡 */
+.pool-carousel {
+  position: absolute;
+  left: 8%; right: 8%;
+  top: 12%; bottom: 22%;
+  display: block;
+  overflow: hidden;
+  user-select: none;
+  touch-action: pan-y;
+  z-index: 8;
+}
+
+.pool-track {
+  position: absolute;
+  left: 0%; right: 0%;
+  top: 0%; bottom: 0%;
+}
+
+/* 卡片：以百分比控制大小與位置 */
+.pool-card {
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%,-50%);
+  width: 64%;
+  height: 50%;
+  border-radius: 2%;
+  overflow: hidden;
+  cursor: grab;
+  transition: transform .50s cubic-bezier(.7,1.7,.6,1), opacity .36s;
+  opacity: .35;
+  pointer-events: none;
+  background: linear-gradient(135deg, #0f1d55, #15397a);
+  border: 0.5% solid rgba(83,226,255,0.27);
+}
+.pool-card.center { opacity: 1; pointer-events: auto; cursor: grab; }
+
+.pool-card img.banner {
+  position: absolute; left: 0%; top: 0%;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+  filter: saturate(1.05) contrast(1.02);
+}
+
+/* 卡片內文：百分比定位＋自動字級 */
+.pool-card .title {
+  position: absolute; left: 3%; top: 6%;
+  width: 60%; height: 16%;
+  color:#fff; font-weight: 800; letter-spacing: .04em;
+  text-shadow: 0 0.8% 3% rgba(0,0,0,0.75);
+}
+.pool-card .desc {
+  position: absolute; left: 3%; right: 3%; bottom: 6%;
+  height: 22%;
+  color:#eaf7ff;
+  text-shadow: 0 0.8% 3% rgba(0,0,0,0.75);
+}
+
+/* 排列層級 */
+.pool-card[data-dist="0"] { transform: translate(-50%,-50%) scale(1.06); z-index: 5; }
+.pool-card[data-dist="1"], .pool-card[data-dist="-1"] { z-index:4; }
+.pool-card[data-dist="2"], .pool-card[data-dist="-2"] { z-index:3; }
+
+/* 拖曳中：關閉轉場 */
+.pool-carousel.dragging .pool-card { transition: none !important; cursor: grabbing; }
+
+/* 未開放：灰階＋亮度降低＋角標 */
+.pool-card.disabled {
+  filter: grayscale(100%) brightness(0.65);
+}
+.pool-card .disabled-tag {
+  position: absolute; right: 3%; top: 5%;
+  width: 18%; height: 12%;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff;
+  background: rgba(0,0,0,0.45);
+  border: 0.5% solid rgba(255,255,255,0.6);
+  border-radius: 8%;
+  text-shadow: 0 0.8% 3% rgba(0,0,0,0.75);
+  pointer-events: none;
+}
+
+/* 小尺寸自適應（仍用百分比） */
+@media (max-width: 991px) {
+  .pool-card { width: 78%; height: 54%; }
+}
+@media (max-width: 767px) {
+  .pool-card { width: 88%; height: 58%; }
+}
