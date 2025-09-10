@@ -3,7 +3,7 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8">
-  <title>謝爾夏｜扭蛋系統2.0</title>
+  <title>謝爾夏｜扭蛋系統2.2</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -461,7 +461,7 @@ body.dark-bg::before {
   </div>
 
 
-<script>
+  <script>
 /* ==============================
    小工具
 ============================== */
@@ -483,20 +483,13 @@ async function sendGachaWebhook(rarity, itemName) {
     const resp = await fetch(url, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        rarity,
-        playerName: PLAYER_NAME || '玩家',
-        itemName,
-        threadId
-      })
+      body: JSON.stringify({ rarity, playerName: PLAYER_NAME || '玩家', itemName, threadId })
     });
     if (!resp.ok) {
       const txt = await resp.text().catch(()=>'(no body)');
       console.error('[gacha-notify] status=', resp.status, 'body=', txt);
     }
-  } catch (e) {
-    console.warn('[gacha-notify] failed:', e);
-  }
+  } catch (e) { console.warn('[gacha-notify] failed:', e); }
 }
 
 /* ==============================
@@ -554,7 +547,7 @@ window.addEventListener('load', resizeAllTexts);
 window.addEventListener('resize', resizeAllTexts);
 
 /* ==============================
-   強制橫向
+   強制橫向（提示用，不影響返回鍵邏輯）
 ============================== */
 function isPortrait(){
   return window.matchMedia('(orientation: portrait)').matches || window.innerHeight > window.innerWidth;
@@ -590,8 +583,16 @@ ensureAuthOrRedirect();
 let pools = { normal: [], hidden: [], limited: [] };
 let canDraw = true;
 let unlockAt = 0;
-let backLocked = false; // 抽卡&未翻完 → 鎖返回
 
+/* ★ 返回鍵：簡單禁用控制（不彈通知） */
+function setBackDisabled(disabled){
+  if (!btnBack) return;
+  btnBack.dataset.disabled = disabled ? '1':'0';
+  btnBack.style.pointerEvents = disabled ? 'none' : 'auto';
+  btnBack.style.opacity = disabled ? '0.6' : '1';
+}
+
+/* 抽卡按鈕鎖 */
 function lockButtons()  { [btnSingle, btnTen, btnBag].forEach(b => b && (b.disabled = true,  b._forceDisabled = true)); }
 function unlockButtons(){ [btnSingle, btnTen, btnBag].forEach(b => b && (b.disabled = false, b._forceDisabled = false)); }
 
@@ -622,6 +623,9 @@ function unlockButtons(){ [btnSingle, btnTen, btnBag].forEach(b => b && (b.disab
   }).observe(resultsContainer, { childList:true, subtree:true });
 
   setInterval(refreshUIFromCounter, 15000);
+
+  // 初始可按（無結果時用）
+  setBackDisabled(false);
 })();
 
 /* ==============================
@@ -630,7 +634,7 @@ function unlockButtons(){ [btnSingle, btnTen, btnBag].forEach(b => b && (b.disab
 async function ensureCounter(){
   const { data } = await G('counters').select('*').eq('player_id', user.id).single();
   if (!data){
-    await G('counters').insert({ player_id: user.id, total_draws: 0, next_pity: 50 }); // max_draws 走 DB 預設
+    await G('counters').insert({ player_id: user.id, total_draws: 0, next_pity: 50 });
   }
 }
 async function getCounter(){
@@ -729,7 +733,7 @@ async function drawOnce(){
     name: chosen.name,
     id: chosen.id,
     event_name,
-    image_url: chosen.image_url || null, // ← 圖片路徑（若資料庫有就顯示）
+    image_url: chosen.image_url || null,
     totalAfter: totalNext
   };
 }
@@ -743,7 +747,7 @@ async function drawTenTimes(){
   for (let i=0;i<10;i++){
     const r = await drawOnce();
     if (!r) break;
-    results.push(r); // 帶著 image_url
+    results.push(r);
   }
   return results;
 }
@@ -779,7 +783,7 @@ function clearResults(){
 }
 
 /* ==============================
-   UI：建立球 / 翻牌與節流（球內放圖、可遮名）
+   UI：建立球 / 翻牌（球內放圖、可遮名）
 ============================== */
 function createOrb(res, { autoReveal=false, revealDelay=0, big=false } = {}){
   const orb = document.createElement('div');
@@ -793,7 +797,6 @@ function createOrb(res, { autoReveal=false, revealDelay=0, big=false } = {}){
 
     inner.innerHTML = '';
 
-    // 先放圖片（z-index:2），可遮住名字
     if (res.image_url) {
       const img = document.createElement('img');
       img.src = res.image_url;
@@ -802,7 +805,6 @@ function createOrb(res, { autoReveal=false, revealDelay=0, big=false } = {}){
       inner.appendChild(img);
     }
 
-    // 再放名字（z-index:1）
     const nameEl = document.createElement('span');
     nameEl.className = 'orb-name auto-resize';
     nameEl.textContent = res.name;
@@ -834,14 +836,17 @@ function checkAllRevealed(){
     setTimeout(()=>{
       canDraw = true;
       unlockButtons();
-      backLocked = false;  // 翻完 → 可按返回
+      /* ★ 全部翻完才解鎖返回鍵（之前完全不能按、也不提示） */
+      setBackDisabled(false);
     }, 500);
   }
 }
 
 function showResultsTen(results){
   canDraw = false;
-  backLocked = true;          // 抽卡期間不可按返回
+  /* ★ 抽卡開始 → 直接禁用返回鍵（不提示） */
+  setBackDisabled(true);
+
   lockButtons();
   resultsContainer.classList.remove('single');
   resultsContainer.innerHTML = '';
@@ -860,7 +865,9 @@ function showResultsTen(results){
 
 function showResultSingle(res){
   canDraw = false;
-  backLocked = true;          // 抽卡期間不可按返回
+  /* ★ 抽卡開始 → 直接禁用返回鍵（不提示） */
+  setBackDisabled(true);
+
   lockButtons();
   resultsContainer.classList.add('single');
   resultsContainer.innerHTML = '';
@@ -872,10 +879,8 @@ function showResultSingle(res){
   rowDiv.appendChild(orb);
   resultsContainer.appendChild(rowDiv);
   resizeAllTexts();
-  if (isWhite) { // 白球自動翻 → 立刻可返回/再抽
-    unlockAt = Date.now() + 500;
-    setTimeout(()=>{ canDraw = true; unlockButtons(); backLocked = false; }, 500);
-  }
+
+  // 白球會自動翻，翻完後由 checkAllRevealed() 統一解鎖返回鍵
 }
 
 /* ==============================
@@ -915,7 +920,7 @@ async function openBackpack(){
   const inPool = car && getComputedStyle(car).display === 'none';
   const currentPool = (window.CURRENT_POOL && window.CURRENT_POOL.key) ? window.CURRENT_POOL.key : '常駐';
 
-  const limitedGroups = new Map(); // event_name -> [{id, html}]
+  const limitedGroups = new Map();
   const hiddenList = [];
   const normalList = [];
 
@@ -972,28 +977,21 @@ infoModal?.addEventListener('click', ()=> infoModal.style.display='none');
 infoModal?.querySelector('.modal-content')?.addEventListener('click', e=> e.stopPropagation());
 
 /* ==============================
-   綁定按鈕（返回鍵：抽卡時不可按；翻完結果→F5；沒結果→回玩家中心）
+   綁定按鈕（返回鍵：抽卡期間完全禁用；翻完才解鎖）
 ============================== */
 function bindUI(){
   btnBag?.addEventListener('click', openBackpack);
 
   btnBack?.addEventListener('click', ()=>{
-    if (isPortrait()) return;
+    // 被禁用就直接無視（不提示）
+    if (btnBack?.dataset.disabled === '1') return;
 
-    const orbs = $$('.gacha-orb', resultsContainer);
-    const hasResults = orbs.length > 0;
-
-    // 抽卡中 or 還沒翻完 → 禁用（跟背包規則一致）
-    if (hasResults && (backLocked || orbs.some(o=>!o.classList.contains('revealed')))) {
-      alert('請先翻開所有扭蛋！');
-      return;
-    }
-
+    const hasResults = $$('.gacha-orb', resultsContainer).length > 0;
     if (hasResults) {
-      // 10 抽頁/單抽頁有結果 → F5
+      // 結果頁 → F5
       location.reload();
     } else {
-      // 沒結果（初始畫面）→ 回玩家中心
+      // 初始頁 → 回玩家中心
       location.href = REDIRECT_PLAYER;
     }
   });
@@ -1003,7 +1001,9 @@ function bindUI(){
     if (isPortrait()) return;
     if (!canDraw || Date.now() < unlockAt) return alert('稍等一下…');
 
-    backLocked = true;          // 抽卡開始 → 鎖返回
+    // ★ 抽卡一開始就禁用返回鍵（不提示）
+    setBackDisabled(true);
+
     gachaBtns?.classList.add('bottom');
     lockButtons();
 
@@ -1015,7 +1015,8 @@ function bindUI(){
       Loader.hide();
       await refreshUIFromCounter();
       unlockButtons();
-      backLocked = false;
+      // 抽卡失敗（例如上限）→ 回復返回鍵
+      setBackDisabled(false);
       return;
     }
 
@@ -1023,7 +1024,7 @@ function bindUI(){
     Loader.hide();
 
     await refreshUIFromCounter();
-    showResultSingle(r); // r 內含 image_url
+    showResultSingle(r);
   });
 
   btnTen?.addEventListener('click', async ()=>{
@@ -1032,11 +1033,11 @@ function bindUI(){
     if (!canDraw || Date.now() < unlockAt) return alert('稍等一下…');
 
     const c = await getCounter();
-    if (c.max_draws - c.total_draws < 10) {
-      return alert('剩餘抽數不足 10 抽');
-    }
+    if (c.max_draws - c.total_draws < 10) return alert('剩餘抽數不足 10 抽');
 
-    backLocked = true;          // 抽卡開始 → 鎖返回
+    // ★ 抽卡一開始就禁用返回鍵（不提示）
+    setBackDisabled(true);
+
     gachaBtns?.classList.add('bottom');
     lockButtons();
 
@@ -1047,13 +1048,13 @@ function bindUI(){
     for (let i = 0; i < 10; i++) {
       const r = await drawOnce();
       if (!r) break;
-      results.push(r);          // r 內含 image_url
+      results.push(r);
       await Loader.step(i + 1, 10);
     }
 
     Loader.hide();
 
-    if (!results.length) { unlockButtons(); backLocked = false; return; }
+    if (!results.length) { unlockButtons(); setBackDisabled(false); return; }
 
     await refreshUIFromCounter();
     showResultsTen(results);
@@ -1063,6 +1064,7 @@ function bindUI(){
   obs.observe(resultsContainer, { childList:true, subtree:true });
 }
 </script>
+
 
 
 
