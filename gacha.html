@@ -1,14 +1,12 @@
-<!DOCTYPE html>
-<html lang="zh-Hant">
-<head>
+<!DOCTYPE html><html lang="zh-Hant"><head>
   <meta charset="UTF-8">
   <title>謝爾夏｜扭蛋系統2.0</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700&amp;display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <!-- 新增：選池倫波外掛 CSS -->
-  <link rel="stylesheet" href="https://shierusha.github.io/library/assets/css/pool-carousel.css"/>
+  <link rel="stylesheet" href="https://shierusha.github.io/library/assets/css/pool-carousel.css">
 
   <style>
 /* ==============================
@@ -280,82 +278,47 @@ body.dark-bg::before {
   <!-- 16:9 主要容器 -->
   <div class="container-16-9">
     <!-- 左上：返回箭頭專用框（滿版黃色箭頭由外掛CSS畫） -->
-    <div class="back" id="btnBack" style="
-      position: absolute;
-      top: 2%;
-      left: 2%;
-      width: 20%;
-      height: 10%;
-    "></div>
+    <div class="back" id="btnBack" style="position: absolute; top: 2%; left: 2%; width: 7%; height: 10%; --arrow-size: 33px;"></div>
 
     <!-- 抽卡結果容器 & 選池資訊（標題/簡介/持有榜按鈕） -->
     <div class="gacha-results" id="gacha-results">
 
       <!-- 卡池名（百分比絕對定位、會被外掛 JS 填字、auto-resize） -->
-      <div id="poolName" class="auto-resize" style="
-        position: absolute;
-        top: 2%;
-        left: 2%;
-        width: 50%;
-        height: 10%;
-        color:#FFF;
-        display:flex; align-items:center;
-      "></div>
+      <div id="poolName" class="auto-resize" style="position: absolute; top: 2%; left: 2%; width: 50%; height: 10%; color: rgb(255, 255, 255); display: flex; align-items: center; font-size: 13px;">謝爾夏周邊-交換外套系列</div>
 
       <!-- 卡池簡介（百分比絕對定位、auto-resize） -->
-      <div id="poolDesc" class="auto-resize" style="
-        position: absolute;
-        bottom: 2%;
-        width: 100%;
-        height: 20%;
-        color:#FFF;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        text-align: center;
-      "></div>
+      <div id="poolDesc" class="auto-resize" style="position: absolute; bottom: -1%; width: 100%; height: 12%; color: rgb(255, 255, 255); display: flex; justify-content: center; align-items: center; text-align: center; font-size: 15.5px;">角色之間交換外套穿啦！</div>
 
       <!-- 持有榜：漂亮外框按鈕（另開分頁），連結由外掛 JS 設定 -->
-      <div id="poolLink" class="auto-resize" style="
-        position: absolute;
-        bottom: 18%;
-        right: 10%;
-        width: 12%;
-        height: 10%;
-        color:#FFF;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        text-align: center;
-      ">持有榜</div>
-    </div>
+      <div id="poolLink" class="auto-resize" style="position: absolute;bottom: 11%;right: 16%;width: 12%;height: 10%;color: rgb(255, 255, 255);display: flex;justify-content: center;align-items: center;text-align: center;font-size: 14.5px;" data-href="https://shierusha.github.io/library/lib/getgacha.html?lim=%E8%AC%9D%E7%88%BE%E5%A4%8F%E5%91%A8%E9%82%8A-%E4%BA%A4%E6%8F%9B%E5%A4%96%E5%A5%97%E7%B3%BB%E5%88%97" title="前往持有榜">持有榜</div>
+    <div class="pool-carousel" tabindex="0" style="display: block;"><div class="pool-track"><div class="pool-card" data-index="0" data-dist="-2" style="transform: translate(-50%, -50%) translateX(-248.5px) scale(0.88); opacity: 0.5; pointer-events: none;"><img class="banner" src="https://cdn.discordapp.com/attachments/1274251146353053707/1274251147665739806/220_20240126191242.png?ex=68bfc6dc&amp;is=68be755c&amp;hm=2489a4ef367920000a689725fe89f9d5e921c4d7b608aca3b5b28a6fc97513dd&amp;" alt="常駐"><div class="title auto-resize" style="font-size: 1.5px;">常駐</div><div class="desc auto-resize" style="font-size: 1.5px;">常駐卡池</div></div><div class="pool-card disabled" data-index="1" data-dist="-1" style="transform: translate(-50%, -50%) translateX(-124.25px) scale(0.88); opacity: 0.75; pointer-events: none;"><img class="banner" src="https://cdn.discordapp.com/attachments/1069192415203840030/1414655562028810281/2.png?ex=68c05c29&amp;is=68bf0aa9&amp;hm=b839f745b1683e13fae94a7b7cc2735a73145abb5aacfcf1cf6eee93abac76de&amp;" alt="謝爾夏饅頭-二週年甜點池"><div class="title auto-resize" style="font-size: 1.5px;">謝爾夏饅頭-二週年甜點池</div><div class="desc auto-resize" style="font-size: 1.5px;">下午了！來些甜點吧！</div></div><div class="pool-card disabled center" data-index="2" data-dist="0" style="transform: translate(-50%, -50%) translateX(0px) scale(1.06);opacity: 1;pointer-events: auto;"><img class="banner" src="https://cdn.discordapp.com/attachments/1069192415203840030/1414651183871688785/-.png?ex=68c05815&amp;is=68bf0695&amp;hm=92a8e5f3f2d8649fb28f9196773a3b241b1e43953040a2557094e5218575004e&amp;" alt="謝爾夏周邊-交換外套系列"><div class="title auto-resize" style="font-size: 1.5px;">謝爾夏周邊-交換外套系列</div><div class="desc auto-resize" style="font-size: 1.5px;">角色之間交換外套穿啦！</div></div><div class="pool-card" data-index="3" data-dist="1" style="transform: translate(-50%, -50%) translateX(124.25px) scale(0.88); opacity: 0.75; pointer-events: none;"><img class="banner" src="https://cdn.discordapp.com/attachments/1069192415203840030/1414659311480733756/1.png?ex=68c05fa6&amp;is=68bf0e26&amp;hm=58306b5fdcea469b781431488855a2b65f7fd068aec65636b10268b675144fe3&amp;" alt="三週年限定-禮服饅頭"><div class="title auto-resize" style="font-size: 1.5px;">三週年限定-禮服饅頭</div><div class="desc auto-resize" style="font-size: 1.5px;">禮服、音樂、聚會！</div></div></div></div></div>
     
     <!-- 轉蛋讀條 Loader -->
     <div id="gacha-loader" class="gacha-loader">
       <div class="loader-box">
         <img class="loader-cat" id="loader-cat" src="https://shierusha.github.io/library/img/cat.png" alt="cat">
         <div class="loader-bar"><div class="loader-fill" id="loader-fill"></div></div>
-        <div class="loader-text auto-resize" id="loader-text">Roro爆肝中……</div>
+        <div class="loader-text auto-resize" id="loader-text" style="font-size: 10px;">Roro爆肝中……</div>
       </div>
     </div>
 
     <!-- 抽卡按鈕 -->
     <div class="gacha-buttons">
-      <button id="btn-single" class="gacha-btn auto-resize">單抽</button>
-      <button id="btn-ten" class="gacha-btn auto-resize">十連抽</button>
+      <button id="btn-single" class="gacha-btn auto-resize" disabled="" style="font-size: 23px;">單抽</button>
+      <button id="btn-ten" class="gacha-btn auto-resize" disabled="" style="font-size: 23px;">十連抽</button>
     </div>
 
     <!-- HUD -->
     <div class="gacha-hud">
       <button id="btn-backpack" class="gacha-backpack">
-        <div class="backpack-box auto-resize">背包</div>
+        <div class="backpack-box auto-resize" style="font-size: 18.5px;">背包</div>
       </button>
     </div>
 
     <!-- ★ 改字：「剩餘抽數」 -->
-    <div class="gacha-counter auto-resize">
+    <div class="gacha-counter auto-resize" style="font-size: 21px;">
       <div class="counter-box">剩餘抽數：
-        <span id="draw-count">0</span>
+        <span id="draw-count">6</span>
       </div>
     </div>
 
@@ -962,5 +925,7 @@ function bindUI(){
 
   <!-- 新增：選池倫波外掛 JS -->
   <script src="https://shierusha.github.io/library/assets/js/pool-carousel.js"></script>
+
+
 </body>
 </html>
