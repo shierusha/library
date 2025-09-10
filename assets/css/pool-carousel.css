@@ -16,54 +16,38 @@
 
 /* ============ Pool Selector Carousel ============ */
 .pool-carousel {
-  position:absolute;
-  inset: 0% 0% 0% 0%;
-  display:block;
-  overflow:hidden;
-  user-select:none;
+  position:absolute; inset: 12% 8% 22% 8%;
+  display:block; overflow:hidden; user-select:none;
   touch-action: pan-y;
   z-index: 8; /* 結果球(9)下、HUD(30)下 */
 }
 .pool-track { position:relative; width:100%; height:100%; }
 
 .pool-card {
-  position:absolute;
-  top:50%;
-  left:50%;
+  position:absolute; top:50%; left:50%;
   transform: translate(-50%,-50%);
-  width: 64%;
-  max-width: 680px;
-  aspect-ratio: 16/7;
-  border-radius: 16px;
-  overflow:hidden;
-  cursor:grab;
-  /* box-shadow: 0 10px 30px rgba(0,0,0,.35); */
+  width: 64%; max-width: 680px; aspect-ratio: 16/7;
+  border-radius: 16px; overflow:hidden; cursor:grab;
+  box-shadow: 0 10px 30px rgba(0,0,0,.35);
   transition: transform .5s cubic-bezier(.7,1.7,.6,1), opacity .36s;
-  opacity: .35;
-  pointer-events: none;
-  will-change: transform, opacity;
-  /* background: linear-gradient(135deg, #0f1d55, #15397a); */
-  /* border: 2px solid #53e2ff44; */
+  opacity: .35; pointer-events: none; will-change: transform, opacity;
+  background: linear-gradient(135deg, #0f1d55, #15397a);
+  border: 2px solid #53e2ff44;
 }
-.pool-card.center {opacity: 1;pointer-events: auto;cursor: grab;box-shadow: 0 10px 30px rgba(0, 0, 0, .35);}
+.pool-card.center { opacity: 1; pointer-events: auto; cursor: grab; }
 
 .pool-card img.banner {
-  position:absolute;
-  inset:0;
-  width: 100%;
-  height:100%;
+  position:absolute; inset:0; width:100%; height:100%;
   object-fit: contain; /* 保留完整圖面比例 */
-  /* background:#000; */
+  background:#000;
   display:block;
   filter: saturate(1.05) contrast(1.02);
 }
 
 /* 非活動期間：灰遮罩（禁抽按鈕由主頁 JS 控） */
 .pool-card.disabled::after{
-  content:"";
-  position:absolute;
-  inset:0;
-  /* background: rgba(0,0,0,.45); */
+  content:""; position:absolute; inset:0;
+  background: rgba(0,0,0,.45);
 }
 
 /* 標題/簡介（字級交給 .auto-resize） */
