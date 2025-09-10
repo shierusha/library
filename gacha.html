@@ -798,13 +798,13 @@ function createOrb(res, { autoReveal=false, revealDelay=0, big=false } = {}){
       const img = document.createElement('img');
       img.src = res.image_url;
       img.alt = res.name;
-      img.className = 'orb-icon auto-resize';
+      img.className = 'orb-icon';
       inner.appendChild(img);
     }
 
     // 再放名字（z-index:1）
     const nameEl = document.createElement('span');
-    nameEl.className = 'orb-name';
+    nameEl.className = 'orb-name auto-resize';
     nameEl.textContent = res.name;
     inner.appendChild(nameEl);
 
