@@ -779,9 +779,14 @@ function checkAllRevealed(){
   const all = orbs.every(o => o.classList.contains('revealed'));
   if (all) {
     unlockAt = Date.now() + 500;
-    setTimeout(()=>{ canDraw = true; unlockButtons(); }, 500);
+    setTimeout(()=>{
+      canDraw = true;
+      unlockButtons();
+      backLocked = false;  // ★ 解除返回鎖
+    }, 500);
   }
 }
+
 let backLocked = false; // ← 是否禁止按箭頭
 function showResultsTen(results){
   canDraw = false; lockButtons(true);
