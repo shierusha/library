@@ -282,6 +282,25 @@ body.dark-bg::before {
 ============================== */
 .gacha-btn:disabled { cursor: pointer; } /* 不要顯示禁止符號 */
 .back { z-index: 60; cursor: pointer; }  /* 確保可點到 */
+
+
+
+
+
+
+.orb-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px; /* 圖片與文字間距 */
+}
+
+.orb-inner .orb-icon {
+  max-height: 100%;
+  max-width: 100%;
+  object-fit: contain;
+}
+
   </style>
 </head>
 <body class="dark-bg">
@@ -717,17 +736,35 @@ function createOrb(res, { autoReveal=false, revealDelay=0, big=false } = {}){
   inner.textContent = '';
 
   const reveal = () => {
-    if (orb.classList.contains('revealed')) return;
-    inner.textContent = res.name;
-    orb.classList.add('revealed');
+  if (orb.classList.contains('revealed')) return;
 
-    if (res.rarity === 'limited' || res.rarity === 'hidden') {
-      sendGachaWebhook(res.rarity, res.name);
-    }
+  // 清空再組內容
+  inner.innerHTML = '';
 
-    resizeAllTexts();
-    checkAllRevealed();
-  };
+  // 如果有圖片就放在文字前面
+  if (res.image_url) {
+    const img = document.createElement('img');
+    img.src = res.image_url;
+    img.alt = res.name;
+    img.className = 'orb-icon';
+    inner.appendChild(img);
+  }
+
+  // 加上名字
+  const span = document.createElement('span');
+  span.textContent = res.name;
+  inner.appendChild(span);
+
+  orb.classList.add('revealed');
+
+  if (res.rarity === 'limited' || res.rarity === 'hidden') {
+    sendGachaWebhook(res.rarity, res.name);
+  }
+
+  resizeAllTexts();
+  checkAllRevealed();
+};
+
 
   if (autoReveal) setTimeout(reveal, revealDelay);
   else orb.addEventListener('click', reveal);
