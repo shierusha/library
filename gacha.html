@@ -408,9 +408,7 @@ body.dark-bg::before {
 /* ==============================
    小工具（原樣）
 ============================== */
-/* ==============================
-   小工具（原樣）
-============================== */
+
 const $  = (s, r=document) => r.querySelector(s);
 const $$ = (s, r=document) => [...r.querySelectorAll(s)];
 const sleep = (ms) => new Promise(res => setTimeout(res, ms));
@@ -832,12 +830,14 @@ function bindUI(){
       alert('請先翻開所有扭蛋！');
       return;
     }
-    const hasResults = document.querySelectorAll('.gacha-row').length > 0;
-    if (hasResults) {
-      location.reload();
-    } else {
-      location.href = REDIRECT_PLAYER;
-    }
+  const hasResults = document.querySelectorAll('.gacha-row').length > 0;
+  if (hasResults) {
+    location.reload();
+  } else {
+    location.href = REDIRECT_PLAYER;
+  }
+});
+
   });
 
   btnSingle?.addEventListener('click', async ()=>{
@@ -1069,7 +1069,11 @@ function bindUI(){
     for (let i = 0; i < 10; i++) {
       const r = await drawOnce();
       if (!r) break;
-      results.push({ rarity: r.rarity, name: r.name });
+results.push({
+  rarity: r.rarity,
+  name: r.name,
+  image_url: r.image_url || null
+});
       await Loader.step(i + 1, 10);
     }
 
