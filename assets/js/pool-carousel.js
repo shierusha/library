@@ -162,11 +162,21 @@
           save(LS_KEY, cur?.name || '常駐');
           if (typeof state.onChange === 'function') state.onChange(cur);
           const active = window.CURRENT_POOL.active;
+          
+          
           const btnSingle = $('#btn-single');
           const btnTen    = $('#btn-ten');
-          if (btnSingle) btnSingle._forceDisabled = !active;
-          if (btnTen)    btnTen._forceDisabled    = !active;
-          if (typeof window.enforceLandscape === 'function') window.enforceLandscape();
+                
+                if (btnSingle) {
+                  btnSingle._forceDisabled = !active;
+                  btnSingle.classList.toggle('inactive', !active);
+                }
+                if (btnTen) {
+                  btnTen._forceDisabled = !active;
+                  btnTen.classList.toggle('inactive', !active);
+                }
+          
+              if (typeof window.enforceLandscape === 'function') window.enforceLandscape();
         }
       };
 
