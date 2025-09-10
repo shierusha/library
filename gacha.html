@@ -782,9 +782,10 @@ function checkAllRevealed(){
     setTimeout(()=>{ canDraw = true; unlockButtons(); }, 500);
   }
 }
-
+let backLocked = false; // ← 是否禁止按箭頭
 function showResultsTen(results){
   canDraw = false; lockButtons(true);
+  backLocked = true;
   resultsContainer.classList.remove('single');
   resultsContainer.innerHTML = '';
   for (let row=0; row<2; row++){
@@ -802,6 +803,7 @@ function showResultsTen(results){
 
 function showResultSingle(res){
   canDraw = false; lockButtons(true);
+  backLocked = true; // ★ 禁止返回
   resultsContainer.classList.add('single');
   resultsContainer.innerHTML = '';
   const isWhite = res.rarity === 'normal';
@@ -928,16 +930,17 @@ function bindUI(){
   btnBag?.addEventListener('click', openBackpack);
 
   // 返回箭頭：有結果→清結果並顯示倫波；沒結果→回玩家中心
-  $('#btnBack')?.addEventListener('click', ()=>{
-    const hasResults = document.querySelectorAll('.gacha-row').length > 0;
-    const car = document.querySelector('.pool-carousel');
-    if (hasResults){
-      clearResults();
-      if (car) car.style.display = 'block';
-    } else {
-      location.href = REDIRECT_PLAYER;
-    }
-  });
+ $('#btnBack')?.addEventListener('click', ()=>{
+  const hasResults = document.querySelectorAll('.gacha-row').length > 0;
+  if (hasResults) {
+    // 直接重整頁面，相當於 F5
+    location.reload();
+  } else {
+    // 回到玩家中心
+    location.href = REDIRECT_PLAYER;
+  }
+});
+
 
   btnSingle?.addEventListener('click', async ()=>{
     if (!ensureAuthOrRedirect()) return;
