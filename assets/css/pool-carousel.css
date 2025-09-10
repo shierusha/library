@@ -68,7 +68,7 @@
   /* background: rgba(0,0,0,.45); */
 }
 
-.pool-card.disabled img.banner {
+.pool-card.disabled img.banner ::after {
 filter: grayscale(100%) brightness(0.7);
 }
 
