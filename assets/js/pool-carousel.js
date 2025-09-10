@@ -89,13 +89,15 @@
         card.className = 'pool-card' + (p.active ? '' : ' disabled');
         card.setAttribute('data-index', i);
 
-        if (p.banner) {
-          const img = document.createElement('img');
-          img.className = 'banner';
-          img.src = p.banner;
-          img.alt = p.name;
-          card.appendChild(img);
-        }
+       if (p.banner) {
+  const img = document.createElement('img');
+  img.className = 'banner';
+  img.src = p.banner;
+  img.alt = p.name;
+  img.draggable = false; // ✅ 禁止原生拖曳
+  card.appendChild(img);
+}
+
 
      //   const t = document.createElement('div');
      //   t.className = 'title auto-resize';
