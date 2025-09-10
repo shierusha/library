@@ -68,6 +68,10 @@
   /* background: rgba(0,0,0,.45); */
 }
 
+.pool-card.disabled img.banner {
+filter: grayscale(100%) brightness(0.7);
+}
+
 /* 標題/簡介（字級交給 .auto-resize） */
 .pool-card .title {
   position:absolute; left:3%; top:6%;
