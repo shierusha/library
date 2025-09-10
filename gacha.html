@@ -3,7 +3,7 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8">
-  <title>謝爾夏｜扭蛋系統2.1</title>
+  <title>謝爾夏｜扭蛋系統2.0</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -302,6 +302,60 @@ body.dark-bg::before {
   object-fit: contain;
 }
 
+/* === Orb 內圖覆蓋名字：請貼在最下面，覆蓋原本的 .orb-inner 版型 === */
+
+/* 內層容器改成定位用的盒子，不再用 flex 排版 */
+.gacha-orb .orb-inner{
+  position: relative;
+  display: block;
+  width: 90%;
+  height: 90%;
+  margin: auto;
+}
+
+/* 單抽大球稍微放大填滿 */
+.gacha-orb.big .orb-inner{
+  width: 95%;
+  height: 95%;
+}
+
+/* 圖片鋪在正中央，層級比名字高 → 可以擋住名字 */
+.gacha-orb .orb-inner .orb-icon{
+  position: absolute;
+  inset: 6%;
+  max-width: 88%;
+  max-height: 88%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  z-index: 2;          /* 圖 > 名字 */
+  pointer-events: none;/* 不擋點擊翻牌 */
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,.35));
+}
+
+/* 名字固定在下緣中央，層級較低 → 會被圖片遮住 */
+.gacha-orb .orb-inner .orb-name{
+  position: absolute;
+  left: 50%;
+  bottom: 50%;
+  transform: translateX(-50%);
+  width: 88%;
+  text-align: center;
+  line-height: 1.1;
+  font-weight: 900;
+  z-index: 1;          /* 名字 < 圖 */
+  white-space: normal;
+  word-break: keep-all;
+}
+
+/* 不同稀有度的名字顏色（被遮住也無妨，當作可讀性備援） */
+.orb-normal.revealed  .orb-name { color:#ffffff; text-shadow:0 2px 6px #000c, 0 0 3px #000; }
+.orb-hidden.revealed  .orb-name { color:#e0e0e0; text-shadow:0 2px 6px #000c, 0 0 3px #000; }
+.orb-limited.revealed .orb-name { color:#ffd54f; text-shadow:0 2px 6px #000c, 0 0 6px #000; }
+
+
+
+    
   </style>
 </head>
 <body class="dark-bg">
@@ -404,6 +458,8 @@ body.dark-bg::before {
       <div class="modal-body" id="info-modal-body"></div>
     </div>
   </div>
+
+
 <script>
 /* ==============================
    小工具
@@ -467,7 +523,6 @@ let sb = window.supabase.createClient(B_URL, B_ANON, {
   global: { headers: B_TOKEN ? { Authorization: `Bearer ${B_TOKEN}` } : {} }
 });
 if (B_TOKEN) sb.realtime.setAuth(B_TOKEN);
-
 const G = (t) => sb.schema('gacha').from(t);
 
 /* ==============================
@@ -529,19 +584,15 @@ setInterval(ensureAuthOrRedirect, 60*1000);
 ensureAuthOrRedirect();
 
 /* ==============================
-   工具 & 狀態
+   狀態
 ============================== */
 let pools = { normal: [], hidden: [], limited: [] };
 let canDraw = true;
 let unlockAt = 0;
-let backLocked = false; // 返回鍵鎖
+let backLocked = false; // 抽卡&未翻完 → 鎖返回
 
-function lockButtons() {
-  [btnSingle, btnTen, btnBag].forEach(b => b && (b.disabled = true, b._forceDisabled = true));
-}
-function unlockButtons() {
-  [btnSingle, btnTen, btnBag].forEach(b => b && (b.disabled = false, b._forceDisabled = false));
-}
+function lockButtons()  { [btnSingle, btnTen, btnBag].forEach(b => b && (b.disabled = true,  b._forceDisabled = true)); }
+function unlockButtons(){ [btnSingle, btnTen, btnBag].forEach(b => b && (b.disabled = false, b._forceDisabled = false)); }
 
 /* ==============================
    初始化
@@ -563,24 +614,22 @@ function unlockButtons() {
 
   bindUI();
 
-  // 結果出現/清除時，切換選池倫波顯示（雙保險）
   new MutationObserver(()=>{
     const hasResults = document.querySelectorAll('.gacha-row').length > 0;
     const car = document.querySelector('.pool-carousel');
     if (car) car.style.display = hasResults ? 'none' : 'block';
   }).observe(resultsContainer, { childList:true, subtree:true });
 
-  // 管理端若改 max_draws，前端 15 秒同步一次
   setInterval(refreshUIFromCounter, 15000);
 })();
 
 /* ==============================
-   Counter（用 max_draws 計算剩餘抽數）
+   Counter（剩餘抽數 = max_draws - total_draws）
 ============================== */
 async function ensureCounter(){
   const { data } = await G('counters').select('*').eq('player_id', user.id).single();
   if (!data){
-    await G('counters').insert({ player_id: user.id, total_draws: 0, next_pity: 50 }); // max_draws 用 DB 預設
+    await G('counters').insert({ player_id: user.id, total_draws: 0, next_pity: 50 }); // max_draws 走 DB 預設
   }
 }
 async function getCounter(){
@@ -679,7 +728,7 @@ async function drawOnce(){
     name: chosen.name,
     id: chosen.id,
     event_name,
-    image_url: chosen.image_url || null, // 圖片（有就顯示）
+    image_url: chosen.image_url || null, // ← 圖片路徑（若資料庫有就顯示）
     totalAfter: totalNext
   };
 }
@@ -693,8 +742,7 @@ async function drawTenTimes(){
   for (let i=0;i<10;i++){
     const r = await drawOnce();
     if (!r) break;
-    // ★ 保留整個物件，包含 image_url
-    results.push(r);
+    results.push(r); // 帶著 image_url
   }
   return results;
 }
@@ -730,7 +778,7 @@ function clearResults(){
 }
 
 /* ==============================
-   UI：建立球 / 翻牌與節流
+   UI：建立球 / 翻牌與節流（球內放圖、可遮名）
 ============================== */
 function createOrb(res, { autoReveal=false, revealDelay=0, big=false } = {}){
   const orb = document.createElement('div');
@@ -742,8 +790,9 @@ function createOrb(res, { autoReveal=false, revealDelay=0, big=false } = {}){
   const reveal = () => {
     if (orb.classList.contains('revealed')) return;
 
-    // 清空再組內容（圖 + 名）
     inner.innerHTML = '';
+
+    // 先放圖片（z-index:2），可遮住名字
     if (res.image_url) {
       const img = document.createElement('img');
       img.src = res.image_url;
@@ -751,9 +800,12 @@ function createOrb(res, { autoReveal=false, revealDelay=0, big=false } = {}){
       img.className = 'orb-icon';
       inner.appendChild(img);
     }
-    const span = document.createElement('span');
-    span.textContent = res.name;
-    inner.appendChild(span);
+
+    // 再放名字（z-index:1）
+    const nameEl = document.createElement('span');
+    nameEl.className = 'orb-name';
+    nameEl.textContent = res.name;
+    inner.appendChild(nameEl);
 
     orb.classList.add('revealed');
 
@@ -781,14 +833,14 @@ function checkAllRevealed(){
     setTimeout(()=>{
       canDraw = true;
       unlockButtons();
-      backLocked = false;  // ★ 全部翻開 → 允許返回
+      backLocked = false;  // 翻完 → 可按返回
     }, 500);
   }
 }
 
 function showResultsTen(results){
   canDraw = false;
-  backLocked = true;          // ★ 抽卡期間不可按返回
+  backLocked = true;          // 抽卡期間不可按返回
   lockButtons();
   resultsContainer.classList.remove('single');
   resultsContainer.innerHTML = '';
@@ -807,7 +859,7 @@ function showResultsTen(results){
 
 function showResultSingle(res){
   canDraw = false;
-  backLocked = true;          // ★ 抽卡期間不可按返回
+  backLocked = true;          // 抽卡期間不可按返回
   lockButtons();
   resultsContainer.classList.add('single');
   resultsContainer.innerHTML = '';
@@ -826,7 +878,7 @@ function showResultSingle(res){
 }
 
 /* ==============================
-   背包（限定2/行；隱藏2/行；普通3/行）
+   背包
 ============================== */
 function nameFromPools(rarity, character_id, event_name){
   if (rarity === 'normal') return pools.normal.find(x=>x.id===character_id)?.name || `#${character_id}`;
@@ -850,7 +902,6 @@ async function openBackpack(){
   if (error) { console.error('[owned_characters] query error:', error); alert('讀取背包失敗'); return; }
   const rows = Array.isArray(data) ? data : [];
 
-  // 合併同 key
   const byKey = new Map();
   for (const r of rows){
     const key = `${r.rarity}|${r.event_name}|${r.character_id}`;
@@ -859,12 +910,10 @@ async function openBackpack(){
   }
   const merged = [...byKey.values()];
 
-  // 是否在池內（有結果→倫波隱藏）
   const car = document.querySelector('.pool-carousel');
   const inPool = car && getComputedStyle(car).display === 'none';
   const currentPool = (window.CURRENT_POOL && window.CURRENT_POOL.key) ? window.CURRENT_POOL.key : '常駐';
 
-  // 分組
   const limitedGroups = new Map(); // event_name -> [{id, html}]
   const hiddenList = [];
   const normalList = [];
@@ -886,20 +935,16 @@ async function openBackpack(){
     }
   });
 
-  // 排序
   const byId = a => a.sort((x,y)=>(x.id??0)-(y.id??0));
   for (const [k, arr] of limitedGroups) limitedGroups.set(k, byId(arr));
   byId(hiddenList); byId(normalList);
 
-  // 換行
   const joinRows = (arr, perLine=3)=>{
     const lines=[]; for(let i=0;i<arr.length;i+=perLine){ lines.push(arr.slice(i,i+perLine).map(x=>x.html).join('、 ')); }
     return lines.join('<br>');
   };
 
   let html='';
-
-  // 限定（按活動分區塊；2/行）
   const limitedKeys = [...limitedGroups.keys()].sort();
   if (limitedKeys.length){
     html += `<div class="backpack-section"><h3>活動限定饅頭：</h3><div class="backpack-items">`;
@@ -911,17 +956,12 @@ async function openBackpack(){
     });
     html += `</div></div>`;
   }
-
-  // 隱藏（2/行）
   if (hiddenList.length){
     html += `<div class="backpack-section"><h3>隱藏饅頭：</h3><div class="backpack-items">${joinRows(hiddenList,2)}</div></div>`;
   }
-
-  // 普通（3/行）
   if (normalList.length){
     html += `<div class="backpack-section"><h3>普通饅頭：</h3><div class="backpack-items">${joinRows(normalList,3)}</div></div>`;
   }
-
   if (!html) html = '<div class="backpack-items">目前沒有任何饅頭</div>';
 
   infoBody.innerHTML = html;
@@ -931,28 +971,28 @@ infoModal?.addEventListener('click', ()=> infoModal.style.display='none');
 infoModal?.querySelector('.modal-content')?.addEventListener('click', e=> e.stopPropagation());
 
 /* ==============================
-   綁定按鈕（返回鍵雙作用 + 抽卡期間鎖）
+   綁定按鈕（返回鍵：抽卡時不可按；翻完結果→F5；沒結果→回玩家中心）
 ============================== */
 function bindUI(){
   btnBag?.addEventListener('click', openBackpack);
 
-  // ★ 返回鍵：像背包一樣，未翻開前不可用；結果畫面 → F5；無結果 → 回玩家中心
   btnBack?.addEventListener('click', ()=>{
-    // 直立或抽卡中/未翻開都不可按
     if (isPortrait()) return;
+
     const orbs = $$('.gacha-orb', resultsContainer);
     const hasResults = orbs.length > 0;
 
+    // 抽卡中 or 還沒翻完 → 禁用（跟背包規則一致）
     if (hasResults && (backLocked || orbs.some(o=>!o.classList.contains('revealed')))) {
       alert('請先翻開所有扭蛋！');
       return;
     }
 
     if (hasResults) {
-      // 直接重整，相當於 F5
+      // 10 抽頁/單抽頁有結果 → F5
       location.reload();
     } else {
-      // 初始畫面 → 返回玩家中心
+      // 沒結果（初始畫面）→ 回玩家中心
       location.href = REDIRECT_PLAYER;
     }
   });
@@ -962,7 +1002,7 @@ function bindUI(){
     if (isPortrait()) return;
     if (!canDraw || Date.now() < unlockAt) return alert('稍等一下…');
 
-    backLocked = true;          // ★ 抽卡開始 → 鎖返回
+    backLocked = true;          // 抽卡開始 → 鎖返回
     gachaBtns?.classList.add('bottom');
     lockButtons();
 
@@ -982,8 +1022,7 @@ function bindUI(){
     Loader.hide();
 
     await refreshUIFromCounter();
-    // ★ 帶上 image_url
-    showResultSingle({ rarity: r.rarity, name: r.name, image_url: r.image_url });
+    showResultSingle(r); // r 內含 image_url
   });
 
   btnTen?.addEventListener('click', async ()=>{
@@ -996,7 +1035,7 @@ function bindUI(){
       return alert('剩餘抽數不足 10 抽');
     }
 
-    backLocked = true;          // ★ 抽卡開始 → 鎖返回
+    backLocked = true;          // 抽卡開始 → 鎖返回
     gachaBtns?.classList.add('bottom');
     lockButtons();
 
@@ -1007,7 +1046,7 @@ function bindUI(){
     for (let i = 0; i < 10; i++) {
       const r = await drawOnce();
       if (!r) break;
-      results.push(r);          // ★ 保留整個物件（含 image_url）
+      results.push(r);          // r 內含 image_url
       await Loader.step(i + 1, 10);
     }
 
@@ -1023,6 +1062,7 @@ function bindUI(){
   obs.observe(resultsContainer, { childList:true, subtree:true });
 }
 </script>
+
 
 
   <!-- 登出腳本（原樣） -->
