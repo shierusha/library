@@ -28,12 +28,13 @@
 
 .pool-card {
   position:absolute;
-  top:50%;
+  top: 51%;
   left:50%;
   transform: translate(-50%,-50%);
   width: 64%;
-  max-width: 680px;
-  aspect-ratio: 16/7;
+  /* max-width: 680px; */
+  height: 66%;
+  /* aspect-ratio: 16/7; */
   border-radius: 16px;
   overflow:hidden;
   cursor:grab;
@@ -45,7 +46,7 @@
   /* background: linear-gradient(135deg, #0f1d55, #15397a); */
   /* border: 2px solid #53e2ff44; */
 }
-.pool-card.center {opacity: 1;pointer-events: auto;cursor: grab;box-shadow: 0 10px 30px rgba(0, 0, 0, .35);}
+.pool-card.center {opacity: 1;pointer-events: auto;cursor: grab;/* box-shadow: 0 10px 30px rgba(0, 0, 0, .35); */}
 
 .pool-card img.banner {
   position:absolute;
@@ -56,6 +57,7 @@
   /* background:#000; */
   display:block;
   filter: saturate(1.05) contrast(1.02);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .35);
 }
 
 /* 非活動期間：灰遮罩（禁抽按鈕由主頁 JS 控） */
@@ -73,8 +75,12 @@
   letter-spacing:.04em;
 }
 .pool-card .desc {
-  position:absolute; left:3%; right:3%; bottom:6%;
-  color:#eaf7ff; text-shadow:0 2px 8px #000c;
+  position:absolute;
+  left:3%;
+  right:3%;
+  bottom: 7%;
+  color:#eaf7ff;
+  /* text-shadow:0 2px 8px #000c; */
 }
 
 /* 堆疊感 */
