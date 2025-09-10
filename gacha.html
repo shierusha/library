@@ -322,13 +322,13 @@ body.dark-bg::before {
 /* 圖片鋪在正中央，層級比名字高 → 可以擋住名字 */
 .gacha-orb .orb-inner .orb-icon{
   position: absolute;
-  inset: 6%;
-  max-width: 88%;
-  max-height: 88%;
+  inset: 0%;
+  max-width: 100%;
+  max-height: 100%;
   width: auto;
   height: auto;
   object-fit: contain;
-  z-index: 2;          /* 圖 > 名字 */
+  /* z-index: 2;          圖 > 名字 */
   pointer-events: none;/* 不擋點擊翻牌 */
   filter: drop-shadow(0 2px 6px rgba(0,0,0,.35));
 }
@@ -337,16 +337,16 @@ body.dark-bg::before {
 .gacha-orb .orb-inner .orb-name{
     position: absolute;
     left: 50%;
-    bottom: 30%;
+    bottom: 0%;
     transform: translateX(-50%);
-    width: 88%;
+    width: 70%;
     text-align: center;
     line-height: 1.1;
     font-weight: 900;
     z-index: 1;
     white-space: normal;
     word-break: keep-all;
-    height: 35%;
+    height: 20%;
 }
 
 /* 不同稀有度的名字顏色（被遮住也無妨，當作可讀性備援） */
