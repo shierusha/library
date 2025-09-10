@@ -177,24 +177,25 @@
         container.classList.add('dragging');
       });
 
-      container.addEventListener('pointermove', (e) => {
-        if (!state.isDrag) return;
-        const dx = e.clientX - state.startX;
-        state.pos = clamp(state.startPos - dx / 160, 0, state.pools.length - 1);
-        update(state.pos);
-      });
+     container.addEventListener('pointermove', (e) => {
+  if (!state.isDrag) return;
+  const dx = e.clientX - state.startX;
+  // 拖曳過程不 clamp
+  state.pos = state.startPos - dx / 160;
+  update(state.pos);
+});
 
-      const endDrag = (e) => {
-        if (!state.isDrag) return;
-        state.isDrag = false;
-        container.classList.remove('dragging');
-        try { container.releasePointerCapture(e.pointerId); } catch {}
+     const endDrag = (e) => {
+  if (!state.isDrag) return;
+  state.isDrag = false;
+  container.classList.remove('dragging');
+  try { container.releasePointerCapture(e.pointerId); } catch {}
 
-        // 決定要停哪張：超過 0.5 就進位
-        const nearest = Math.round(state.pos);
-        state.pos = clamp(nearest, 0, state.pools.length - 1);
-        update(state.pos);
-      };
+  // 放開時才 clamp
+  const nearest = Math.round(state.pos);
+  state.pos = clamp(nearest, 0, state.pools.length - 1);
+  update(state.pos);
+};
 
       container.addEventListener('pointerup', endDrag);
       container.addEventListener('pointercancel', endDrag);
