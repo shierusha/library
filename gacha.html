@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
@@ -408,9 +409,6 @@ body.dark-bg::before {
 /* ==============================
    小工具（原樣）
 ============================== */
-/* ==============================
-   小工具（原樣）
-============================== */
 const $  = (s, r=document) => r.querySelector(s);
 const $$ = (s, r=document) => [...r.querySelectorAll(s)];
 const sleep = (ms) => new Promise(res => setTimeout(res, ms));
@@ -534,12 +532,11 @@ setInterval(ensureAuthOrRedirect, 60*1000);
 ensureAuthOrRedirect();
 
 /* ==============================
-   工具 & 狀態
+   工具 & 狀態（原樣）
 ============================== */
 let pools = { normal: [], hidden: [], limited: [] };
 let canDraw = true;
 let unlockAt = 0;
-let backLocked = false; // ★ 是否禁止按箭頭
 function lockButtons(force = true) {
   [btnSingle, btnTen, btnBag].forEach(b => { if (!b) return; b._forceDisabled = force; });
   enforceLandscape();
@@ -550,7 +547,7 @@ function unlockButtons() {
 }
 
 /* ==============================
-   初始化
+   初始化（原樣）
 ============================== */
 (async function boot(){
   if (!ensureAuthOrRedirect()) return;
@@ -569,13 +566,14 @@ function unlockButtons() {
 
   bindUI();
 
-  // 當結果出現/清除時，切換 選池倫波 顯示/隱藏
+  // 當結果出現/清除時，切換 選池倫波 顯示/隱藏（外掛也會做一次，這裡雙保險）
   new MutationObserver(()=>{
     const hasResults = document.querySelectorAll('.gacha-row').length > 0;
     const car = document.querySelector('.pool-carousel');
     if (car) car.style.display = hasResults ? 'none' : 'block';
   }).observe(resultsContainer, { childList:true, subtree:true });
 
+  // 管理端若改 max_draws，前端 15 秒同步一次
   setInterval(refreshUIFromCounter, 15000);
 })();
 
@@ -585,7 +583,7 @@ function unlockButtons() {
 async function ensureCounter(){
   const { data } = await G('counters').select('*').eq('player_id', user.id).single();
   if (!data){
-    await G('counters').insert({ player_id: user.id, total_draws: 0, next_pity: 50 });
+    await G('counters').insert({ player_id: user.id, total_draws: 0, next_pity: 50 }); // max_draws 用 DB 預設
   }
 }
 async function getCounter(){
@@ -599,14 +597,14 @@ async function setCounter(_total_draws, next_pity) {
 }
 async function refreshUIFromCounter(){
   const c = await getCounter();
-  const remain = Math.max(0, c.max_draws - c.total_draws);
-  if (drawCounterEl) drawCounterEl.textContent = remain;
+  const remain = Math.max(0, c.max_draws - c.total_draws);   // ★ 剩餘抽數
+  if (drawCounterEl) drawCounterEl.textContent = remain;      // ★ 顯示剩餘
   if (btnTen)    btnTen.disabled    = remain < 10 || btnTen._forceDisabled === true || isPortrait();
   if (btnSingle) btnSingle.disabled = remain <  1 || btnSingle._forceDisabled === true || isPortrait();
 }
 
 /* ==============================
-   Owned upsert
+   Owned upsert（原樣）
 ============================== */
 async function addOwned(rarity, character_id, event_name){
   const { data: rows } = await G('owned_characters')
@@ -627,7 +625,7 @@ async function addOwned(rarity, character_id, event_name){
 }
 
 /* ==============================
-   抽卡核心
+   抽卡核心（原樣；★ 常駐金→銀；保底在常駐也消耗）
 ============================== */
 async function drawOnce(){
   const c = await getCounter();
@@ -635,18 +633,21 @@ async function drawOnce(){
     alert('已達抽卡上限'); await refreshUIFromCounter(); return null;
   }
 
+  // 由選池外掛提供
   const currentPoolKey = (window.CURRENT_POOL && window.CURRENT_POOL.key) ? window.CURRENT_POOL.key : DEFAULT_EVENT;
+
   let totalNext = c.total_draws + 1;
   let nextPity  = c.next_pity;
 
   let rarity, chosen, event_name = DEFAULT_EVENT;
 
+  // ★★ 保底：常駐→銀（且 nextPity+50）、活動→金（nextPity+50）
   if (totalNext === nextPity) {
     if (currentPoolKey === DEFAULT_EVENT) {
       rarity = 'hidden';
       chosen = pick(pools.hidden);
       event_name = DEFAULT_EVENT;
-      nextPity += 50;
+      nextPity += 50; // 消耗保底
     } else {
       rarity = 'limited';
       const poolLimited = pools.limited.filter(x => x.event_name === currentPoolKey);
@@ -655,11 +656,12 @@ async function drawOnce(){
       nextPity += 50;
     }
   } else {
-    const r = Math.floor(Math.random()*100) + 1;
+    const r = Math.floor(Math.random()*100) + 1; // 1..100
     if (r === 1) {
       rarity = 'hidden';  chosen = pick(pools.hidden);  event_name = DEFAULT_EVENT;
     } else if (r === 100) {
       if (currentPoolKey === DEFAULT_EVENT) {
+        // 常駐：隨機金→轉銀（不是保底，不動 nextPity）
         rarity = 'hidden';  chosen = pick(pools.hidden);  event_name = DEFAULT_EVENT;
       } else {
         rarity = 'limited';
@@ -677,14 +679,14 @@ async function drawOnce(){
   await addOwned(rarity, chosen.id, event_name);
   await setCounter(totalNext, nextPity);
 
-  return {
-    rarity,
-    name: chosen.name,
-    id: chosen.id,
-    event_name,
-    image_url: chosen.image_url || null,
-    totalAfter: totalNext
-  };
+return {
+  rarity,
+  name: chosen.name,
+  id: chosen.id,
+  event_name,
+  image_url: chosen.image_url || null,   // ★ 加這裡
+  totalAfter: totalNext
+};
 }
 
 async function drawTenTimes(){
@@ -696,17 +698,13 @@ async function drawTenTimes(){
   for (let i=0;i<10;i++){
     const r = await drawOnce();
     if (!r) break;
-    results.push({
-      rarity: r.rarity,
-      name: r.name,
-      image_url: r.image_url || null
-    });
+    results.push({ rarity: r.rarity, name: r.name });
   }
   return results;
 }
 
 /* ==============================
-   Loader
+   Loader（原樣）
 ============================== */
 const loaderEl  = $('#gacha-loader');
 const fillEl    = $('#loader-fill');
@@ -736,168 +734,100 @@ function clearResults(){
 }
 
 /* ==============================
-   Orb 建立
+   UI：建立球 / 翻牌與節流（原樣）
 ============================== */
 function createOrb(res, { autoReveal=false, revealDelay=0, big=false } = {}){
   const orb = document.createElement('div');
   orb.className = `gacha-orb orb-${res.rarity}` + (big?' big':'');
   const inner = document.createElement('div');
   inner.className = 'orb-inner auto-resize';
-  orb.appendChild(inner);
+  inner.textContent = '';
 
   const reveal = () => {
-    if (orb.classList.contains('revealed')) return;
+  if (orb.classList.contains('revealed')) return;
 
-    inner.innerHTML = '';
+  // 清空再組內容
+  inner.innerHTML = '';
 
-    if (res.image_url) {
-      const img = document.createElement('img');
-      img.src = res.image_url;
-      img.alt = res.name;
-      img.className = 'orb-icon';
-      inner.appendChild(img);
-    }
+  // 如果有圖片就放在文字前面
+  if (res.image_url) {
+    const img = document.createElement('img');
+    img.src = res.image_url;
+    img.alt = res.name;
+    img.className = 'orb-icon';
+    inner.appendChild(img);
+  }
 
-    const span = document.createElement('span');
-    span.textContent = res.name;
-    inner.appendChild(span);
+  // 加上名字
+  const span = document.createElement('span');
+  span.textContent = res.name;
+  inner.appendChild(span);
 
-    orb.classList.add('revealed');
+  orb.classList.add('revealed');
 
-    if (res.rarity === 'limited' || res.rarity === 'hidden') {
-      sendGachaWebhook(res.rarity, res.name);
-    }
+  if (res.rarity === 'limited' || res.rarity === 'hidden') {
+    sendGachaWebhook(res.rarity, res.name);
+  }
 
-    resizeAllTexts();
-    checkAllRevealed();
-  };
+  resizeAllTexts();
+  checkAllRevealed();
+};
+
 
   if (autoReveal) setTimeout(reveal, revealDelay);
   else orb.addEventListener('click', reveal);
 
+  orb.appendChild(inner);
   return orb;
 }
 
-/* ==============================
-   檢查是否全部翻開
-============================== */
 function checkAllRevealed(){
   const orbs = $$('.gacha-orb', resultsContainer);
   if (orbs.length === 0) return;
   const all = orbs.every(o => o.classList.contains('revealed'));
   if (all) {
     unlockAt = Date.now() + 500;
-    setTimeout(()=>{ canDraw = true; unlockButtons(); backLocked = false; }, 500);
+    setTimeout(()=>{
+      canDraw = true;
+      unlockButtons();
+      backLocked = false;  // ★ 解除返回鎖
+    }, 500);
   }
 }
 
-/* ==============================
-   顯示結果
-============================== */
+let backLocked = false; // ← 是否禁止按箭頭
 function showResultsTen(results){
-  canDraw = false; lockButtons(true); backLocked = true;
+  canDraw = false; lockButtons(true);
+  backLocked = true;
   resultsContainer.classList.remove('single');
   resultsContainer.innerHTML = '';
   for (let row=0; row<2; row++){
     const rowDiv = document.createElement('div');
     rowDiv.className = 'gacha-row';
     results.slice(row*5, row*5+5).forEach((res, idx)=>{
-      const orb = createOrb(res, { autoReveal: res.rarity==='normal', revealDelay: idx*200 });
+      const index = row*5 + idx;
+      const orb = createOrb(res, { autoReveal: res.rarity==='normal', revealDelay: index*200 });
       rowDiv.appendChild(orb);
     });
     resultsContainer.appendChild(rowDiv);
   }
+  resizeAllTexts();
 }
 
 function showResultSingle(res){
-  canDraw = false; lockButtons(true); backLocked = true;
+  canDraw = false; lockButtons(true);
+  backLocked = true; // ★ 禁止返回
   resultsContainer.classList.add('single');
   resultsContainer.innerHTML = '';
-  const orb = createOrb(res, { autoReveal:res.rarity==='normal', revealDelay:0, big:true });
+  const isWhite = res.rarity === 'normal';
+  const orb = createOrb(res, { autoReveal:isWhite, revealDelay:0, big:true });
   const rowDiv = document.createElement('div');
   rowDiv.className = 'gacha-row';
   rowDiv.style.justifyContent = 'center';
   rowDiv.appendChild(orb);
   resultsContainer.appendChild(rowDiv);
-}
-
-/* ==============================
-   綁定按鈕 / 返回箭頭
-============================== */
-function bindUI(){
-  btnBag?.addEventListener('click', openBackpack);
-
-  $('#btnBack')?.addEventListener('click', ()=>{
-    if (backLocked) {
-      alert('請先翻開所有扭蛋！');
-      return;
-    }
-    const hasResults = document.querySelectorAll('.gacha-row').length > 0;
-    if (hasResults) {
-      location.reload();
-    } else {
-      location.href = REDIRECT_PLAYER;
-    }
-  });
-
-  btnSingle?.addEventListener('click', async ()=>{
-    if (!ensureAuthOrRedirect()) return;
-    if (!canDraw || Date.now() < unlockAt) return alert('稍等一下…');
-
-    gachaBtns?.classList.add('bottom');
-    lockButtons(true);
-
-    clearResults();
-    Loader.show('Roro爆肝中……');
-
-    const r = await drawOnce();
-    if (!r) {
-      Loader.hide();
-      await refreshUIFromCounter();
-      unlockButtons();
-      return;
-    }
-
-    await Loader.step(1, 1);
-    Loader.hide();
-
-    await refreshUIFromCounter();
-    showResultSingle(r);
-  });
-
-  btnTen?.addEventListener('click', async ()=>{
-    if (!ensureAuthOrRedirect()) return;
-    if (!canDraw || Date.now() < unlockAt) return alert('稍等一下…');
-
-    const c = await getCounter();
-    if (c.max_draws - c.total_draws < 10) {
-      return alert('剩餘抽數不足 10 抽');
-    }
-
-    gachaBtns?.classList.add('bottom');
-    lockButtons(true);
-
-    clearResults();
-    Loader.show('Roro爆肝中……');
-
-    const results = [];
-    for (let i = 0; i < 10; i++) {
-      const r = await drawOnce();
-      if (!r) break;
-      results.push(r);
-      await Loader.step(i + 1, 10);
-    }
-
-    Loader.hide();
-
-    if (!results.length) { unlockButtons(); return; }
-
-    await refreshUIFromCounter();
-    showResultsTen(results);
-  });
-
-  const obs = new MutationObserver(()=>{ resizeAllTexts(); checkAllRevealed(); });
-  obs.observe(resultsContainer, { childList:true, subtree:true });
+  resizeAllTexts();
+  if (isWhite) { unlockAt = Date.now() + 500; setTimeout(()=>{ canDraw = true; unlockButtons(); }, 500); }
 }
 
 /* ==============================
@@ -1093,3 +1023,8 @@ function bindUI(){
   <script src="https://shierusha.github.io/library/assets/js/pool-carousel.js"></script>
 </body>
 </html>
+
+
+
+
+請直接給我完整的JS 我順便把祂另存
