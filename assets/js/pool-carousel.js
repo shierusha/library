@@ -97,15 +97,15 @@
           card.appendChild(img);
         }
 
-        const t = document.createElement('div');
-        t.className = 'title auto-resize';
-        t.textContent = p.name;
-        card.appendChild(t);
+     //   const t = document.createElement('div');
+     //   t.className = 'title auto-resize';
+     //   t.textContent = p.name;
+     //   card.appendChild(t);
 
-        const d = document.createElement('div');
-        d.className = 'desc auto-resize';
-        d.textContent = p.desc || '';
-        card.appendChild(d);
+    //    const d = document.createElement('div');
+    //    d.className = 'desc auto-resize';
+     //   d.textContent = p.desc || '';
+    //    card.appendChild(d);
 
         state.track.appendChild(card);
         state.cards.push(card);
