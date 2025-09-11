@@ -562,7 +562,7 @@ async function drawOnce(){
 async function drawTenTimes(){
   const c = await getCounter();
   const remain = Math.max(0, c.max_draws - c.total_draws);
-  if (remain < 10) { alert('剩餘抽數不足 10 抽'); return null; }
+  if (remain < 10) { return null; }
 
   const results = [];
   for (let i=0;i<10;i++){
@@ -766,37 +766,48 @@ async function runSpecialUpgradeAnimation(targetOrb, revealFn){
   await sleep(SPECIAL.darkWaitMs);
   specialCat.style.opacity = '1';
 
-  // === 四段直線：垂直(1/3) → 水平(1/3) → 垂直到目標 → 水平成目標 ===
-  const { rb, lb } = viewportTargets(targetOrb);
-  const q = Math.max(0, Math.floor(SPECIAL.axisMoveTotalMs / 4));
+// === 六段直線移動：垂直1/3 → 水平1/3 → 垂直2/3 → 水平2/3 → 垂直到目標 → 水平成目標 ===
+const { rb, lb } = viewportTargets(targetOrb);
+const q = Math.max(0, Math.floor(SPECIAL.axisMoveTotalMs / 6));
 
-  const dyThird = (rb.y - start.y) / 3;
-  const dxThird = (rb.x - start.x) / 3;
-  const y1_3 = start.y + dyThird;   // 垂直 1/3
-  const x1_3 = start.x + dxThird;   // 水平 1/3
+const dyThird = (rb.y - start.y) / 3;
+const dxThird = (rb.x - start.x) / 3;
 
-  // 追蹤目前位置，方便判斷方向
-  let curX = start.x, curY = start.y;
+const y1_3 = start.y + dyThird;
+const y2_3 = start.y + dyThird * 2;
+const x1_3 = start.x + dxThird;
+const x2_3 = start.x + dxThird * 2;
 
-  // 1) 垂直到「1/3 Y」（不彈）
-  stopLoopBounce();
-  await moveVert(y1_3, q); curY = y1_3;
+// 追蹤目前位置（給翻頭用）
+let curX = start.x, curY = start.y;
 
-  // 2) 水平到「1/3 X」（彈，並依方向翻頭）
-  faceForMove(curX, x1_3);
-  startLoopBounce();
-  await moveHoriz(x1_3, q); curX = x1_3;
-  stopLoopBounce();
+// 1) 垂直到 1/3 Y（不彈）
+stopLoopBounce();
+await moveVert(y1_3, q); curY = y1_3;
 
-  // 3) 垂直到「目標 Y」（不彈）
-  stopLoopBounce();
-  await moveVert(rb.y, q); curY = rb.y;
+// 2) 水平到 1/3 X（彈，並依方向翻頭）
+faceForMove(curX, x1_3);
+startLoopBounce();
+await moveHoriz(x1_3, q); curX = x1_3;
+stopLoopBounce();
 
-  // 4) 水平成「目標 X」（彈，並依方向翻頭）
-  faceForMove(curX, rb.x);
-  startLoopBounce();
-  await moveHoriz(rb.x, q); curX = rb.x;
-  stopLoopBounce();
+// 3) 垂直到 2/3 Y（不彈）
+await moveVert(y2_3, q); curY = y2_3;
+
+// 4) 水平到 2/3 X（彈，並依方向翻頭）
+faceForMove(curX, x2_3);
+startLoopBounce();
+await moveHoriz(x2_3, q); curX = x2_3;
+stopLoopBounce();
+
+// 5) 垂直到目標 Y（不彈）
+await moveVert(rb.y, q); curY = rb.y;
+
+// 6) 水平成目標 X（彈，並依方向翻頭）
+faceForMove(curX, rb.x);
+startLoopBounce();
+await moveHoriz(rb.x, q); curX = rb.x;
+stopLoopBounce();
 
   // === 後續固定節奏 ===
   await sleep(SPECIAL.hopDelayMs);  await bounce(1);
