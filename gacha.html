@@ -279,12 +279,21 @@ body.dark-bg::before {
   filter: drop-shadow(0 6px 14px rgba(0,0,0,.6));
   transition: left .45s cubic-bezier(.22,.61,.36,1), top .45s cubic-bezier(.22,.61,.36,1); /* ★ 可微調：移動速度/曲線 */
 }
-.special-bounce{ animation: sp-bounce .28s ease-out; } /* ★ 可微調：彈跳時間 */
-@keyframes sp-bounce{
-  0%   { transform: translate(-50%,-60%); } /* ★ 可微調：彈跳幅度 */
-  50%  { transform: translate(-50%,-40%); } /* ★ 可微調：彈跳幅度 */
-  100% { transform: translate(-50%,-50%); }
+.special-bounce {
+  animation: cat-bounce 500ms ease-out; /* 時間跟你 JS 的 SPECIAL.hopDurMs 對齊 */
 }
+/* ★ 翻轉：左右翻圖，不影響 translate 定位 */
+#special-cat.flipX {
+  transform: translate(-50%, -50%) scaleX(-1);
+}
+
+/* ★ 彈跳：用 margin-top 動畫，避免和 transform/翻轉衝突 */
+@keyframes cat-bounce {
+  0%   { margin-top: 0; }
+  50%  { margin-top: -14px; } /* ← 高度可改 */
+  100% { margin-top: 0; }
+}
+
   </style>
 </head>
 <body class="dark-bg">
@@ -614,71 +623,7 @@ function softResetToIdle(){
 /* ==============================
    特效邏輯（銀→金→翻牌）
 ============================== */
-const specialMask = document.getElementById('special-mask');
-const specialCat  = document.getElementById('special-cat');
 
-function viewportTargetForOrb(orbEl){
-  const r = orbEl.getBoundingClientRect();
-  return { x: r.left + r.width * 0.78, y: r.top + r.height * 0.78 }; // 右下角略內縮
-}
-function randomEdgeStart(){
-  const w = window.innerWidth, h = window.innerHeight;
-  const side = Math.floor(Math.random()*4);
-  if (side === 0) return { x: -50, y: Math.random()*h };   // 左外
-  if (side === 1) return { x: w+50, y: Math.random()*h };  // 右外
-  if (side === 2) return { x: Math.random()*w, y: -50 };   // 上外
-  return { x: Math.random()*w, y: h+50 };                   // 下外
-}
-
-// 依序：入場 → 移動 → 白→銀 → 銀→金 → 翻開 → 離場
-async function runSpecialUpgradeAnimation(targetOrb, revealFn){
-  if (!targetOrb) { revealFn?.(); return; }
-
-  // 顯示遮罩 & 貓 入場
-  specialMask.style.display = 'block';
-  const start = randomEdgeStart();
-  specialCat.style.left = `${start.x}px`;
-  specialCat.style.top  = `${start.y}px`;
-
-  await sleep(60); // ★ 可微調：入場延遲
-
-  // 移動到球右下角
-  const p = viewportTargetForOrb(targetOrb);
-  specialCat.style.left = `${p.x}px`;
-  specialCat.style.top  = `${p.y}px`;
-  await sleep(470); // ★ 可微調：移動時間（需與 CSS transition 對齊）
-
-  // 白 → 銀
-  targetOrb.classList.remove('orb-normal');
-  targetOrb.classList.add('orb-hidden');
-  specialCat.classList.add('special-bounce');
-  await sleep(280); // ★ 可微調：彈跳時間（需與 .special-bounce 動畫一致）
-  specialCat.classList.remove('special-bounce');
-
-  // 銀 → 金
-  targetOrb.classList.remove('orb-hidden');
-  targetOrb.classList.add('orb-limited');
-  specialCat.classList.add('special-bounce');
-  await sleep(280); // ★ 可微調
-  specialCat.classList.remove('special-bounce');
-
-  // 翻開（顯示圖與名字）— 不送恭喜，由外層決定送什麼
-  specialCat.classList.add('special-bounce');
-  await sleep(180); // ★ 可微調：翻開前的停頓
-  specialCat.classList.remove('special-bounce');
-  revealFn?.();
-
-  // 快速離場
-  const end = randomEdgeStart();
-  specialCat.style.transitionDuration = '.32s'; // ★ 可微調：離場速度
-  specialCat.style.left = `${end.x}px`;
-  specialCat.style.top  = `${end.y}px`;
-  await sleep(360); // ★ 可微調：離場等待
-  specialCat.style.transitionDuration = '.45s';
-
-  // 關遮罩
-  specialMask.style.display = 'none';
-}
 
 /* ==============================
    UI：建立球 / 翻牌（球內放圖、可遮名）
