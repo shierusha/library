@@ -464,6 +464,13 @@ let sb = window.supabase.createClient(B_URL, B_ANON, {
 if (B_TOKEN) sb.realtime.setAuth(B_TOKEN);
 const G = (t) => sb.schema('gacha').from(t);
 
+/* ✅ 角色名稱/圖片索引（背包顯示名字用） */
+const CHAR = {
+  normal:  new Map(),                          // id -> { name, image_url }
+  hidden:  new Map(),                          // id -> { name, image_url }
+  limited: new Map()                           // `${event_name}|${id}` -> { name, image_url }
+};
+
 /* ==============================
    DOM 快取
 ============================== */
@@ -478,6 +485,8 @@ const infoTitle          = $('#info-modal-title');
 const infoBody           = $('#info-modal-body');
 const drawCounterEl      = $('#draw-count');
 const orientationModal   = $('#orientation-modal');
+
+
 
 /* ==============================
    自動字級（套 auto-resize）
@@ -578,6 +587,20 @@ async function drawTenTimes(){
 ============================== */
 (async function boot(){
   if (!ensureAuthOrRedirect()) return;
+
+  /* ✅ 先載入角色清單建立索引（背包顯示名字需要） */
+  try {
+    const [nChars, hChars, lChars] = await Promise.all([
+      G('normal_characters').select('id,name,image_url'),
+      G('hidden_characters').select('id,name,image_url'),
+      G('limited_characters').select('id,event_name,name,image_url'),
+    ]);
+    (nChars.data || []).forEach(r => CHAR.normal.set(r.id, { name: r.name, image_url: r.image_url || null }));
+    (hChars.data || []).forEach(r => CHAR.hidden.set(r.id, { name: r.name, image_url: r.image_url || null }));
+    (lChars.data || []).forEach(r => CHAR.limited.set(`${r.event_name}|${r.id}`, { name: r.name, image_url: r.image_url || null }));
+  } catch(e) {
+    console.warn('[CHAR index] load failed:', e);
+  }
 
   await ensureCounter();
   await refreshUIFromCounter();
@@ -1046,7 +1069,15 @@ function showResultSingle(res){
    背包（展示）
 ============================== */
 function nameFromPools(rarity, character_id, event_name){
-  return `#${character_id}`;
+  if (rarity === 'normal') {
+    return CHAR.normal.get(character_id)?.name || `#${character_id}`;
+  }
+  if (rarity === 'hidden') {
+    return CHAR.hidden.get(character_id)?.name || `#${character_id}`;
+  }
+  // limited
+  return CHAR.limited.get(`${event_name}|${character_id}`)?.name
+      || `#${character_id}`;
 }
 
 async function openBackpack(){
@@ -1199,6 +1230,7 @@ function bindUI(){
   obs.observe(resultsContainer, { childList:true, subtree:true });
 }
 </script>
+
 
   <!-- 登出腳本 -->
   <script src="https://shierusha.github.io/library/assets/js/logout.js"></script>
