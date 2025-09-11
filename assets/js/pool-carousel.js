@@ -7,7 +7,7 @@
   const load = (k,d) => { try{ const v = JSON.parse(localStorage.getItem(k)); return v ?? d; }catch{ return d; } };
 
   const buildLink = (name) =>
-    `https://shierusha.github.io/library/lib/getgacha.html?lim=${(!name || name==='常駐') ? '' : encodeURIComponent(name)}`;
+    `https://shierusha.github.io/library/lib/getgacha.html?lim=${(!name || name==='謝爾夏饅頭扭蛋') ? '' : encodeURIComponent(name)}`;
 
   function sizeBackArrow(){
     const el = document.getElementById('btnBack') || document.querySelector('.back');
@@ -28,15 +28,15 @@
       const now  = Date.now();
 
       const list = [];
-      const base = rows.find(r=>r.event_name==='常駐') || null;
+      const base = rows.find(r=>r.event_name==='謝爾夏饅頭扭蛋') || null;
       list.push({
-        name: '常駐',
+        name: '謝爾夏饅頭扭蛋',
         desc: base?.display_name || '一般池（含隱藏機率）',
         banner: base?.image_url || '',
         threadId: base?.discord_thread_id || null,
         active: true
       });
-      rows.filter(r=>r.event_name!=='常駐').forEach(r=>{
+      rows.filter(r=>r.event_name!=='謝爾夏饅頭扭蛋').forEach(r=>{
         const st = new Date(r.starts_at).getTime();
         const ed = new Date(r.ends_at).getTime();
         list.push({
@@ -71,7 +71,7 @@
 
       const state = this._state = {
         root: container, track, nameEl, descEl, linkEl, onChange,
-        pools: (pools && pools.length) ? pools : [{name:'常駐', desc:'一般池', banner:''}],
+        pools: (pools && pools.length) ? pools : [{name:'謝爾夏饅頭扭蛋', desc:'一般池', banner:''}],
         cards: [],
         pos: 0,
         isDrag:false, startX:0, startPos:0
@@ -139,17 +139,17 @@
 
         const cur = this.getCurrent();
         window.CURRENT_POOL = {
-          key: cur?.name || '常駐',
-          name: cur?.name || '常駐',
+          key: cur?.name || '謝爾夏饅頭扭蛋',
+          name: cur?.name || '謝爾夏饅頭扭蛋',
           desc: cur?.desc || '',
           banner: cur?.banner || '',
           threadId: cur?.threadId || null,
-          active: cur?.active !== false || (cur?.name === '常駐')
+          active: cur?.active !== false || (cur?.name === '謝爾夏饅頭扭蛋')
         };
         if (state.nameEl) state.nameEl.textContent = cur?.name || '';
         if (state.descEl) state.descEl.textContent = cur?.desc || '';
         if (state.linkEl) {
-          const href = buildLink(cur?.name || '常駐');
+          const href = buildLink(cur?.name || '謝爾夏饅頭扭蛋');
           state.linkEl.dataset.href = href;
           state.linkEl.title = `前往持有榜`;
         }
@@ -159,7 +159,7 @@
         const idx = Math.round(center);
         if (state._lastIndex !== idx) {
           state._lastIndex = idx;
-          save(LS_KEY, cur?.name || '常駐');
+          save(LS_KEY, cur?.name || '謝爾夏饅頭扭蛋');
           if (typeof state.onChange === 'function') state.onChange(cur);
           const active = window.CURRENT_POOL.active;
           
@@ -222,7 +222,7 @@
 
       if (state.linkEl) {
         state.linkEl.addEventListener('click', ()=>{
-          const href = state.linkEl.dataset.href || buildLink('常駐');
+          const href = state.linkEl.dataset.href || buildLink('謝爾夏饅頭扭蛋');
           window.open(href, '_blank');
         });
       }
