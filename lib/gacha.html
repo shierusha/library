@@ -397,7 +397,7 @@ $('#btn-rf-save').addEventListener('click', async ()=>{
   const pid = $('#rf-player').value;
   const cid = Number($('#rf-bun').value);
   const qty = Math.floor(Number($('#rf-qty').value)||0);
-  if (!ev || !pid || !cid || qty<=0){ setMsg($('#rf-msg'), '請完整選擇與輸入數量（>0）', false); return; }
+  //if (!ev || !pid || !cid || qty<=0){ setMsg($('#rf-msg'), '請完整選擇與輸入數量（>0）', false); return; }
 
   setMsg($('#rf-msg'), '儲存中…', true);
   try{
