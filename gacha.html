@@ -1,19 +1,18 @@
-
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8">
-  <title>謝爾夏｜扭蛋系統2.2</title>
+  <title>謝爾夏｜扭蛋系統2.0</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <!-- 新增：選池倫波外掛 CSS -->
+  <!-- 選池倫波外掛 CSS -->
   <link rel="stylesheet" href="https://shierusha.github.io/library/assets/css/pool-carousel.css"/>
 
   <style>
 /* ==============================
-   全域背景 / 字體（原樣）
+   全域背景 / 字體
 ============================== */
 body {
   background: url('https://shierusha.github.io/create-student/imgs/citybg.png') center center no-repeat;
@@ -30,7 +29,7 @@ body.dark-bg::before {
 }
 
 /* ==============================
-   16:9 容器（原樣）
+   16:9 容器
 ============================== */
 .container-16-9 {
   position: relative;
@@ -42,7 +41,7 @@ body.dark-bg::before {
   box-shadow: 0 0 24px #0004;
   margin: 3vh auto;
 }
-.bg-img {
+.bg_img {
   position: absolute; inset: 0;
   width: 100%; height: 100%;
   object-fit: cover;
@@ -50,7 +49,7 @@ body.dark-bg::before {
 }
 
 /* ==============================
-   Modal（旋轉 / 背包）（原樣）
+   Modal（旋轉 / 背包）
 ============================== */
 .modal-overlay {
   position: fixed;
@@ -102,7 +101,7 @@ body.dark-bg::before {
 .modal-body::-webkit-scrollbar { display:none; }
 
 /* ==============================
-   抽卡按鈕（原樣）
+   抽卡按鈕
 ============================== */
 .gacha-buttons {
   position: absolute;
@@ -113,13 +112,7 @@ body.dark-bg::before {
   z-index: 10;
   transition: bottom 0.4s ease;
 }
-
-
-.gacha-btn.inactive {
-    border: none;
-    box-shadow: none;
-}
-
+.gacha-btn.inactive { border: none; box-shadow: none; }
 .gacha-btn {
   flex: 1; height: 100%;
   border-radius: 12px;
@@ -134,7 +127,7 @@ body.dark-bg::before {
 }
 
 /* ==============================
-   抽卡結果容器（原樣）
+   抽卡結果容器
 ============================== */
 .gacha-results {
   position: absolute;
@@ -168,18 +161,11 @@ body.dark-bg::before {
 .orb-hidden.revealed  { border: 3px solid #c0c0c0; color: #c0c0c0; }
 .orb-limited.revealed { border: 3px solid gold;    color: #ffd700; }
 
-.gacha-results.single {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.gacha-orb.big {
-  aspect-ratio: 1/1;
-  max-width: 25%;
-}
+.gacha-results.single { display: flex; align-items: center; justify-content: center; }
+.gacha-orb.big { aspect-ratio: 1/1; max-width: 25%; }
 
 /* ==============================
-   HUD（右下角）（原樣）
+   HUD（右下角）
 ============================== */
 .gacha-hud {
   position: absolute;
@@ -209,7 +195,7 @@ body.dark-bg::before {
 }
 .gacha-results { z-index: 10; }
 
-/* 背包按鈕（原樣） */
+/* 背包按鈕 */
 .gacha-backpack {
   height: 100%; aspect-ratio: 2/1;
   border: 2px solid #1eb5e5; border-radius: 8px;
@@ -218,93 +204,35 @@ body.dark-bg::before {
   box-shadow: 0 0 8px #53e2ff88, 0 0 16px #1eb5e577 inset;
   display: flex; align-items: center; justify-content: center;
 }
-.backpack-box {
-  height: 100%;
-  display: flex; align-items: center; justify-content: center;
-}
+.backpack-box { height: 100%; display: flex; align-items: center; justify-content: center; }
 .backpack-section { margin: 0.5rem 0; }
 .backpack-section h3 { color: #53e2ff; margin-bottom: 0.3rem; }
 .backpack-items { color: #fff; }
 .backpack-items span { color: #ffe082; font-weight: bold; }
 
 /* ==============================
-   Loader（原樣）
+   Loader
 ============================== */
-.gacha-loader{
-  position:absolute; 
-  left:10%; 
-  right:10%;
-  top: 45%;
-  height: 15%;
-  z-index:60; 
-  display:none;
-}
+.gacha-loader{ position:absolute; left:10%; right:10%; top: 45%; height: 15%; z-index:60; display:none; }
 .gacha-loader.show{ display:block; }
-.gacha-loader .loader-box{
-  position:relative; 
-  height:100%;
-  display:flex; 
-  flex-direction:column; 
-  gap:8px; justify-content:center;
-}
-.loader-bar{
-  position:relative; height:42%;
-  background:#263257; border-radius:999px; overflow:hidden;
-  box-shadow: inset 0 0 10px #000a;
-}
-.loader-fill{
-  position:absolute; left:0; top:0; height:100%; width:0%;
-  background: linear-gradient(90deg,#2de0ff88,#6dffae88);
-  box-shadow: 0 0 18px #53e2ff99 inset;
-  transition: width .26s cubic-bezier(.22,.61,.36,1);
-}
-.loader-cat{
-  position:absolute; 
-  top:-15%; left:0;
-  transform: translate(-50%, -90%);
-  height: 100%;
-  aspect-ratio: 1 / 1;
-  filter: drop-shadow(0 3px 8px #000c);
-  transition: left .26s cubic-bezier(.22,.61,.36,1);
-  pointer-events:none;
-}
-.loader-text{
-  text-align:center; color:#e9efff; font-weight:900;
-  text-shadow:0 2px 6px #000c;
-  height: 100%;
-  display:flex; align-items:center; justify-content:center;
-}
+.gacha-loader .loader-box{ position:relative; height:100%; display:flex; flex-direction:column; gap:8px; justify-content:center; }
+.loader-bar{ position:relative; height:42%; background:#263257; border-radius:999px; overflow:hidden; box-shadow: inset 0 0 10px #000a; }
+.loader-fill{ position:absolute; left:0; top:0; height:100%; width:0%; background: linear-gradient(90deg,#2de0ff88,#6dffae88); box-shadow: 0 0 18px #53e2ff99 inset; transition: width .26s cubic-bezier(.22,.61,.36,1); }
+.loader-cat{ position:absolute; top:-15%; left:0; transform: translate(-50%,-90%); height: 100%; aspect-ratio: 1/1; filter: drop-shadow(0 3px 8px #000c); transition: left .26s cubic-bezier(.22,.61,.36,1); pointer-events:none; }
+.loader-text{ text-align:center; color:#e9efff; font-weight:900; text-shadow:0 2px 6px #000c; height: 100%; display:flex; align-items:center; justify-content:center; }
 
-/* 自動字級（原樣；新增區塊會加 class 使用） */
+/* 自動字級 */
 .auto-resize {}
 
 /* ==============================
-   ★ 新增：修正游標與箭頭層級（不改舊規則）
+   游標與箭頭層級
 ============================== */
-.gacha-btn:disabled { cursor: pointer; } /* 不要顯示禁止符號 */
+.gacha-btn:disabled { cursor: pointer; } /* 不顯示禁止符號 */
 .back { z-index: 60; cursor: pointer; }  /* 確保可點到 */
 
-
-
-
-
-
-.orb-inner {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px; /* 圖片與文字間距 */
-}
-
-.orb-inner .orb-icon {
-  max-height: 100%;
-  max-width: 100%;
-  object-fit: contain;
-}
-
-/* === Orb 內圖覆蓋名字：請貼在最下面，覆蓋原本的 .orb-inner 版型 === */
-
-/* 內層容器改成定位用的盒子，不再用 flex 排版 */
+/* ==============================
+   Orb 內圖覆蓋名字
+============================== */
 .gacha-orb .orb-inner{
   position: relative;
   display: block;
@@ -312,103 +240,64 @@ body.dark-bg::before {
   height: 90%;
   margin: auto;
 }
-
-/* 單抽大球稍微放大填滿 */
-.gacha-orb.big .orb-inner{
-  width: 95%;
-  height: 95%;
-}
-
-/* 圖片鋪在正中央，層級比名字高 → 可以擋住名字 */
+.gacha-orb.big .orb-inner{ width: 95%; height: 95%; }
+/* 圖片鋪中央，層級高於名字 → 可遮住名字 */
 .gacha-orb .orb-inner .orb-icon{
-  position: absolute;
-  inset: 0%;
-  max-width: 100%;
-  max-height: 100%;
-  width: auto;
-  height: auto;
-  object-fit: contain;
-  /* z-index: 2;          圖 > 名字 */
-  pointer-events: none;/* 不擋點擊翻牌 */
+  position: absolute; inset: 0%;
+  max-width: 100%; max-height: 100%;
+  width: auto; height: auto; object-fit: contain;
+  z-index: 2; pointer-events: none;
   filter: drop-shadow(0 2px 6px rgba(0,0,0,.35));
 }
-
-/* 名字固定在下緣中央，層級較低 → 會被圖片遮住 */
+/* 名字貼底，層級較低 → 會被圖片遮住 */
 .gacha-orb .orb-inner .orb-name{
-    position: absolute;
-    left: 50%;
-    bottom: 0%;
-    transform: translateX(-50%);
-    width: 70%;
-    text-align: center;
-    line-height: 1.1;
-    font-weight: 900;
-    z-index: 1;
-    white-space: normal;
-    word-break: keep-all;
-    height: 20%;
+  position: absolute; left: 50%; bottom: 0%;
+  transform: translateX(-50%);
+  width: 70%; text-align: center; line-height: 1.1; font-weight: 900;
+  z-index: 1; white-space: normal; word-break: keep-all;
+  height: 20%; font-size: .36em;
 }
-
-/* 不同稀有度的名字顏色（被遮住也無妨，當作可讀性備援） */
 .orb-normal.revealed  .orb-name { color:#ffffff; text-shadow:0 2px 6px #000c, 0 0 3px #000; }
 .orb-hidden.revealed  .orb-name { color:#e0e0e0; text-shadow:0 2px 6px #000c, 0 0 3px #000; }
-.orb-limited.revealed .orb-name { color:#ffd54f; text-shadow:0 2px 6px #000c, 0 0 6px #000; }
+.orb-limited.revealed { color:#ffd54f; text-shadow:0 2px 6px #000c, 0 0 6px #000; }
 
-
-
-    
+/* ==============================
+   特殊升級動畫遮罩（銀→金→翻牌）
+============================== */
+#special-mask{
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.65);
+  display: none;
+  z-index: 4000;
+}
+#special-cat{
+  position: absolute;
+  width: 7vw;          /* ★ 可微調：特效貓尺寸（改百分比或 px） */
+  max-width: 120px;    /* ★ 可微調：最大尺寸上限 */
+  aspect-ratio: 1/1;
+  transform: translate(-50%,-50%);
+  filter: drop-shadow(0 6px 14px rgba(0,0,0,.6));
+  transition: left .45s cubic-bezier(.22,.61,.36,1), top .45s cubic-bezier(.22,.61,.36,1); /* ★ 可微調：移動速度/曲線 */
+}
+.special-bounce{ animation: sp-bounce .28s ease-out; } /* ★ 可微調：彈跳時間 */
+@keyframes sp-bounce{
+  0%   { transform: translate(-50%,-60%); } /* ★ 可微調：彈跳幅度 */
+  50%  { transform: translate(-50%,-40%); } /* ★ 可微調：彈跳幅度 */
+  100% { transform: translate(-50%,-50%); }
+}
   </style>
 </head>
 <body class="dark-bg">
   <!-- 16:9 主要容器 -->
   <div class="container-16-9">
     <!-- 左上：返回箭頭專用框（滿版黃色箭頭由外掛CSS畫） -->
-    <div class="back" id="btnBack" style="
-      position: absolute;
-      left: 2%;
-      width: 7%;
-      height: 16%;"></div>
+    <div class="back" id="btnBack" style="position:absolute; left:2%; width:7%; height:16%;"></div>
 
-    <!-- 抽卡結果容器 & 選池資訊（標題/簡介/持有榜按鈕） -->
+    <!-- 抽卡結果容器 & 選池資訊 -->
     <div class="gacha-results" id="gacha-results">
-
-      <!-- 卡池名（百分比絕對定位、會被外掛 JS 填字、auto-resize） -->
-      <div id="poolName" class="auto-resize" style="
-        position: absolute;
-        top: 2%;
-        left: 4%;
-        width: 50%;
-        height: 17%;
-        color:#FFF;
-        display:flex; align-items:center;
-      "></div>
-
-      <!-- 卡池簡介（百分比絕對定位、auto-resize） -->
-      <div id="poolDesc" class="auto-resize" style="
-        position: absolute;
-        bottom: -2%;
-        width: 100%;
-        height: 13%;
-        color:#FFF;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        text-align: center;
-      "></div>
-
-      <!-- 持有榜：漂亮外框按鈕（另開分頁），連結由外掛 JS 設定 -->
-      <div id="poolLink" class="auto-resize" style="
-    position: absolute;
-    top: 16%;
-    right: 8%;
-    width: 13%;
-    height: 11%;
-        color:#FFF;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        text-align: center;
-      ">持有榜</div>
+      <div id="poolName" class="auto-resize" style="position:absolute; top:2%; left:4%; width:50%; height:17%; color:#FFF; display:flex; align-items:center;"></div>
+      <div id="poolDesc" class="auto-resize" style="position:absolute; bottom:-2%; width:100%; height:13%; color:#FFF; display:flex; justify-content:center; align-items:center; text-align:center;"></div>
+      <div id="poolLink" class="auto-resize" style="position:absolute; top:16%; right:8%; width:13%; height:11%; color:#FFF; display:flex; justify-content:center; align-items:center; text-align:center;">持有榜</div>
     </div>
     
     <!-- 轉蛋讀條 Loader -->
@@ -433,15 +322,18 @@ body.dark-bg::before {
       </button>
     </div>
 
-    <!-- ★ 改字：「剩餘抽數」 -->
+    <!-- 剩餘抽數 -->
     <div class="gacha-counter auto-resize">
-      <div class="counter-box">剩餘抽數：
-        <span id="draw-count">0</span>
-      </div>
+      <div class="counter-box">剩餘抽數：<span id="draw-count">0</span></div>
     </div>
 
     <!-- 背景圖 -->
-    <img class="bg-img" src="https://shierusha.github.io/school-battle/teachers/img/8.webp" alt="background">
+    <img class="bg_img" src="https://shierusha.github.io/school-battle/teachers/img/8.webp" alt="background">
+
+    <!-- 特效遮罩（銀→金→翻牌） -->
+    <div id="special-mask">
+      <img id="special-cat" src="https://shierusha.github.io/library/img/cat.png" alt="">
+    </div>
   </div>
 
   <!-- 旋轉提示（不可關閉） -->
@@ -460,8 +352,7 @@ body.dark-bg::before {
     </div>
   </div>
 
-
-  <script>
+<script>
 /* ==============================
    小工具
 ============================== */
@@ -469,26 +360,30 @@ const $  = (s, r=document) => r.querySelector(s);
 const $$ = (s, r=document) => [...r.querySelectorAll(s)];
 const sleep = (ms) => new Promise(res => setTimeout(res, ms));
 const escapeHtml = s => (s||'').replace(/[&<>"']/g,c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const pick = arr => arr[Math.floor(Math.random()*arr.length)];
 
 /* ==============================
-   DC Webhook（銀/金被翻開時送）
+   DC Webhook（銀/金）
+   用：sendGachaWebhook(rarity, name, { mode: 'congrats'|'swap' })
 ============================== */
-async function sendGachaWebhook(rarity, itemName) {
+async function sendGachaWebhook(rarity, itemName, { mode = 'congrats' } = {}) {
+  // 白球永遠不送
   if (rarity !== 'limited' && rarity !== 'hidden') return;
   try {
-    const threadId = (window.CURRENT_POOL && window.CURRENT_POOL.threadId) ? window.CURRENT_POOL.threadId : null;
+    const threadId = (window.CURRENT_POOL && window.CURRENT_POOL.threadId) || null;
     if (!threadId) return;
     const url = `${B_URL}/functions/v1/gacha-notify`;
     const resp = await fetch(url, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ rarity, playerName: PLAYER_NAME || '玩家', itemName, threadId })
+      body: JSON.stringify({
+        rarity,
+        playerName: PLAYER_NAME || '玩家',
+        itemName,
+        threadId,
+        mode // Edge 端用 mode 決定文案
+      })
     });
-    if (!resp.ok) {
-      const txt = await resp.text().catch(()=>'(no body)');
-      console.error('[gacha-notify] status=', resp.status, 'body=', txt);
-    }
+    if (!resp.ok) console.warn('[gacha-notify] status=', resp.status, await resp.text().catch(()=>'(no body)'));
   } catch (e) { console.warn('[gacha-notify] failed:', e); }
 }
 
@@ -547,7 +442,7 @@ window.addEventListener('load', resizeAllTexts);
 window.addEventListener('resize', resizeAllTexts);
 
 /* ==============================
-   強制橫向（提示用，不影響返回鍵邏輯）
+   強制橫向
 ============================== */
 function isPortrait(){
   return window.matchMedia('(orientation: portrait)').matches || window.innerHeight > window.innerWidth;
@@ -578,13 +473,12 @@ setInterval(ensureAuthOrRedirect, 60*1000);
 ensureAuthOrRedirect();
 
 /* ==============================
-   狀態
+   狀態 & 返回鍵控制
 ============================== */
-let pools = { normal: [], hidden: [], limited: [] };
 let canDraw = true;
 let unlockAt = 0;
 
-/* ★ 返回鍵：簡單禁用控制（不彈通知） */
+/* 返回鍵：抽卡中完全禁用（無提示） */
 function setBackDisabled(disabled){
   if (!btnBack) return;
   btnBack.dataset.disabled = disabled ? '1':'0';
@@ -597,145 +491,22 @@ function lockButtons()  { [btnSingle, btnTen, btnBag].forEach(b => b && (b.disab
 function unlockButtons(){ [btnSingle, btnTen, btnBag].forEach(b => b && (b.disabled = false, b._forceDisabled = false)); }
 
 /* ==============================
-   初始化
-============================== */
-(async function boot(){
-  if (!ensureAuthOrRedirect()) return;
-
-  const [n, h, l] = await Promise.all([
-    G('normal_characters').select('*').order('id',{ascending:true}),
-    G('hidden_characters').select('*').order('id',{ascending:true}),
-    G('limited_characters').select('*').order('id',{ascending:true}),
-  ]);
-  pools.normal  = Array.isArray(n.data) ? n.data : [];
-  pools.hidden  = Array.isArray(h.data) ? h.data : [];
-  pools.limited = Array.isArray(l.data) ? l.data : [];
-
-  await ensureCounter();
-  await refreshUIFromCounter();
-
-  bindUI();
-
-  new MutationObserver(()=>{
-    const hasResults = document.querySelectorAll('.gacha-row').length > 0;
-    const car = document.querySelector('.pool-carousel');
-    if (car) car.style.display = hasResults ? 'none' : 'block';
-  }).observe(resultsContainer, { childList:true, subtree:true });
-
-  setInterval(refreshUIFromCounter, 15000);
-
-  // 初始可按（無結果時用）
-  setBackDisabled(false);
-})();
-
-/* ==============================
-   Counter（剩餘抽數 = max_draws - total_draws）
-============================== */
-async function ensureCounter(){
-  const { data } = await G('counters').select('*').eq('player_id', user.id).single();
-  if (!data){
-    await G('counters').insert({ player_id: user.id, total_draws: 0, next_pity: 50 });
-  }
-}
-async function getCounter(){
-  const { data } = await G('counters')
-    .select('total_draws,next_pity,max_draws')
-    .eq('player_id', user.id).single();
-  return data || { total_draws: 0, next_pity: 50, max_draws: 0 };
-}
-async function setCounter(_total_draws, next_pity) {
-  await G('counters').upsert({ player_id: user.id, next_pity }, { onConflict: 'player_id' });
-}
-async function refreshUIFromCounter(){
-  const c = await getCounter();
-  const remain = Math.max(0, c.max_draws - c.total_draws);
-  if (drawCounterEl) drawCounterEl.textContent = remain;
-  if (btnTen)    btnTen.disabled    = remain < 10 || btnTen._forceDisabled === true || isPortrait();
-  if (btnSingle) btnSingle.disabled = remain <  1 || btnSingle._forceDisabled === true || isPortrait();
-}
-
-/* ==============================
-   Owned upsert
-============================== */
-async function addOwned(rarity, character_id, event_name){
-  const { data: rows } = await G('owned_characters')
-    .select('count')
-    .eq('player_id', user.id)
-    .eq('rarity', rarity)
-    .eq('character_id', character_id)
-    .eq('event_name', event_name)
-    .limit(1);
-  const prev = rows?.[0]?.count || 0;
-
-  await G('owned_characters').upsert({
-    player_id: user.id,
-    rarity, event_name,
-    character_id,
-    count: prev + 1
-  }, { onConflict: 'player_id,rarity,event_name,character_id' });
-}
-
-/* ==============================
-   抽卡核心（常駐金→銀；保底在常駐也消耗）
+   Edge 單抽（只走 Edge）
 ============================== */
 async function drawOnce(){
-  const c = await getCounter();
-  if (c.total_draws >= c.max_draws) {
-    alert('已達抽卡上限'); await refreshUIFromCounter(); return null;
-  }
-
   const currentPoolKey = (window.CURRENT_POOL && window.CURRENT_POOL.key) ? window.CURRENT_POOL.key : DEFAULT_EVENT;
 
-  let totalNext = c.total_draws + 1;
-  let nextPity  = c.next_pity;
-
-  let rarity, chosen, event_name = DEFAULT_EVENT;
-
-  // 保底
-  if (totalNext === nextPity) {
-    if (currentPoolKey === DEFAULT_EVENT) {
-      rarity = 'hidden';
-      chosen = pick(pools.hidden);
-      event_name = DEFAULT_EVENT;
-      nextPity += 50;
-    } else {
-      rarity = 'limited';
-      const poolLimited = pools.limited.filter(x => x.event_name === currentPoolKey);
-      chosen = pick(poolLimited.length ? poolLimited : pools.limited);
-      event_name = chosen?.event_name || currentPoolKey;
-      nextPity += 50;
-    }
-  } else {
-    const r = Math.floor(Math.random()*100) + 1; // 1..100
-    if (r === 1) {
-      rarity = 'hidden';  chosen = pick(pools.hidden);  event_name = DEFAULT_EVENT;
-    } else if (r === 100) {
-      if (currentPoolKey === DEFAULT_EVENT) {
-        rarity = 'hidden';  chosen = pick(pools.hidden);  event_name = DEFAULT_EVENT;
-      } else {
-        rarity = 'limited';
-        const poolLimited = pools.limited.filter(x => x.event_name === currentPoolKey);
-        chosen = pick(poolLimited.length ? poolLimited : pools.limited);
-        event_name = chosen?.event_name || currentPoolKey;
-      }
-    } else {
-      rarity = 'normal';  chosen = pick(pools.normal);  event_name = DEFAULT_EVENT;
-    }
+  const resp = await fetch(`${B_URL}/functions/v1/gacha-draw`, {
+    method: 'POST',
+    headers: { 'content-type':'application/json', 'authorization': `Bearer ${B_TOKEN}` },
+    body: JSON.stringify({ pool: currentPoolKey })
+  });
+  const out = await resp.json().catch(()=>null);
+  if (!resp.ok) {
+    alert(out?.message || out?.error || '抽卡失敗'); 
+    return null;
   }
-
-  if (!chosen) { alert('對應池子沒有資料'); return null; }
-
-  await addOwned(rarity, chosen.id, event_name);
-  await setCounter(totalNext, nextPity);
-
-  return {
-    rarity,
-    name: chosen.name,
-    id: chosen.id,
-    event_name,
-    image_url: chosen.image_url || null,
-    totalAfter: totalNext
-  };
+  return out; // { rarity, name, character_id, event_name, image_url?, special_anim?, is_11x? }
 }
 
 async function drawTenTimes(){
@@ -750,6 +521,52 @@ async function drawTenTimes(){
     results.push(r);
   }
   return results;
+}
+
+/* ==============================
+   初始化
+============================== */
+(async function boot(){
+  if (!ensureAuthOrRedirect()) return;
+
+  await ensureCounter();
+  await refreshUIFromCounter();
+
+  bindUI();
+
+  // 倫波顯示切換（有結果就隱藏）
+  new MutationObserver(()=>{
+    const hasResults = document.querySelectorAll('.gacha-row').length > 0;
+    const car = document.querySelector('.pool-carousel');
+    if (car) car.style.display = hasResults ? 'none' : 'block';
+  }).observe(resultsContainer, { childList:true, subtree:true });
+
+  setInterval(refreshUIFromCounter, 15000);
+
+  setBackDisabled(false);
+})();
+
+/* ==============================
+   Counter（剩餘抽數 = max_draws - total_draws）
+============================== */
+async function ensureCounter(){
+  const { data } = await G('counters').select('*').eq('player_id', user?.id).single();
+  if (!data){
+    await G('counters').insert({ player_id: user?.id, total_draws: 0, next_pity: 50 });
+  }
+}
+async function getCounter(){
+  const { data } = await G('counters')
+    .select('total_draws,next_pity,max_draws')
+    .eq('player_id', user?.id).single();
+  return data || { total_draws: 0, next_pity: 50, max_draws: 0 };
+}
+async function refreshUIFromCounter(){
+  const c = await getCounter();
+  const remain = Math.max(0, (c?.max_draws||0) - (c?.total_draws||0));
+  if (drawCounterEl) drawCounterEl.textContent = remain;
+  if (btnTen)    btnTen.disabled    = remain < 10 || btnTen._forceDisabled === true || isPortrait();
+  if (btnSingle) btnSingle.disabled = remain <  1 || btnSingle._forceDisabled === true || isPortrait();
 }
 
 /* ==============================
@@ -782,21 +599,99 @@ function clearResults(){
   resultsContainer.innerHTML = '';
 }
 
+/* 軟重置：清結果、還原按鈕與倫波，不換頁 */
+function softResetToIdle(){
+  clearResults();
+  const car = document.querySelector('.pool-carousel');
+  if (car) car.style.display = 'block';
+  canDraw = true;
+  unlockAt = 0;
+  unlockButtons();
+  setBackDisabled(false);
+  resizeAllTexts();
+}
+
+/* ==============================
+   特效邏輯（銀→金→翻牌）
+============================== */
+const specialMask = document.getElementById('special-mask');
+const specialCat  = document.getElementById('special-cat');
+
+function viewportTargetForOrb(orbEl){
+  const r = orbEl.getBoundingClientRect();
+  return { x: r.left + r.width * 0.78, y: r.top + r.height * 0.78 }; // 右下角略內縮
+}
+function randomEdgeStart(){
+  const w = window.innerWidth, h = window.innerHeight;
+  const side = Math.floor(Math.random()*4);
+  if (side === 0) return { x: -50, y: Math.random()*h };   // 左外
+  if (side === 1) return { x: w+50, y: Math.random()*h };  // 右外
+  if (side === 2) return { x: Math.random()*w, y: -50 };   // 上外
+  return { x: Math.random()*w, y: h+50 };                   // 下外
+}
+
+// 依序：入場 → 移動 → 白→銀 → 銀→金 → 翻開 → 離場
+async function runSpecialUpgradeAnimation(targetOrb, revealFn){
+  if (!targetOrb) { revealFn?.(); return; }
+
+  // 顯示遮罩 & 貓 入場
+  specialMask.style.display = 'block';
+  const start = randomEdgeStart();
+  specialCat.style.left = `${start.x}px`;
+  specialCat.style.top  = `${start.y}px`;
+
+  await sleep(60); // ★ 可微調：入場延遲
+
+  // 移動到球右下角
+  const p = viewportTargetForOrb(targetOrb);
+  specialCat.style.left = `${p.x}px`;
+  specialCat.style.top  = `${p.y}px`;
+  await sleep(470); // ★ 可微調：移動時間（需與 CSS transition 對齊）
+
+  // 白 → 銀
+  targetOrb.classList.remove('orb-normal');
+  targetOrb.classList.add('orb-hidden');
+  specialCat.classList.add('special-bounce');
+  await sleep(280); // ★ 可微調：彈跳時間（需與 .special-bounce 動畫一致）
+  specialCat.classList.remove('special-bounce');
+
+  // 銀 → 金
+  targetOrb.classList.remove('orb-hidden');
+  targetOrb.classList.add('orb-limited');
+  specialCat.classList.add('special-bounce');
+  await sleep(280); // ★ 可微調
+  specialCat.classList.remove('special-bounce');
+
+  // 翻開（顯示圖與名字）— 不送恭喜，由外層決定送什麼
+  specialCat.classList.add('special-bounce');
+  await sleep(180); // ★ 可微調：翻開前的停頓
+  specialCat.classList.remove('special-bounce');
+  revealFn?.();
+
+  // 快速離場
+  const end = randomEdgeStart();
+  specialCat.style.transitionDuration = '.32s'; // ★ 可微調：離場速度
+  specialCat.style.left = `${end.x}px`;
+  specialCat.style.top  = `${end.y}px`;
+  await sleep(360); // ★ 可微調：離場等待
+  specialCat.style.transitionDuration = '.45s';
+
+  // 關遮罩
+  specialMask.style.display = 'none';
+}
+
 /* ==============================
    UI：建立球 / 翻牌（球內放圖、可遮名）
 ============================== */
-function createOrb(res, { autoReveal=false, revealDelay=0, big=false } = {}){
+function createOrb(res, { autoReveal=false, revealDelay=0, big=false, forceInitialNormal=false } = {}){
   const orb = document.createElement('div');
-  orb.className = `gacha-orb orb-${res.rarity}` + (big?' big':'');
+  const initialClass = forceInitialNormal ? 'orb-normal' : `orb-${res.rarity}`;
+  orb.className = `gacha-orb ${initialClass}` + (big?' big':'');
   const inner = document.createElement('div');
   inner.className = 'orb-inner';
-  inner.textContent = '';
 
-  const reveal = () => {
-    if (orb.classList.contains('revealed')) return;
-
+  const doRevealContent = () => {
     inner.innerHTML = '';
-
     if (res.image_url) {
       const img = document.createElement('img');
       img.src = res.image_url;
@@ -804,27 +699,31 @@ function createOrb(res, { autoReveal=false, revealDelay=0, big=false } = {}){
       img.className = 'orb-icon';
       inner.appendChild(img);
     }
-
     const nameEl = document.createElement('span');
     nameEl.className = 'orb-name auto-resize';
     nameEl.textContent = res.name;
     inner.appendChild(nameEl);
-
     orb.classList.add('revealed');
-
-    if (res.rarity === 'limited' || res.rarity === 'hidden') {
-      sendGachaWebhook(res.rarity, res.name);
-    }
-
     resizeAllTexts();
     checkAllRevealed();
   };
 
-  if (autoReveal) setTimeout(reveal, revealDelay);
-  else orb.addEventListener('click', reveal);
+  // ⚠️ 是否「玩家手動」由這個 wrapper 控制
+  const reveal = (isManual=false) => {
+    if (orb.classList.contains('revealed')) return;
+    doRevealContent();
+
+    // ✅ 恭喜只在「玩家手動 + 銀/金」時發
+    if (isManual && (res.rarity === 'limited' || res.rarity === 'hidden')) {
+      sendGachaWebhook(res.rarity, res.name, { mode: 'congrats' });
+    }
+  };
+
+  if (autoReveal) setTimeout(() => reveal(false), revealDelay);
+  else orb.addEventListener('click', () => reveal(true));
 
   orb.appendChild(inner);
-  return orb;
+  return { el: orb, reveal, rawReveal: doRevealContent }; // rawReveal 不送恭喜（給特效用）
 }
 
 function checkAllRevealed(){
@@ -836,43 +735,80 @@ function checkAllRevealed(){
     setTimeout(()=>{
       canDraw = true;
       unlockButtons();
-      /* ★ 全部翻完才解鎖返回鍵（之前完全不能按、也不提示） */
-      setBackDisabled(false);
+      setBackDisabled(false); // 全部翻完才解鎖返回
     }, 500);
   }
 }
 
 function showResultsTen(results){
   canDraw = false;
-  /* ★ 抽卡開始 → 直接禁用返回鍵（不提示） */
   setBackDisabled(true);
 
-  lockButtons();
   resultsContainer.classList.remove('single');
   resultsContainer.innerHTML = '';
+
+  const spIndex = results.findIndex(r => r.special_anim);
+  const hasSpecial = spIndex >= 0;
+
+  const allOrbs = [];
+
   for (let row=0; row<2; row++){
     const rowDiv = document.createElement('div');
     rowDiv.className = 'gacha-row';
+
     results.slice(row*5, row*5+5).forEach((res, idx)=>{
       const index = row*5 + idx;
-      const orb = createOrb(res, { autoReveal: res.rarity==='normal', revealDelay: index*200 });
-      rowDiv.appendChild(orb);
+      const isSpecialTarget = (index === spIndex);
+      // 有特效時，白球延後；無特效時白球照舊自動翻
+      const auto = (!hasSpecial && res.rarity === 'normal');
+      const { el, reveal, rawReveal } = createOrb(res, {
+        autoReveal: auto,
+        revealDelay: index*200,
+        forceInitialNormal: isSpecialTarget
+      });
+      el.dataset.index = String(index);
+      rowDiv.appendChild(el);
+      allOrbs.push({ el, res, reveal, rawReveal, index });
     });
+
     resultsContainer.appendChild(rowDiv);
   }
   resizeAllTexts();
+
+  if (hasSpecial) {
+    const target = allOrbs.find(o => o.index === spIndex);
+    // 特效內翻開「目標金蛋」（不送恭喜）
+    runSpecialUpgradeAnimation(target?.el, () => target?.rawReveal()).then(async ()=>{
+      // 🎯 特效剛結束：先送「偷偷調包」
+      try { await sendGachaWebhook(target.res.rarity, target.res.name, { mode: 'swap' }); } catch(e){}
+
+      // 然後只自動翻「白球」，銀/金留給玩家手動點
+      for (const o of allOrbs){
+        if (o.index === spIndex) continue; // 特效那顆已翻
+        if (o.res.rarity === 'normal' && !o.el.classList.contains('revealed')) {
+          await sleep(120); // ★ 可微調：補翻間隔
+          o.reveal(false);  // 非手動 → 不送恭喜
+        }
+      }
+    });
+  }
 }
 
 function showResultSingle(res){
   canDraw = false;
-  /* ★ 抽卡開始 → 直接禁用返回鍵（不提示） */
   setBackDisabled(true);
 
-  lockButtons();
   resultsContainer.classList.add('single');
   resultsContainer.innerHTML = '';
-  const isWhite = res.rarity === 'normal';
-  const orb = createOrb(res, { autoReveal:isWhite, revealDelay:0, big:true });
+
+  const needSpecial = !!res.special_anim;
+  const { el: orb, reveal, rawReveal } = createOrb(res, {
+    autoReveal: !needSpecial && res.rarity==='normal',  // 白球無特效直接自動翻
+    revealDelay: 0,
+    big: true,
+    forceInitialNormal: needSpecial
+  });
+
   const rowDiv = document.createElement('div');
   rowDiv.className = 'gacha-row';
   rowDiv.style.justifyContent = 'center';
@@ -880,30 +816,36 @@ function showResultSingle(res){
   resultsContainer.appendChild(rowDiv);
   resizeAllTexts();
 
-  // 白球會自動翻，翻完後由 checkAllRevealed() 統一解鎖返回鍵
+  if (needSpecial) {
+    // 特效內翻牌（不送恭喜）
+    runSpecialUpgradeAnimation(orb, () => rawReveal()).then(async () => {
+      // 🎯 特效結束後送「偷偷調包」
+      try { await sendGachaWebhook(res.rarity, res.name, { mode: 'swap' }); } catch(e){}
+      // 單抽沒有其他白球要補翻；恭喜也不送（因為不是玩家點開）
+    });
+  } else if (res.rarity === 'normal') {
+    // 白球：自動翻後直接解鎖
+    unlockAt = Date.now() + 500;
+    setTimeout(()=>{ canDraw = true; unlockButtons(); setBackDisabled(false); }, 500);
+  }
 }
 
 /* ==============================
-   背包
+   背包（展示）
 ============================== */
 function nameFromPools(rarity, character_id, event_name){
-  if (rarity === 'normal') return pools.normal.find(x=>x.id===character_id)?.name || `#${character_id}`;
-  if (rarity === 'hidden') return pools.hidden.find(x=>x.id===character_id)?.name || `#${character_id}`;
-  const hit = pools.limited.find(x=>x.id===character_id && x.event_name===event_name) || pools.limited.find(x=>x.id===character_id);
-  return hit ? hit.name : `#${character_id}`;
+  return `#${character_id}`;
 }
 
 async function openBackpack(){
   const orbs = $$('.gacha-orb', resultsContainer);
-  if (orbs.some(o=>!o.classList.contains('revealed'))) {
-    alert('請先翻開所有扭蛋！'); return;
-  }
+  if (orbs.some(o=>!o.classList.contains('revealed'))) { alert('請先翻開所有扭蛋！'); return; }
 
   infoTitle.textContent = `${PLAYER_NAME}的背包`;
 
   const { data, error } = await G('owned_characters')
     .select('rarity,event_name,character_id,count')
-    .eq('player_id', user.id);
+    .eq('player_id', user?.id);
 
   if (error) { console.error('[owned_characters] query error:', error); alert('讀取背包失敗'); return; }
   const rows = Array.isArray(data) ? data : [];
@@ -916,29 +858,19 @@ async function openBackpack(){
   }
   const merged = [...byKey.values()];
 
-  const car = document.querySelector('.pool-carousel');
-  const inPool = car && getComputedStyle(car).display === 'none';
-  const currentPool = (window.CURRENT_POOL && window.CURRENT_POOL.key) ? window.CURRENT_POOL.key : '常駐';
-
-  const limitedGroups = new Map();
+  const limitedGroups = new Map(); // event_name -> [{id, html}]
   const hiddenList = [];
   const normalList = [];
 
   merged.forEach(r=>{
     const nm = nameFromPools(r.rarity, r.character_id, r.event_name);
     const item = { id:r.character_id, html:`${escapeHtml(nm)} × <span>${r.count}</span>` };
-
     if (r.rarity === 'limited') {
-      if (!inPool || r.event_name === currentPool) {
-        const arr = limitedGroups.get(r.event_name) || [];
-        arr.push(item);
-        limitedGroups.set(r.event_name, arr);
-      }
-    } else if (r.rarity === 'hidden') {
-      hiddenList.push(item);
-    } else {
-      normalList.push(item);
-    }
+      const arr = limitedGroups.get(r.event_name) || [];
+      arr.push(item);
+      limitedGroups.set(r.event_name, arr);
+    } else if (r.rarity === 'hidden') hiddenList.push(item);
+    else normalList.push(item);
   });
 
   const byId = a => a.sort((x,y)=>(x.id??0)-(y.id??0));
@@ -977,21 +909,17 @@ infoModal?.addEventListener('click', ()=> infoModal.style.display='none');
 infoModal?.querySelector('.modal-content')?.addEventListener('click', e=> e.stopPropagation());
 
 /* ==============================
-   綁定按鈕（返回鍵：抽卡期間完全禁用；翻完才解鎖）
+   綁定按鈕（返回鍵：抽卡期間完全禁用；翻完才解鎖；有結果→軟重置）
 ============================== */
 function bindUI(){
   btnBag?.addEventListener('click', openBackpack);
 
   btnBack?.addEventListener('click', ()=>{
-    // 被禁用就直接無視（不提示）
-    if (btnBack?.dataset.disabled === '1') return;
-
+    if (btnBack?.dataset.disabled === '1') return; // 被禁用直接無視
     const hasResults = $$('.gacha-orb', resultsContainer).length > 0;
     if (hasResults) {
-      // 結果頁 → F5
-      location.reload();
+      softResetToIdle(); // 不換頁
     } else {
-      // 初始頁 → 回玩家中心
       location.href = REDIRECT_PLAYER;
     }
   });
@@ -1001,9 +929,7 @@ function bindUI(){
     if (isPortrait()) return;
     if (!canDraw || Date.now() < unlockAt) return alert('稍等一下…');
 
-    // ★ 抽卡一開始就禁用返回鍵（不提示）
     setBackDisabled(true);
-
     gachaBtns?.classList.add('bottom');
     lockButtons();
 
@@ -1015,7 +941,6 @@ function bindUI(){
       Loader.hide();
       await refreshUIFromCounter();
       unlockButtons();
-      // 抽卡失敗（例如上限）→ 回復返回鍵
       setBackDisabled(false);
       return;
     }
@@ -1033,11 +958,9 @@ function bindUI(){
     if (!canDraw || Date.now() < unlockAt) return alert('稍等一下…');
 
     const c = await getCounter();
-    if (c.max_draws - c.total_draws < 10) return alert('剩餘抽數不足 10 抽');
+    if ((c?.max_draws||0) - (c?.total_draws||0) < 10) return alert('剩餘抽數不足 10 抽');
 
-    // ★ 抽卡一開始就禁用返回鍵（不提示）
     setBackDisabled(true);
-
     gachaBtns?.classList.add('bottom');
     lockButtons();
 
@@ -1065,14 +988,10 @@ function bindUI(){
 }
 </script>
 
-
-
-
-  <!-- 登出腳本（原樣） -->
+  <!-- 登出腳本 -->
   <script src="https://shierusha.github.io/library/assets/js/logout.js"></script>
 
-  <!-- 新增：選池倫波外掛 JS -->
+  <!-- 選池倫波外掛 JS -->
   <script src="https://shierusha.github.io/library/assets/js/pool-carousel.js"></script>
 </body>
 </html>
-
