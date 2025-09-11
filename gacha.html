@@ -256,10 +256,21 @@ body.dark-bg::before {
   width: 70%; text-align: center; line-height: 1.1; font-weight: 900;
   z-index: 1; white-space: normal; word-break: keep-all;
   height: 20%; font-size: .36em;
+
+  opacity: 0;                 /* 預設看不到，但會預先下載 */
+  transition: opacity .2s ease;
 }
+
+.gacha-orb.revealed .orb-inner .orb-icon{
+  opacity: 1;                 /* 翻牌後立刻顯示（已經載好了） */
+}
+
 .orb-normal.revealed  .orb-name { color:#ffffff; text-shadow:0 2px 6px #000c, 0 0 3px #000; }
 .orb-hidden.revealed  .orb-name { color:#e0e0e0; text-shadow:0 2px 6px #000c, 0 0 3px #000; }
 .orb-limited.revealed { color:#ffd54f; text-shadow:0 2px 6px #000c, 0 0 6px #000; }
+
+
+
 
 /* ==============================
    特殊升級動畫遮罩（銀→金→翻牌）
@@ -629,9 +640,7 @@ function softResetToIdle(){
 /* ==============================
    特效邏輯（銀→金→翻牌）
 ============================== */
-/* ==============================
-   特效邏輯（四段直線移動＋連續彈跳＋翻轉；白→銀→金→開）
-============================== */
+
 const specialMask = document.getElementById('special-mask');
 const specialCat  = document.getElementById('special-cat');
 
@@ -715,8 +724,8 @@ function setFlip(on){ specialCat.classList.toggle('flipX', !!on); }
 async function runSpecialUpgradeAnimation(targetOrb, revealFn){
   if (!targetOrb) { revealFn?.(); return; }
 
-// 進場前先等 1 秒
-await sleep(SPECIAL.preDarkDelayMs);
+  // 進場前先等 1 秒
+  await sleep(SPECIAL.preDarkDelayMs);
 
   // 進場遮罩 + 起始位置
   specialMask.style.display = 'block';
@@ -725,54 +734,82 @@ await sleep(SPECIAL.preDarkDelayMs);
   specialCat.style.left = `${start.x}px`;
   specialCat.style.top  = `${start.y}px`;
 
-
   // 暗場
   await sleep(SPECIAL.darkWaitMs);
   specialCat.style.opacity = '1';
 
-  // 四段直線移動：垂直 → 水平 → 垂直 → 水平（均分時間，持續彈跳）
+  // 四段直線移動（垂直→水平→垂直→水平）
   const { rb, lb } = viewportTargets(targetOrb);
   const q = Math.max(0, Math.floor(SPECIAL.axisMoveTotalMs / 4));
-  const midY = start.y + (rb.y - start.y) * 0.5;
-  const midX = start.x + (rb.x - start.x) * 0.5;
+  const midY = start.y + (rb.y - start.y) * 0.3;
+  const midX = start.x + (rb.x - start.x) * 0.3;
 
-  startLoopBounce();                // 移動中維持彈跳（節奏 moveBounceMs）
-  await moveVert (midY, q);         // 1) 垂直到中間 y
-  await moveHoriz(midX, q);         // 2) 水平到中間 x
-  await moveVert (rb.y, q);         // 3) 垂直到目標 y
-  await moveHoriz(rb.x, q);         // 4) 水平成目標 x（右下）
+  // 1) 垂直到中間 y（不彈）
+  stopLoopBounce();
+  await moveVert(midY, q);
+
+  // 2) 水平到中間 x（彈）
+  startLoopBounce();
+  await moveHoriz(midX, q);
   stopLoopBounce();
 
-  // 後續固定節奏
-  await sleep(SPECIAL.hopDelayMs);                 await bounce(1);
+  // 3) 垂直到目標 y（不彈）
+  stopLoopBounce();
+  await moveVert(rb.y, q);
 
-  await sleep(SPECIAL.hopDelayMs); setFlip(true);  await moveHoriz(lb.x, SPECIAL.hopDurMs); await bounce(1);
+  // 4) 水平成目標 x（彈）
+  startLoopBounce();
+  await moveHoriz(rb.x, q);
+  stopLoopBounce();
 
-  await sleep(SPECIAL.hopDelayMs);                 await bounce(1);
-                        setFlip(false);            await moveHoriz(rb.x, SPECIAL.hopDurMs); await bounce(1);
+  // 後續固定節奏（在做「單次跳」前，保險關掉 loop 彈）
+  await sleep(SPECIAL.hopDelayMs);
+  stopLoopBounce();               await bounce(1);
 
-  await sleep(SPECIAL.hopDelayMs);                 await bounce(2);
+  await sleep(SPECIAL.hopDelayMs);
+  setFlip(true);  startLoopBounce();  // 水平移到左下時要彈
+  await moveHoriz(lb.x, SPECIAL.hopDurMs);
+  stopLoopBounce();               await bounce(1);
 
-  await sleep(SPECIAL.hopDelayMs);                 await bounce(2);
+  await sleep(SPECIAL.hopDelayMs);
+  stopLoopBounce();               await bounce(1);
+  setFlip(false); startLoopBounce();  // 回到右下時也彈
+  await moveHoriz(rb.x, SPECIAL.hopDurMs);
+  stopLoopBounce();               await bounce(1);
+
+  await sleep(SPECIAL.hopDelayMs);
+  stopLoopBounce();               await bounce(2);
+
+  await sleep(SPECIAL.hopDelayMs);
+  stopLoopBounce();               await bounce(2);
   // 白 → 銀
   targetOrb.classList.remove('orb-normal');
   targetOrb.classList.add('orb-hidden');
 
-  await sleep(SPECIAL.hopDelayMs); setFlip(true);  await moveHoriz(lb.x, SPECIAL.hopDurMs); await bounce(1);
+  await sleep(SPECIAL.hopDelayMs);
+  setFlip(true);  startLoopBounce();  // 左下
+  await moveHoriz(lb.x, SPECIAL.hopDurMs);
+  stopLoopBounce();               await bounce(1);
 
-  await sleep(SPECIAL.hopDelayMs);                 await bounce(1);
-                        setFlip(false);            await moveHoriz(rb.x, SPECIAL.hopDurMs); await bounce(1);
+  await sleep(SPECIAL.hopDelayMs);
+  stopLoopBounce();               await bounce(1);
+  setFlip(false); startLoopBounce();  // 右下
+  await moveHoriz(rb.x, SPECIAL.hopDurMs);
+  stopLoopBounce();               await bounce(1);
 
-  await sleep(SPECIAL.hopDelayMs);                 await bounce(3);
+  await sleep(SPECIAL.hopDelayMs);
+  stopLoopBounce();               await bounce(3);
   // 銀 → 金
   targetOrb.classList.remove('orb-hidden');
   targetOrb.classList.add('orb-limited');
 
-  await sleep(SPECIAL.hopDelayMs);                 await bounce(3);
+  await sleep(SPECIAL.hopDelayMs);
+  stopLoopBounce();               await bounce(3);
   // 金 → 打開（顯示圖與名字；不送恭喜）
   revealFn?.();
 
-  await sleep(SPECIAL.hopDelayMs);                 await bounce(3);
+  await sleep(SPECIAL.hopDelayMs);
+  stopLoopBounce();               await bounce(3);
 
   // 高速離場
   const end = randomEdgeStart();
@@ -797,30 +834,36 @@ function createOrb(res, { autoReveal=false, revealDelay=0, big=false, forceIniti
   const inner = document.createElement('div');
   inner.className = 'orb-inner';
 
+  // ✅ 先把圖片放進去（隱形，但會開始下載）
+  if (res.image_url) {
+    const img = document.createElement('img');
+    img.src = res.image_url;
+    img.alt = res.name;
+    img.className = 'orb-icon';
+    // 提示瀏覽器優先載入
+    img.setAttribute('loading', 'eager');
+    img.setAttribute('decoding', 'async');
+    img.setAttribute('fetchpriority', 'high');
+    inner.appendChild(img);
+  }
+
+  // 翻牌才補名字＋顯示（不要清 inner，否則會把預載圖移除）
   const doRevealContent = () => {
-    inner.innerHTML = '';
-    if (res.image_url) {
-      const img = document.createElement('img');
-      img.src = res.image_url;
-      img.alt = res.name;
-      img.className = 'orb-icon';
-      inner.appendChild(img);
+    if (!inner.querySelector('.orb-name')) {
+      const nameEl = document.createElement('span');
+      nameEl.className = 'orb-name auto-resize';
+      nameEl.textContent = res.name;
+      inner.appendChild(nameEl);
     }
-    const nameEl = document.createElement('span');
-    nameEl.className = 'orb-name auto-resize';
-    nameEl.textContent = res.name;
-    inner.appendChild(nameEl);
-    orb.classList.add('revealed');
+    orb.classList.add('revealed');  // 觸發 CSS：讓圖從 opacity:0 → 1
     resizeAllTexts();
     checkAllRevealed();
   };
 
-  // ⚠️ 是否「玩家手動」由這個 wrapper 控制
+  // 只在「玩家手動 + 銀/金」時送恭喜
   const reveal = (isManual=false) => {
     if (orb.classList.contains('revealed')) return;
     doRevealContent();
-
-    // ✅ 恭喜只在「玩家手動 + 銀/金」時發
     if (isManual && (res.rarity === 'limited' || res.rarity === 'hidden')) {
       sendGachaWebhook(res.rarity, res.name, { mode: 'congrats' });
     }
@@ -830,8 +873,9 @@ function createOrb(res, { autoReveal=false, revealDelay=0, big=false, forceIniti
   else orb.addEventListener('click', () => reveal(true));
 
   orb.appendChild(inner);
-  return { el: orb, reveal, rawReveal: doRevealContent }; // rawReveal 不送恭喜（給特效用）
+  return { el: orb, reveal, rawReveal: doRevealContent }; // rawReveal：給特效用，不送恭喜
 }
+
 
 function checkAllRevealed(){
   const orbs = $$('.gacha-orb', resultsContainer);
