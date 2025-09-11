@@ -629,21 +629,23 @@ function softResetToIdle(){
 /* ==============================
    特效邏輯（銀→金→翻牌）
 ============================== */
-
+/* ==============================
+   特效邏輯（四段直線移動＋連續彈跳＋翻轉；白→銀→金→開）
+============================== */
 const specialMask = document.getElementById('special-mask');
 const specialCat  = document.getElementById('special-cat');
 
-/* ★ 可微調：一鍵改所有節奏 */
+/* ★ 你的速度參數（已套用） */
 const SPECIAL = {
-  darkWaitMs: 2000,      // 進特效後先全黑 3 秒
-  axisMoveTotalMs: 3000, // 只走直線到右下的總時間（將切成 1/2 + 1/2）
-  hopDelayMs: 200,       // 每個「…0.5秒後…」的等待
-  hopDurMs: 250,         // 每次彈跳動畫時間（需和 CSS keyframes 手感一致）
-  exitMs: 220,           // 最後高速離場時間
-  targetOffset: 0.78,    // 球內落點（0~1），越大越靠右下
-  timingFn: 'cubic-bezier(.22,.61,.36,1)' // 直線移動的補間曲線
+  darkWaitMs:      2000,  // 暗場(全黑) 2s
+  axisMoveTotalMs: 3000,  // 四段總移動時間（將均分成 4 份）
+  moveBounceMs:     250,  // 連續彈跳節奏（移動期間用；和 CSS 無限動畫一致）
+  hopDelayMs:       200,  // 每段「…0.5秒後…」→ 你改成 0.2s
+  hopDurMs:         250,  // 單次彈跳時間
+  exitMs:           220,  // 高速離場時間
+  targetOffset:    0.78,  // 球內落點（越大越靠右下）
+  timingFn: 'cubic-bezier(.22,.61,.36,1)'
 };
-
 
 function setCatTransition(ms){
   specialCat.style.transitionProperty = 'left, top';
@@ -668,21 +670,20 @@ function randomEdgeStart(){
   return { x: Math.random()*w, y: h+50 };                  // 下外
 }
 
-/* 垂直 / 水平位移（只改一軸） */
+/* 單軸移動 */
 async function moveHoriz(toX, dur){ setCatTransition(dur); specialCat.style.left = `${toX}px`; await sleep(dur); }
-async function moveVert(toY,  dur){ setCatTransition(dur); specialCat.style.top  = `${toY}px`; await sleep(dur); }
+async function moveVert (toY, dur){ setCatTransition(dur); specialCat.style.top  = `${toY}px`; await sleep(dur); }
 
-/* 單次/多次彈跳（停在原地彈） */
+/* 停在原地的「n 次彈跳」 */
 async function bounce(times=1, dur=SPECIAL.hopDurMs){
   return new Promise(resolve=>{
-    // 用 inline animation，和連續彈跳（class）區隔
     specialCat.style.animation = `cat-bounce ${dur}ms ease-out ${times}`;
     const onEnd = () => { specialCat.style.animation = ''; specialCat.removeEventListener('animationend', onEnd); resolve(); };
     specialCat.addEventListener('animationend', onEnd);
   });
 }
 
-/* 連續彈跳（移動中用） */
+/* 連續彈跳（移動時） */
 function startLoopBounce(ms=SPECIAL.moveBounceMs){
   specialCat.classList.add('bounce-loop');
   specialCat.style.setProperty('--bounceMs', `${ms}ms`);
@@ -692,26 +693,28 @@ function stopLoopBounce(){
   specialCat.style.removeProperty('--bounceMs');
 }
 
-/* 翻轉：左右鏡像 */
+/* 左右翻轉 */
 function setFlip(on){ specialCat.classList.toggle('flipX', !!on); }
 
-/* 依序：
-   暗場(3s) → 出現
+/* 依你新版時序：
+   暗場→ 出現
    → 四段移動到右下（垂直→水平→垂直→水平；全程連續彈跳）
-   → 0.5s 跳1
-   → 0.5s 翻轉 + 移到左下(0.5s) → 跳1
-   → 0.5s 跳1 → 翻回 + 移回右下(0.5s) → 跳1
-   → 0.5s 跳2
-   → 0.5s 跳2 並 白→銀
-   → 0.5s 翻轉 + 左下(0.5s) → 跳1
-   → 0.5s 跳1 → 翻回 + 右下(0.5s) → 跳1
-   → 0.5s 跳2 並 銀→金 → 翻牌(revealFn)
-   → 0.5s 跳3 → 高速離場
+   → +0.5s 跳1
+   → +0.5s 翻轉 + 移到左下 → 跳1
+   → +0.5s 跳1 → 翻回 + 移回右下 → 跳1
+   → +0.5s 跳2
+   → +0.5s 跳2 並 白→銀
+   → +0.5s 翻轉 + 左下 → 跳1
+   → +0.5s 跳1 → 翻回 + 右下 → 跳1
+   → +0.5s 跳3 並 銀→金
+   → +0.5s 跳3 並 金→打開（revealFn）
+   → +0.5s 跳3 → 高速離場
+   （注意：你把 0.5s 改成 hopDelayMs=200ms，我就照 0.2s 跑）
 */
 async function runSpecialUpgradeAnimation(targetOrb, revealFn){
   if (!targetOrb) { revealFn?.(); return; }
 
-  // 遮罩開 & 初始位置
+  // 進場遮罩 + 起始位置
   specialMask.style.display = 'block';
   specialCat.style.opacity = '0';
   const start = randomEdgeStart();
@@ -722,50 +725,49 @@ async function runSpecialUpgradeAnimation(targetOrb, revealFn){
   await sleep(SPECIAL.darkWaitMs);
   specialCat.style.opacity = '1';
 
-  // 四段直線：垂直 → 水平 → 垂直 → 水平（全程連續彈跳）
+  // 四段直線移動：垂直 → 水平 → 垂直 → 水平（均分時間，持續彈跳）
   const { rb, lb } = viewportTargets(targetOrb);
   const q = Math.max(0, Math.floor(SPECIAL.axisMoveTotalMs / 4));
-  const midY = start.y + (rb.y - start.y) * 0.5; // 中間 y
-  const midX = start.x + (rb.x - start.x) * 0.5; // 中間 x
+  const midY = start.y + (rb.y - start.y) * 0.5;
+  const midX = start.x + (rb.x - start.x) * 0.5;
 
-  startLoopBounce();                // 移動時保持彈跳
+  startLoopBounce();                // 移動中維持彈跳（節奏 moveBounceMs）
   await moveVert (midY, q);         // 1) 垂直到中間 y
   await moveHoriz(midX, q);         // 2) 水平到中間 x
   await moveVert (rb.y, q);         // 3) 垂直到目標 y
   await moveHoriz(rb.x, q);         // 4) 水平成目標 x（右下）
   stopLoopBounce();
 
-  // 後續固定節奏（你的需求）
-  await sleep(SPECIAL.hopDelayMs);  await bounce(1);
+  // 後續固定節奏
+  await sleep(SPECIAL.hopDelayMs);                 await bounce(1);
 
-  await sleep(SPECIAL.hopDelayMs);  setFlip(true);
-  await moveHoriz(lb.x, SPECIAL.hopDurMs); await bounce(1);
+  await sleep(SPECIAL.hopDelayMs); setFlip(true);  await moveHoriz(lb.x, SPECIAL.hopDurMs); await bounce(1);
 
-  await sleep(SPECIAL.hopDelayMs);  await bounce(1); setFlip(false);
-  await moveHoriz(rb.x, SPECIAL.hopDurMs); await bounce(1);
+  await sleep(SPECIAL.hopDelayMs);                 await bounce(1);
+                        setFlip(false);            await moveHoriz(rb.x, SPECIAL.hopDurMs); await bounce(1);
 
-  await sleep(SPECIAL.hopDelayMs);  await bounce(2);
+  await sleep(SPECIAL.hopDelayMs);                 await bounce(2);
 
-  await sleep(SPECIAL.hopDelayMs);  await bounce(2);
-  // 白 -> 銀
+  await sleep(SPECIAL.hopDelayMs);                 await bounce(2);
+  // 白 → 銀
   targetOrb.classList.remove('orb-normal');
   targetOrb.classList.add('orb-hidden');
 
-  await sleep(SPECIAL.hopDelayMs);  setFlip(true);
-  await moveHoriz(lb.x, SPECIAL.hopDurMs); await bounce(1);
+  await sleep(SPECIAL.hopDelayMs); setFlip(true);  await moveHoriz(lb.x, SPECIAL.hopDurMs); await bounce(1);
 
-  await sleep(SPECIAL.hopDelayMs);  await bounce(1); setFlip(false);
-  await moveHoriz(rb.x, SPECIAL.hopDurMs); await bounce(1);
+  await sleep(SPECIAL.hopDelayMs);                 await bounce(1);
+                        setFlip(false);            await moveHoriz(rb.x, SPECIAL.hopDurMs); await bounce(1);
 
-  await sleep(SPECIAL.hopDelayMs);  await bounce(2);
-  // 銀 -> 金
+  await sleep(SPECIAL.hopDelayMs);                 await bounce(3);
+  // 銀 → 金
   targetOrb.classList.remove('orb-hidden');
   targetOrb.classList.add('orb-limited');
 
-  // 翻牌內容（不送恭喜；外層照舊在 .then 送 swap）
+  await sleep(SPECIAL.hopDelayMs);                 await bounce(3);
+  // 金 → 打開（顯示圖與名字；不送恭喜）
   revealFn?.();
 
-  await sleep(SPECIAL.hopDelayMs);  await bounce(3);
+  await sleep(SPECIAL.hopDelayMs);                 await bounce(3);
 
   // 高速離場
   const end = randomEdgeStart();
@@ -774,7 +776,7 @@ async function runSpecialUpgradeAnimation(targetOrb, revealFn){
   specialCat.style.top  = `${end.y}px`;
   await sleep(SPECIAL.exitMs);
 
-  // 關遮罩 & 清理
+  // 收尾
   specialMask.style.display = 'none';
   setFlip(false);
 }
