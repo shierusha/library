@@ -637,6 +637,7 @@ const specialCat  = document.getElementById('special-cat');
 
 /* ★ 你的速度參數（已套用） */
 const SPECIAL = {
+  preDarkDelayMs: 1000,  // ★ 新增：先等 1 秒再變暗
   darkWaitMs:      2000,  // 暗場(全黑) 2s
   axisMoveTotalMs: 3000,  // 四段總移動時間（將均分成 4 份）
   moveBounceMs:     250,  // 連續彈跳節奏（移動期間用；和 CSS 無限動畫一致）
@@ -714,12 +715,16 @@ function setFlip(on){ specialCat.classList.toggle('flipX', !!on); }
 async function runSpecialUpgradeAnimation(targetOrb, revealFn){
   if (!targetOrb) { revealFn?.(); return; }
 
+// 進場前先等 1 秒
+await sleep(SPECIAL.preDarkDelayMs);
+
   // 進場遮罩 + 起始位置
   specialMask.style.display = 'block';
   specialCat.style.opacity = '0';
   const start = randomEdgeStart();
   specialCat.style.left = `${start.x}px`;
   specialCat.style.top  = `${start.y}px`;
+
 
   // 暗場
   await sleep(SPECIAL.darkWaitMs);
