@@ -862,6 +862,15 @@ stopLoopBounce();
   // 金 → 打開（顯示圖與名字；不送恭喜）
   revealFn?.();
 
+
+ await sleep(SPECIAL.hopDelayMs);
+  faceForMove(curX, lb.x);        // 往左 → flip
+  startLoopBounce();              // 水平移動時保持彈跳
+  await moveHoriz(lb.x, SPECIAL.hopDurMs);
+  curX = lb.x;
+  stopLoopBounce();
+  await bounce(1);
+
   await sleep(SPECIAL.hopDelayMs);  await bounce(3);
 
   // 高速離場（保持當前朝向即可）
