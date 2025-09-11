@@ -246,20 +246,23 @@ body.dark-bg::before {
 }
 
 /* 圖片預先放進球裡，但先隱形；翻牌後再顯示 */
-.gacha-orb .orb-inner .orb-icon{
+.gacha-orb .orb-inner .orb-icon {
   position: absolute;
-  inset: 0;                 /* = top:0; right:0; bottom:0; left:0 */
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%); /* ✅ 幾何置中 */
   max-width: 100%;
   max-height: 100%;
-  width: auto;
+  width: auto;                     /* 保持比例，不硬撐滿 */
   height: auto;
   object-fit: contain;
-  z-index: 2;               /* 圖層比名字高 → 圖可以擋住名字 */
+  z-index: 0;                      /* 圖壓在名字上 */
   pointer-events: none;
-  filter: drop-shadow(0 2px 6px rgba(0,0,0,.35));
-  opacity: 0;               /* ★ 先藏起來 */
-  transition: opacity .2s ease;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, .35));
+  opacity: 0;                      /* 先藏，翻牌再顯示 */
+  transition: opacity .2s ease;    /* ← 別斷行 */
 }
+
 .gacha-orb.revealed .orb-inner .orb-icon{
   opacity: 1;               /* ★ 翻牌後立刻顯示（圖已預載） */
 }
