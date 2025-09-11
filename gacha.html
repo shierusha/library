@@ -624,6 +624,160 @@ function softResetToIdle(){
    特效邏輯（銀→金→翻牌）
 ============================== */
 
+  /* ==============================
+   特效邏輯（直線移動 + 翻轉 + 彈跳 + 白→銀→金）
+============================== */
+const specialMask = document.getElementById('special-mask');
+const specialCat  = document.getElementById('special-cat');
+
+/* ★ 可微調：一鍵改所有節奏 */
+const SPECIAL = {
+  darkWaitMs: 3000,      // 進特效後先全黑 3 秒
+  axisMoveTotalMs: 3000, // 只走直線到右下的總時間（將切成 1/2 + 1/2）
+  hopDelayMs: 500,       // 每個「…0.5秒後…」的等待
+  hopDurMs: 500,         // 每次彈跳動畫時間（需和 CSS keyframes 手感一致）
+  exitMs: 320,           // 最後高速離場時間
+  targetOffset: 0.78,    // 球內落點（0~1），越大越靠右下
+  timingFn: 'cubic-bezier(.22,.61,.36,1)' // 直線移動的補間曲線
+};
+
+function setCatTransition(ms){
+  specialCat.style.transitionProperty = 'left, top';
+  specialCat.style.transitionDuration = `${ms}ms`;
+  specialCat.style.transitionTimingFunction = SPECIAL.timingFn;
+}
+
+function viewportTargets(orbEl){
+  const r = orbEl.getBoundingClientRect();
+  const t = SPECIAL.targetOffset;
+  // 右下、左下（同一個 y，只改 x）
+  const rb = { x: r.left + r.width * t,     y: r.top + r.height * t };
+  const lb = { x: r.left + r.width * (1-t), y: rb.y };
+  return { rb, lb };
+}
+
+function randomEdgeStart(){
+  const w = window.innerWidth, h = window.innerHeight;
+  const side = Math.floor(Math.random()*4);
+  if (side === 0) return { x: -50,  y: Math.random()*h }; // 左外
+  if (side === 1) return { x: w+50, y: Math.random()*h }; // 右外
+  if (side === 2) return { x: Math.random()*w, y: -50  }; // 上外
+  return { x: Math.random()*w, y: h+50 };                  // 下外
+}
+
+/* 水平/垂直直線移動（只改一軸） */
+async function moveHoriz(toX, dur){ setCatTransition(dur); specialCat.style.left = `${toX}px`; await sleep(dur); }
+async function moveVert(toY, dur){  setCatTransition(dur); specialCat.style.top  = `${toY}px`; await sleep(dur); }
+
+/* 彈跳：不影響 transform/翻轉，跑完自動清除 */
+async function bounce(times=1, dur=SPECIAL.hopDurMs){
+  return new Promise(resolve=>{
+    specialCat.style.animation = `cat-bounce ${dur}ms ease-out ${times}`;
+    const onEnd = () => { specialCat.style.animation = ''; specialCat.removeEventListener('animationend', onEnd); resolve(); };
+    specialCat.addEventListener('animationend', onEnd);
+  });
+}
+
+/* 翻轉：左右鏡像 */
+function setFlip(on){ specialCat.classList.toggle('flipX', !!on); }
+
+/* 依序：
+   暗場(3s) → 出現 → X(1.5s) → Y(1.5s) → 0.5s → 跳1
+   → 0.5s → 翻轉+移到左下(0.5s) → 跳1
+   → 0.5s → 跳1 → 翻回+移回右下(0.5s) → 跳1
+   → 0.5s → 跳2
+   → 0.5s → 跳2 並 白→銀
+
+   → 0.5s → 翻轉+移左下(0.5s) → 跳1
+   → 0.5s → 跳1 → 翻回+移右下(0.5s) → 跳1
+   → 0.5s → 跳2 並 銀→金 → 翻牌(revealFn)
+   → 0.5s → 跳3 → 高速離場
+*/
+async function runSpecialUpgradeAnimation(targetOrb, revealFn){
+  if (!targetOrb) { revealFn?.(); return; }
+
+  // 0) 全屏遮罩 + 禁點由外層處理；這裡只管動畫
+  specialMask.style.display = 'block';
+  specialCat.style.opacity = '0';
+
+  // 初始位置在螢幕邊緣
+  const start = randomEdgeStart();
+  specialCat.style.left = `${start.x}px`;
+  specialCat.style.top  = `${start.y}px`;
+
+  // 1) 暗場 3 秒後，貓咪出現
+  await sleep(SPECIAL.darkWaitMs);
+  specialCat.style.opacity = '1';
+
+  // 2) 只走直線到右下（總 3 秒：水平 1.5s + 垂直 1.5s）
+  const { rb, lb } = viewportTargets(targetOrb);
+  const leg = Math.max(0, Math.floor(SPECIAL.axisMoveTotalMs / 2));
+  await moveHoriz(rb.x, leg);
+  await moveVert(rb.y,  leg);
+
+  // 3) 0.5s 後 跳 1
+  await sleep(SPECIAL.hopDelayMs);
+  await bounce(1);
+
+  // 4) 0.5s 後 翻轉 + 水平移到左下(0.5s) → 跳1
+  await sleep(SPECIAL.hopDelayMs);
+  setFlip(true);
+  await moveHoriz(lb.x, SPECIAL.hopDurMs);
+  await bounce(1);
+
+  // 5) 0.5s 後 跳1 → 翻回 + 移回右下(0.5s) → 跳1
+  await sleep(SPECIAL.hopDelayMs);
+  await bounce(1);
+  setFlip(false);
+  await moveHoriz(rb.x, SPECIAL.hopDurMs);
+  await bounce(1);
+
+  // 6) 0.5s 後 跳2
+  await sleep(SPECIAL.hopDelayMs);
+  await bounce(2);
+
+  // 7) 0.5s 後 跳2 並 白→銀
+  await sleep(SPECIAL.hopDelayMs);
+  await bounce(2);
+  targetOrb.classList.remove('orb-normal');
+  targetOrb.classList.add('orb-hidden');
+
+  // 8) 0.5s 後 翻轉 + 移左下(0.5s) → 跳1
+  await sleep(SPECIAL.hopDelayMs);
+  setFlip(true);
+  await moveHoriz(lb.x, SPECIAL.hopDurMs);
+  await bounce(1);
+
+  // 9) 0.5s 後 跳1 → 翻回 + 移右下(0.5s) → 跳1
+  await sleep(SPECIAL.hopDelayMs);
+  await bounce(1);
+  setFlip(false);
+  await moveHoriz(rb.x, SPECIAL.hopDurMs);
+  await bounce(1);
+
+  // 10) 0.5s 後 跳2 並 銀→金 → 翻牌
+  await sleep(SPECIAL.hopDelayMs);
+  await bounce(2);
+  targetOrb.classList.remove('orb-hidden');
+  targetOrb.classList.add('orb-limited');
+  // 翻開內容（不送恭喜，外層照舊在 .then() 送 swap）
+  revealFn?.();
+
+  // 11) 0.5s 後 跳3 → 高速離場
+  await sleep(SPECIAL.hopDelayMs);
+  await bounce(3);
+
+  const end = randomEdgeStart();
+  setCatTransition(SPECIAL.exitMs);
+  specialCat.style.left = `${end.x}px`;
+  specialCat.style.top  = `${end.y}px`;
+  await sleep(SPECIAL.exitMs);
+
+  // 收尾
+  specialMask.style.display = 'none';
+  setFlip(false);
+}
+
 
 /* ==============================
    UI：建立球 / 翻牌（球內放圖、可遮名）
