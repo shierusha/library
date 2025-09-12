@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <title>謝爾夏｜圖書館</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Supabase（可先不填，頁面會用假資料演示） -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    :root{
+      --room-bg: url("https://shierusha.github.io/library/img/ROOM.webp");
+      --panel-bg: rgba(255,255,255,.72);
+      --panel-stroke: rgba(0,0,0,.08);
+      --text: #1f2937;
+      --muted: #6b7280;
+      --badge-student: #2563eb;
+      --badge-nonstudent: #10b981;
+      --card-shadow: 0 6px 24px rgba(0,0,0,.18);
+      --radius-2xl: 18px;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body{
+      margin: 0;
+      font-family: "Noto Sans TC",ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue","PingFang TC","Microsoft JhengHei",sans-serif;
+      color: var(--text);
+      background: #0b1020;
+    }
+
+    /* 中央房間容器：左右 90% 寬、上下自動；以 3:2 比例最佳化 */
+    .room-wrap{
+      width: 90vw;
+      max-width: 1600px;
+      aspect-ratio: 3/2;
+      max-height: 92vh;   /* 避免太高溢出 */
+      margin: 4vh auto;
+      position: relative;
+      background-image: var(--room-bg);
+      background-size: cover;
+      background-position: center;
+      border-radius: var(--radius-2xl);
+      box-shadow: 0 10px 40px rgba(0,0,0,.35);
+      overflow: hidden;
+    }
+
+    /* 內層玻璃板（放書籍清單） */
+    .panel{
+      position: absolute;
+      inset: 3% 3% 3% 3%;
+      background: var(--panel-bg);
+      backdrop-filter: blur(6px);
+      border: 1px solid var(--panel-stroke);
+      border-radius: calc(var(--radius-2xl) - 6px);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .panel-header{
+      padding: 14px 18px;
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      border-bottom: 1px solid var(--panel-stroke);
+    }
+    .panel-header h1{
+      font-size: clamp(18px, 2.2vw, 28px);
+      margin: 0;
+      letter-spacing: .02em;
+    }
+    .panel-sub{
+      color: var(--muted);
+      font-size: clamp(12px, 1.5vw, 14px);
+    }
+
+    .book-grid{
+      flex: 1;
+      padding: 16px;
+      overflow: auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 16px;
+    }
+
+    /* 書卡 */
+    .book-card{
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: var(--card-shadow);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border: 1px solid rgba(0,0,0,.06);
+      transition: transform .15s ease, box-shadow .15s ease;
+      cursor: pointer;
+    }
+    .book-card:hover{
+      transform: translateY(-2px);
+      box-shadow: 0 10px 30px rgba(0,0,0,.22);
+    }
+
+    /* 封面：固定比例，若有 cover_image 就鋪圖；否則用 cover_color 當底色 */
+    .cover{
+      position: relative;
+      aspect-ratio: 2/3;   /* 書本常見比例 */
+      width: 100%;
+      background: #e5e7eb;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+    }
+    .cover::after{
+      content:"";
+      position: absolute; inset: 0;
+      box-shadow: inset 0 0 0 2px rgba(0,0,0,.05);
+      pointer-events: none;
+    }
+    .cover img{
+      width: 100%; height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .cover .title-badge{
+      position: absolute;
+      left: 8px; right: 8px; bottom: 8px;
+      background: rgba(0,0,0,.55);
+      color: #fff;
+      padding: 6px 8px;
+      border-radius: 8px;
+      min-height: 38px;
+      display: grid;
+      place-items: center;
+    }
+    .title-badge .auto-resize{
+      line-height: 1.05;
+      width: 100%;
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .meta{
+      padding: 10px 12px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .badge{
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .02em;
+      color: #fff;
+      white-space: nowrap;
+    }
+    .badge.student{ background: var(--badge-student); }
+    .badge.non-student{ background: var(--badge-nonstudent); }
+    .small{
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    /* 橫向提示（縱向時顯示） */
+    #orientationModal{
+      position: fixed; inset: 0;
+      display: none; /* 由 JS 控制 */
+      align-items: center; justify-content: center;
+      background: rgba(0,0,0,.25);
+      z-index: 50;
+    }
+    #orientationModal .box{
+      background: #ffffffd9;
+      border: 1px solid var(--panel-stroke);
+      border-radius: 16px;
+      padding: 18px 22px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.25);
+      font-size: 16px;
+    }
+
+    /* 首次說明彈窗（固定開啟；關閉鈕先保留但註解於 HTML） */
+    #firstRunModal{
+      position: fixed; inset: 0;
+      display: flex; /* 先固定開啟 */
+      align-items: center; justify-content: center;
+      background: rgba(255,255,255,.2); /* 不要壓太暗 */
+      backdrop-filter: blur(1px);
+      z-index: 60;
+    }
+    #firstRunModal .dialog{
+      width: min(640px, 92vw);
+      background: #fffefb;
+      border: 1px solid var(--panel-stroke);
+      border-radius: 18px;
+      box-shadow: 0 18px 50px rgba(0,0,0,.28);
+      padding: 20px 22px;
+    }
+    #firstRunModal h2{
+      margin: 0 0 8px 0;
+      font-size: 20px;
+    }
+    #firstRunModal p{
+      margin: 6px 0;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    #firstRunModal .kbd{
+      padding: 2px 6px;
+      border: 1px solid #ddd;
+      border-bottom-width: 2px;
+      border-radius: 6px;
+      background: #f8fafc;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 12px;
+    }
+    /* .close-btn { 之後你要啟用可解註解 HTML 裡的按鈕
+      appearance: none; border: none; background: #111827; color: #fff;
+      padding: 8px 10px; border-radius: 10px; cursor: pointer; font-weight: 700;
+    } */
+  </style>
+</head>
+<body>
+
+  <!-- 橫向提示 -->
+  <div id="orientationModal">
+    <div class="box">建議以橫向模式瀏覽此頁面</div>
+  </div>
+
+  <!-- 首次說明彈窗（固定開啟） -->
+  <div id="firstRunModal">
+    <div class="dialog">
+      <h2>📚 圖書館使用說明（Demo）</h2>
+      <p>這是「列出書籍」的前端範例。背景用房間圖、中央容器寬度 <b>90%</b>，高度依比例自動。</p>
+      <p>目前資料來源：若尚未配置 Supabase，會以假資料演示；填上你的 <span class="kbd">SUPABASE_URL</span> 與 <span class="kbd">SUPABASE_ANON_KEY</span> 後即可讀取 <span class="kbd">books</span> 表。</p>
+      <p>帶有 <span class="kbd">.auto-resize</span> 的標題會隨容器高度自動縮放（預設 50% 高度）。</p>
+      <p style="margin-top: 10px; font-weight:700;">關閉鈕我先幫你註解，等你要啟用再把 HTML 的按鈕解註。</p>
+      <!-- <div style="margin-top:14px; display:flex; justify-content:flex-end;">
+        <button class="close-btn" onclick="document.getElementById('firstRunModal').style.display='none'">我知道了</button>
+      </div> -->
+    </div>
+  </div>
+
+  <!-- 房間背景 & 書籍清單 -->
+  <div class="room-wrap">
+    <div class="panel">
+      <div class="panel-header">
+        <h1>圖書館</h1>
+        <div class="panel-sub" id="summary">載入中…</div>
+      </div>
+
+      <div class="book-grid" id="bookGrid">
+        <!-- JS 產生書卡 -->
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* 小工具 */
+    const $  = (s, r=document) => r.querySelector(s);
+    const $$ = (s, r=document) => [...r.querySelectorAll(s)];
+
+    /* ==============================
+       自動字級（套 .auto-resize）
+    ============================== */
+    function resizeAllTexts() {
+      $$('.auto-resize').forEach(el => {
+        const h = el.offsetHeight || el.getBoundingClientRect().height || 20;
+        el.style.fontSize = (h * 0.50) + 'px'; // 想更大就改 0.50
+      });
+    }
+    window.addEventListener('load', resizeAllTexts);
+    window.addEventListener('resize', resizeAllTexts);
+
+    /* ==============================
+       強制橫向（縱向時顯示提示）
+    ============================== */
+    function isPortrait(){
+      return window.matchMedia('(orientation: portrait)').matches || window.innerHeight > window.innerWidth;
+    }
+    const orientationModal = document.getElementById('orientationModal');
+    function enforceLandscape(){
+      const portrait = isPortrait();
+      if (orientationModal) orientationModal.style.display = portrait ? 'flex' : 'none';
+      document.body.style.overflow = portrait ? 'hidden' : '';
+    }
+    enforceLandscape();
+    window.addEventListener('resize', enforceLandscape);
+    window.addEventListener('orientationchange', enforceLandscape);
+
+    /* ==============================
+       Supabase（可留空→用假資料）
+    ============================== */
+    const SUPABASE_URL      = ''; // ← 填你的專案 URL
+    const SUPABASE_ANON_KEY = ''; // ← 填你的 anon key
+    let supabaseClient = null;
+    try {
+      if (window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY) {
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+          auth: { persistSession: true, autoRefreshToken: true }
+        });
+      }
+    } catch(e){ console.warn('Supabase 初始化失敗：', e); }
+
+    /* ==============================
+       取得書籍 & 繪製 UI
+    ============================== */
+    async function getBooks(){
+      // 有配置 Supabase → 從 DB 讀
+      if (supabaseClient){
+        const { data, error } = await supabaseClient
+          .from('books')
+          .select('id,title,cover_color,cover_image,student_id,sort_order,created_at')
+          .order('sort_order', { ascending: true })
+          .order('created_at', { ascending: true });
+
+        if (error) {
+          console.error(error);
+          return [];
+        }
+        return data || [];
+      }
+
+      // 沒有 Supabase → 假資料（方便先看版面）
+      return [
+        { id:'1', title:'未命名書籍', cover_color:'#7c8cfb', cover_image:null, student_id:null, sort_order:1, created_at:'2025-09-01' },
+        { id:'2', title:'學生的詩集', cover_color:'#f59e0b', cover_image:null, student_id:'xxxx-xxxx', sort_order:2, created_at:'2025-09-02' },
+        { id:'3', title:'插畫設定集', cover_color:'#10b981', cover_image:'https://picsum.photos/400/600?random=12', student_id:null, sort_order:3, created_at:'2025-09-03' },
+        { id:'4', title:'戰鬥筆記', cover_color:'#ef4444', cover_image:'', student_id:'yyyy-yyyy', sort_order:4, created_at:'2025-09-05' },
+      ];
+    }
+
+    function bookCardTpl(b){
+      const isStudent = !!b.student_id;
+      const badgeClass = isStudent ? 'student' : 'non-student';
+      const badgeText  = isStudent ? '學生書籍' : '一般收藏';
+
+      // 封面：若 cover_image 有值就用圖；否則用 cover_color 當底
+      const coverInner = b.cover_image
+        ? `<img src="${b.cover_image}" alt="cover"/>`
+        : `<div style="width:100%;height:100%;background:${b.cover_color || '#e5e7eb'};"></div>`;
+
+      return `
+      <div class="book-card" data-id="${b.id}" onclick="onOpenBook('${b.id}')">
+        <div class="cover">
+          ${coverInner}
+          <div class="title-badge"><div class="auto-resize">${escapeHtml(b.title || '未命名書籍')}</div></div>
+        </div>
+        <div class="meta">
+          <span class="badge ${badgeClass}">${badgeText}</span>
+          <span class="small">${(b.created_at||'').toString().slice(0,10)}</span>
+        </div>
+      </div>`;
+    }
+
+    function escapeHtml(s){
+      return (s||'').replace(/[&<>"']/g,c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    }
+
+    async function renderBooks(){
+      $('#summary').textContent = '載入中…';
+      const list = await getBooks();
+      const grid = $('#bookGrid');
+      grid.innerHTML = list.map(bookCardTpl).join('');
+      $('#summary').textContent = `共 ${list.length} 本書`;
+      resizeAllTexts();
+    }
+
+    // 點卡片的後續行為（先留空，你之後可導向章節頁/編輯器）
+    window.onOpenBook = function(id){
+      // 先簡單提醒；之後可改為：location.href = `/books/${id}` 或開彈窗
+      alert('開啟書籍：' + id);
+    }
+
+    // 啟動
+    window.addEventListener('load', renderBooks);
+  </script>
+</body>
+</html>
