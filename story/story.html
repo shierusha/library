@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="zh-Hant"><head>
+<html lang="zh-Hant"><head>
   <meta charset="UTF-8">
   <title>謝爾夏｜圖書館</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -182,7 +182,7 @@
 <body>
 
   <!-- 橫向提示 -->
-  <div id="orientationModal">
+  <div id="orientationModal" style="display: none;">
     <div class="box">建議以橫向模式瀏覽此頁面</div>
   </div>
 
@@ -191,12 +191,11 @@
     <div class="panel">
       <div class="panel-header">
         <h1>書櫃</h1>
-        <div class="panel-sub" id="summary"></div>
+        
       </div>
 
       <div class="book-grid" id="bookGrid">
-        <!-- JS 產生書卡 -->
-      </div>
+     </div>
     </div>
   </div>
 
@@ -297,6 +296,7 @@
 
     window.addEventListener('load', renderBooks);
   </script>
+
 
 
 </body></html>
