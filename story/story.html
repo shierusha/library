@@ -11,7 +11,7 @@
   <style>
     :root{
       --room-bg: url("https://shierusha.github.io/library/img/ROOM.webp");
-      --panel-bg: rgba(255,255,255,.72);
+      --panel-bg: #fff; /* 不透明白底 */
       --panel-stroke: rgba(0,0,0,.08);
       --text: #1f2937;
       --muted: #6b7280;
@@ -30,12 +30,12 @@
       background: #0b1020;
     }
 
-    /* 中央房間容器：左右 90% 寬、上下自動；以 3:2 比例最佳化 */
+    /* 中央房間容器 */
     .room-wrap{
       width: 90vw;
       max-width: 1600px;
       aspect-ratio: 3/2;
-      max-height: 92vh;   /* 避免太高溢出 */
+      max-height: 92vh;
       margin: 4vh auto;
       position: relative;
       background-image: var(--room-bg);
@@ -46,12 +46,11 @@
       overflow: hidden;
     }
 
-    /* 內層玻璃板（放書籍清單） */
+    /* 內層面板 */
     .panel{
       position: absolute;
       inset: 3% 3% 3% 3%;
       background: var(--panel-bg);
-      backdrop-filter: blur(6px);
       border: 1px solid var(--panel-stroke);
       border-radius: calc(var(--radius-2xl) - 6px);
       display: flex;
@@ -101,10 +100,9 @@
       box-shadow: 0 10px 30px rgba(0,0,0,.22);
     }
 
-    /* 封面：固定比例，若有 cover_image 就鋪圖；否則用 cover_color 當底色 */
     .cover{
       position: relative;
-      aspect-ratio: 2/3;   /* 書本常見比例 */
+      aspect-ratio: 2/3;
       width: 100%;
       background: #e5e7eb;
       display: grid;
@@ -165,10 +163,10 @@
       font-size: 12px;
     }
 
-    /* 橫向提示（縱向時顯示） */
+    /* 橫向提示 */
     #orientationModal{
       position: fixed; inset: 0;
-      display: none; /* 由 JS 控制 */
+      display: none;
       align-items: center; justify-content: center;
       background: rgba(0,0,0,.25);
       z-index: 50;
@@ -181,46 +179,6 @@
       box-shadow: 0 10px 30px rgba(0,0,0,.25);
       font-size: 16px;
     }
-
-    /* 首次說明彈窗（固定開啟；關閉鈕先保留但註解於 HTML） */
-    #firstRunModal{
-      position: fixed; inset: 0;
-      display: flex; /* 先固定開啟 */
-      align-items: center; justify-content: center;
-      background: rgba(255,255,255,.2); /* 不要壓太暗 */
-      backdrop-filter: blur(1px);
-      z-index: 60;
-    }
-    #firstRunModal .dialog{
-      width: min(640px, 92vw);
-      background: #fffefb;
-      border: 1px solid var(--panel-stroke);
-      border-radius: 18px;
-      box-shadow: 0 18px 50px rgba(0,0,0,.28);
-      padding: 20px 22px;
-    }
-    #firstRunModal h2{
-      margin: 0 0 8px 0;
-      font-size: 20px;
-    }
-    #firstRunModal p{
-      margin: 6px 0;
-      color: var(--muted);
-      line-height: 1.6;
-    }
-    #firstRunModal .kbd{
-      padding: 2px 6px;
-      border: 1px solid #ddd;
-      border-bottom-width: 2px;
-      border-radius: 6px;
-      background: #f8fafc;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      font-size: 12px;
-    }
-    /* .close-btn { 之後你要啟用可解註解 HTML 裡的按鈕
-      appearance: none; border: none; background: #111827; color: #fff;
-      padding: 8px 10px; border-radius: 10px; cursor: pointer; font-weight: 700;
-    } */
   </style>
 </head>
 <body>
@@ -228,20 +186,6 @@
   <!-- 橫向提示 -->
   <div id="orientationModal">
     <div class="box">建議以橫向模式瀏覽此頁面</div>
-  </div>
-
-  <!-- 首次說明彈窗（固定開啟） -->
-  <div id="firstRunModal">
-    <div class="dialog">
-      <h2>📚 圖書館使用說明（Demo）</h2>
-      <p>這是「列出書籍」的前端範例。背景用房間圖、中央容器寬度 <b>90%</b>，高度依比例自動。</p>
-      <p>目前資料來源：若尚未配置 Supabase，會以假資料演示；填上你的 <span class="kbd">SUPABASE_URL</span> 與 <span class="kbd">SUPABASE_ANON_KEY</span> 後即可讀取 <span class="kbd">books</span> 表。</p>
-      <p>帶有 <span class="kbd">.auto-resize</span> 的標題會隨容器高度自動縮放（預設 50% 高度）。</p>
-      <p style="margin-top: 10px; font-weight:700;">關閉鈕我先幫你註解，等你要啟用再把 HTML 的按鈕解註。</p>
-      <!-- <div style="margin-top:14px; display:flex; justify-content:flex-end;">
-        <button class="close-btn" onclick="document.getElementById('firstRunModal').style.display='none'">我知道了</button>
-      </div> -->
-    </div>
   </div>
 
   <!-- 房間背景 & 書籍清單 -->
@@ -259,25 +203,20 @@
   </div>
 
   <script>
-    /* 小工具 */
     const $  = (s, r=document) => r.querySelector(s);
     const $$ = (s, r=document) => [...r.querySelectorAll(s)];
 
-    /* ==============================
-       自動字級（套 .auto-resize）
-    ============================== */
+    /* 自動字級 */
     function resizeAllTexts() {
       $$('.auto-resize').forEach(el => {
         const h = el.offsetHeight || el.getBoundingClientRect().height || 20;
-        el.style.fontSize = (h * 0.50) + 'px'; // 想更大就改 0.50
+        el.style.fontSize = (h * 0.50) + 'px';
       });
     }
     window.addEventListener('load', resizeAllTexts);
     window.addEventListener('resize', resizeAllTexts);
 
-    /* ==============================
-       強制橫向（縱向時顯示提示）
-    ============================== */
+    /* 強制橫向提示 */
     function isPortrait(){
       return window.matchMedia('(orientation: portrait)').matches || window.innerHeight > window.innerWidth;
     }
@@ -291,11 +230,9 @@
     window.addEventListener('resize', enforceLandscape);
     window.addEventListener('orientationchange', enforceLandscape);
 
-    /* ==============================
-       Supabase（可留空→用假資料）
-    ============================== */
-    const SUPABASE_URL      = ''; // ← 填你的專案 URL
-    const SUPABASE_ANON_KEY = ''; // ← 填你的 anon key
+    /* Supabase */
+    const SUPABASE_URL      = ''; 
+    const SUPABASE_ANON_KEY = ''; 
     let supabaseClient = null;
     try {
       if (window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY) {
@@ -305,31 +242,21 @@
       }
     } catch(e){ console.warn('Supabase 初始化失敗：', e); }
 
-    /* ==============================
-       取得書籍 & 繪製 UI
-    ============================== */
+    /* 取得書籍 & 繪製 UI */
     async function getBooks(){
-      // 有配置 Supabase → 從 DB 讀
       if (supabaseClient){
         const { data, error } = await supabaseClient
           .from('books')
           .select('id,title,cover_color,cover_image,student_id,sort_order,created_at')
           .order('sort_order', { ascending: true })
           .order('created_at', { ascending: true });
-
-        if (error) {
-          console.error(error);
-          return [];
-        }
+        if (error) { console.error(error); return []; }
         return data || [];
       }
-
-      // 沒有 Supabase → 假資料（方便先看版面）
+      // 假資料
       return [
         { id:'1', title:'未命名書籍', cover_color:'#7c8cfb', cover_image:null, student_id:null, sort_order:1, created_at:'2025-09-01' },
-        { id:'2', title:'學生的詩集', cover_color:'#f59e0b', cover_image:null, student_id:'xxxx-xxxx', sort_order:2, created_at:'2025-09-02' },
-        { id:'3', title:'插畫設定集', cover_color:'#10b981', cover_image:'https://picsum.photos/400/600?random=12', student_id:null, sort_order:3, created_at:'2025-09-03' },
-        { id:'4', title:'戰鬥筆記', cover_color:'#ef4444', cover_image:'', student_id:'yyyy-yyyy', sort_order:4, created_at:'2025-09-05' },
+        { id:'2', title:'學生的詩集', cover_color:'#f59e0b', cover_image:null, student_id:'xxxx-xxxx', sort_order:2, created_at:'2025-09-02' }
       ];
     }
 
@@ -337,12 +264,9 @@
       const isStudent = !!b.student_id;
       const badgeClass = isStudent ? 'student' : 'non-student';
       const badgeText  = isStudent ? '學生書籍' : '一般收藏';
-
-      // 封面：若 cover_image 有值就用圖；否則用 cover_color 當底
       const coverInner = b.cover_image
         ? `<img src="${b.cover_image}" alt="cover"/>`
         : `<div style="width:100%;height:100%;background:${b.cover_color || '#e5e7eb'};"></div>`;
-
       return `
       <div class="book-card" data-id="${b.id}" onclick="onOpenBook('${b.id}')">
         <div class="cover">
@@ -369,13 +293,10 @@
       resizeAllTexts();
     }
 
-    // 點卡片的後續行為（先留空，你之後可導向章節頁/編輯器）
     window.onOpenBook = function(id){
-      // 先簡單提醒；之後可改為：location.href = `/books/${id}` 或開彈窗
       alert('開啟書籍：' + id);
     }
 
-    // 啟動
     window.addEventListener('load', renderBooks);
   </script>
 </body>
