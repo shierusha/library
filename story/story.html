@@ -1,30 +1,22 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-Hant">
 <head>
-  <meta charset="UTF-8" />
-  <title>謝爾夏｜圖書館</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-
-  <!-- Supabase（可先不填，頁面會用假資料演示） -->
+  <meta charset="utf-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>謝爾夏|休息室</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
+  <!-- Supabase JS v2 -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
   <style>
     :root{
       --room-bg: url("https://shierusha.github.io/library/img/ROOM.webp");
-      --room-bg-top: url("https://shierusha.github.io/library/img/ROOM-TOP.png");
-      --room-book1: url("https://shierusha.github.io/library/img/book1.png");
-      --room-b00k2: url("https://shierusha.github.io/library/img/book2.png");
-
-      --panel-bg: #ffffff8c;
+      --panel-bg: #ffffffec;
       --panel-stroke: rgba(0,0,0,.08);
       --text: #1f2937;
-      --muted: #6b7280;
-      --badge-student: #2563eb;
-      --badge-nonstudent: #10b981;
-      --card-shadow: 0 6px 24px rgba(0,0,0,.18);
-      --radius-2xl: 18px;
+      --radius-2xl: 24px;
     }
-
     * { box-sizing: border-box; }
     html, body { height: 100%; }
     body{
@@ -39,7 +31,6 @@
       width: 90vw;
       max-width: 1600px;
       aspect-ratio: 3/2;
-      max-height: 92vh;
       margin: 4vh auto;
       position: relative;
       background-image: var(--room-bg);
@@ -50,236 +41,41 @@
       overflow: hidden;
     }
 
-    /* 內層面板（不使用模糊） */
-    .panel{
+    /* 書架上的書群組容器 */
+    .book{
       position: absolute;
-      inset: 3% 3% 3% 3%;
-      background: var(--panel-bg);
-      border: 1px solid var(--panel-stroke);
-      border-radius: calc(var(--radius-2xl) - 6px);
-      display: flex;
-      flex-direction: column;
+      left: 5.5%;
+      width: 23%;
+      height: 12%;
+    }
+    .book img{
+      position: absolute;
+      bottom: 0%;
+      width: 20%;
     }
 
-    .panel-header{
-      padding: 14px 18px;
-      display: flex;
-      align-items: baseline;
-      gap: 10px;
-      border-bottom: 1px solid var(--panel-stroke);
-    }
-    .panel-header h1{
-      font-size: clamp(18px, 2.2vw, 28px);
-      margin: 0;
-      letter-spacing: .02em;
-    }
-    .panel-sub{
-      color: var(--muted);
-      font-size: clamp(12px, 1.5vw, 14px);
-    }
-
-    .book-grid{
-      flex: 1;
-      padding: 16px;
-      overflow: auto;
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-      gap: 16px;
-    }
-
-    /* 書卡 */
-    .book-card{
-      background: #fff;
-      border-radius: 14px;
-      box-shadow: var(--card-shadow);
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      border: 1px solid rgba(0,0,0,.06);
-      transition: transform .15s ease, box-shadow .15s ease;
+    .book-btn{
+      position: absolute;
+      bottom: 65%;
+      width: 24%;
+      left: 5%;
+      height: 27%;
+      background: transparent; /* 透明背景 */
+      border: 0;               /* 無邊框 */
+      padding: 0;
       cursor: pointer;
     }
-    .book-card:hover{
-      transform: translateY(-2px);
-      box-shadow: 0 10px 30px rgba(0,0,0,.22);
-    }
 
-    .cover{
-      position: relative;
-      aspect-ratio: 2/3;
-      width: 100%;
-      background: #e5e7eb;
-      display: grid;
-      place-items: center;
-      overflow: hidden;
+    /* 共用 modal 樣式（orientation + library） */
+    .modal-overlay{
+      position:fixed;inset:0;background:rgba(0,0,0,.55);
+      display:flex;align-items:center;justify-content:center;z-index:9999;
+      padding:24px;
     }
-    .cover::after{
-      content:"";
-      position: absolute; inset: 0;
-      box-shadow: inset 0 0 0 2px rgba(0,0,0,.05);
-      pointer-events: none;
+    .modal-content{
+      background:var(--panel-bg,#ffffffe8);
+      border:1px solid var(--panel-stroke,rgba(0,0,0,.06));
+      border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.35);
+      overflow:hidden;max-width:920px;width:92%;
     }
-    .cover img{
-      width: 100%; height: 100%;
-      object-fit: cover;
-      display: block;
-    }
-    .cover .title-badge{
-      position: absolute;
-      left: 8px; right: 8px; bottom: 8px;
-      background: rgba(0,0,0,.55);
-      color: #fff;
-      padding: 6px 8px;
-      border-radius: 8px;
-      min-height: 38px;
-      display: grid;
-      place-items: center;
-    }
-    .title-badge .auto-resize{
-      line-height: 1.05;
-      width: 100%;
-      text-align: center;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .meta{
-      padding: 10px 12px 12px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-    }
-    .badge{
-      padding: 4px 8px;
-      border-radius: 999px;
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: .02em;
-      color: #fff;
-      white-space: nowrap;
-    }
-    .badge.student{ background: var(--badge-student); }
-    .badge.non-student{ background: var(--badge-nonstudent); }
-    .small{
-      color: var(--muted);
-      font-size: 12px;
-    }
-
-    /* ==============================
-       Modal（旋轉 / 背包）
-    ============================== */
-    .modal-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.45);
-      z-index: 2000;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      animation: modal-fadein-bg 0.25s;
-    }
-    @keyframes modal-fadein-bg {
-      from { background: rgba(0,0,0,0); }
-      to   { background: rgba(0,0,0,0.45); }
-    }
-    .modal-content {
-      background: rgb(13 27 77 / 82%);
-      border-radius: 18px;
-      border: 2px solid #1eb5e5;
-      box-shadow: 0 0 16px 2px #62f1fe88, 0 8px 32px #1eb5e5aa;
-      width: 500px; max-width: 93vw;
-      height: 340px; max-height: 80vh;
-      display: flex; flex-direction: column;
-      overflow: hidden;
-      animation: modal-pop 0.32s cubic-bezier(.42,1.4,.51,1.01);
-    }
-    @keyframes modal-pop {
-      from { opacity: 0; transform: scale(0.92); }
-      to   { opacity: 1; transform: scale(1); }
-    }
-    .modal-header {
-      background: none;
-      padding: 15px 20px 0px 24px;
-      color: #fff; font-size: 1.5em; font-weight: bold;
-      letter-spacing: 1px; text-shadow: 0 1px 4px #000a;
-    }
-    .modal-header::after {
-      content: ""; display: block; height: 5px; width: 70%;
-      margin:.5rem 0 0; border-radius: 2px;
-      background: linear-gradient(to right,#53e2ff99 65%,#53e2ff00 100%);
-      pointer-events: none;
-    }
-    .modal-body {
-      color:#fff; padding: 12px 24px 24px 24px;
-      font-size: 1.2em; line-height:1.5; text-shadow:0 1px 4px #0008;
-      overflow-y:auto; max-height:240px; white-space: pre-line;
-      scrollbar-width:none;
-    }
-    .modal-body::-webkit-scrollbar { display:none; }
-  </style>
-</head>
-<body>
-
-  <!-- 旋轉提示（不可關閉） -->
-  <div id="orientation-modal" class="modal-overlay" style="display:none;">
-    <div class="modal-content">
-      <div class="modal-header">請旋轉螢幕</div>
-      <div class="modal-body">為了最佳體驗，請將裝置轉成橫向模式</div>
-    </div>
-  </div>
-
-  <!-- 房間背景 & 書籍清單 -->
-  <div class="room-wrap">
-  <!--     <div class="panel">
-   <div class="panel-header">
-        <h1>圖書館</h1>
-        <div class="panel-sub" id="summary">載入中…</div>
-      </div>
-
-      <div class="book-grid" id="bookGrid">
-書卡
-  
-      </div>
-    </div>
---> 
-  </div>
-
-  <script>
-    const $  = (s, r=document) => r.querySelector(s);
-    const $$ = (s, r=document) => [...r.querySelectorAll(s)];
-
-    /* ==============================
-       自動字級（套 .auto-resize）
-    ============================== */
-    function resizeAllTexts() {
-      $$('.auto-resize').forEach(el => {
-        const h = el.offsetHeight || el.getBoundingClientRect().height || 20;
-        el.style.fontSize = (h * 0.50) + 'px';
-      });
-    }
-    window.addEventListener('load', resizeAllTexts);
-    window.addEventListener('resize', resizeAllTexts);
-
-    /* ==============================
-       強制橫向（使用你的 Modal）
-    ============================== */
-    function isPortrait(){
-      return window.matchMedia('(orientation: portrait)').matches || window.innerHeight > window.innerWidth;
-    }
-    const orientationModal = document.getElementById('orientation-modal');
-    function enforceLandscape(){
-      const portrait = isPortrait();
-      if (orientationModal) orientationModal.style.display = portrait ? 'flex' : 'none';
-      document.body.style.overflow = portrait ? 'hidden' : '';
-    }
-    enforceLandscape();
-    window.addEventListener('resize', enforceLandscape);
-    window.addEventListener('orientationchange', enforceLandscape);
-    if (orientationModal) orientationModal.addEventListener('click', e => e.stopPropagation()); // 不可關閉，只阻止冒泡
-
- 
-  </script>
-</body>
-</html>
+    .modal-header{padding:14px 16p
