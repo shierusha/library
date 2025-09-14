@@ -2,7 +2,9 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>謝爾夏|休息室</title>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
   <!-- Supabase JS v2 -->
@@ -64,67 +66,73 @@
       cursor: pointer;
     }
 
-    /* ===== 你的彈窗樣式（保留原樣） ===== */
-    .modal-overlay {
-      position: fixed;
-      inset: 0;
-      z-index: 2000;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      animation: modal-fadein-bg 0.25s;
-    }
-    @keyframes modal-fadein-bg {
-      from { background: rgba(0,0,0,0); }
-      to   { background: rgba(0,0,0,0.45); }
-    }
-    .modal-content {
-      background: rgb(13 27 77 / 82%);
-      border-radius: 18px;
-      border: 2px solid #1eb5e5;
-      box-shadow: 0 0 16px 2px #62f1fe88, 0 8px 32px #1eb5e5aa;
-      width: 500px; max-width: 93vw;
-      height: 340px; max-height: 80vh;
-      display: flex; flex-direction: column;
-      overflow: hidden;
-      animation: modal-pop 0.32s cubic-bezier(.42,1.4,.51,1.01);
-    }
-    .modal-content2 {
-      background: rgb(255 255 255 / 69%);
-      border-radius: 18px;
-      border: 2px solid #1eb5e5;
-      box-shadow: 0 0 16px 2px #62f1fe88, 0 8px 32px #1eb5e5aa;
-      width: 75vw;
-      max-width: 1200px;
-      min-height: 75vh;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      animation: modal-pop 0.32s cubic-bezier(.42, 1.4, .51, 1.01);
-    }
-    @keyframes modal-pop {
-      from { opacity: 0; transform: scale(0.92); }
-      to   { opacity: 1; transform: scale(1); }
-    }
-    .modal-header {
-      background: none;
-      padding: 15px 20px 0px 24px;
-      font-size: 1.5em; font-weight: bold;
-      letter-spacing: 1px; 
-    }
-    .modal-header::after {
-      content: ""; display: block; height: 5px; width: 70%;
-      margin:.5rem 0 0; border-radius: 2px;
-      background: linear-gradient(to right,#53e2ff99 65%,#53e2ff00 100%);
-      pointer-events: none;
-    }
-    .modal-body {
-      color:#fff; padding: 12px 24px 24px 24px;
-      font-size: 1.2em; line-height:1.5; text-shadow:0 1px 4px #0008;
-      overflow-y:auto; max-height:240px; white-space: pre-line;
-      scrollbar-width:none;
-    }
-    .modal-body::-webkit-scrollbar { display:none; }
+    /* ===== 你的彈窗樣式沿用原本 class（無花俏濾鏡） ===== */
+   .modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: modal-fadein-bg 0.25s;
+}
+@keyframes modal-fadein-bg {
+  from { background: rgba(0,0,0,0); }
+  to   { background: rgba(0,0,0,0.45); }
+}
+.modal-content {
+  background: rgb(13 27 77 / 82%);
+  border-radius: 18px;
+  border: 2px solid #1eb5e5;
+  box-shadow: 0 0 16px 2px #62f1fe88, 0 8px 32px #1eb5e5aa;
+  width: 500px; max-width: 93vw;
+  height: 340px; max-height: 80vh;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  animation: modal-pop 0.32s cubic-bezier(.42,1.4,.51,1.01);
+}
+.modal-content2 {
+    background: rgb(255 255 255 / 69%);
+    border-radius: 18px;
+    border: 2px solid #1eb5e5;
+    box-shadow: 0 0 16px 2px #62f1fe88, 0 8px 32px #1eb5e5aa;
+    width: 75vw;
+    max-width: 1200px;
+    min-height: 75vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: modal-pop 0.32s 
+cubic-bezier(.42, 1.4, .51, 1.01);
+}
+
+
+
+
+@keyframes modal-pop {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.modal-header {
+  background: none;
+  padding: 15px 20px 0px 24px;
+  font-size: 1.5em; font-weight: bold;
+  letter-spacing: 1px; 
+}
+.modal-header::after {
+  content: ""; display: block; height: 5px; width: 70%;
+  margin:.5rem 0 0; border-radius: 2px;
+  background: linear-gradient(to right,#53e2ff99 65%,#53e2ff00 100%);
+  pointer-events: none;
+}
+.modal-body {
+  color:#fff; padding: 12px 24px 24px 24px;
+  font-size: 1.2em; line-height:1.5; text-shadow:0 1px 4px #0008;
+  overflow-y:auto; max-height:240px; white-space: pre-line;
+  scrollbar-width:none;
+}
+.modal-body::-webkit-scrollbar { display:none; }
+
 
     /* 書卡片 */
     .book-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
@@ -132,7 +140,6 @@
       display:flex;gap:12px;align-items:center;
       background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:12px;
       padding:10px 12px;
-      color:#111827;               /* 只在卡片內改深字色，避免白字白底 */
     }
     .book-icon{
       width:56px;height:70px;flex:0 0 auto;border-radius:6px;overflow:hidden;
@@ -140,7 +147,7 @@
     }
     .book-icon img{max-width:100%;max-height:100%;display:block;}
     .book-meta{min-width:0;display:flex;flex-direction:column;gap:4px;}
-    .book-title{font-weight:700;line-height:1.2;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;color:#111827;}
+    .book-title{font-weight:700;line-height:1.2;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;}
     .book-sub{font-size:.88rem;color:#6b7280;}
     .book-actions{margin-left:auto;}
     .go-btn,.manage-btn{
@@ -150,67 +157,30 @@
     @media (max-width: 640px){
       .book-list{grid-template-columns:1fr;}
     }
-
-    /* ===== 只針對「書庫彈窗」的工具列樣式（最小範圍，不影響其他彈窗） ===== */
-    #library-modal .modal-header{
-      display:flex;
-      align-items:center;
-      gap:12px;
-    }
-    #library-modal .modal-title{
-      flex:1 1 auto;
-    }
-    #library-modal .modal-tools{
-      margin-left:auto;
-      display:flex;
-      align-items:center;
-      gap:10px;
-      font-size:14px;              /* 工具列字變小，不跟 header 的 1.5em 放大 */
-    }
-    #library-modal #student-filter,
-    #library-modal .manage-btn{
-      height:34px;
-      line-height:32px;
-      padding:0 .75rem;
-      border-radius:.55rem;
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      box-sizing:border-box;
-    }
-    #library-modal #student-filter{
-      border:1px solid var(--panel-stroke);
-      background:#fff;
-      color:#111827;
-      min-width:180px;
-      appearance:none;
-      -webkit-appearance:none;
-      -moz-appearance:none;
-    }
   </style>
 </head>
 <body>
 
-  <!-- 旋轉提示（不可關閉；保持你原本的一進頁就顯示，交由 JS 判斷直橫向切換） -->
-  <div id="orientation-modal" class="modal-overlay" style="display: flex;">
+  <!-- 旋轉提示（不可關閉） -->
+<div id="orientation-modal" class="modal-overlay" style="display: flex;">
     <div class="modal-content">
-      <div class="modal-header" style="color:#fff;text-shadow:0 1px 4px #000a;">請旋轉螢幕</div>
+      <div class="modal-header"style="
+    color: #fff;
+    text-shadow: 0 1px 4px #000a;">請旋轉螢幕</div>
       <div class="modal-body">為了最佳體驗，請將裝置轉成橫向模式</div>
     </div>
   </div>
 
-  <!-- 書櫃彈窗（僅把重複的 id 換成 library-modal，其餘邏輯不動） -->
-  <div id="library-modal" class="modal-overlay" style="display: flex;">
+  <!-- 書櫃彈窗（預設開啟；沿用你的 modal 樣式） -->
+
+<div id="orientation-modal" class="modal-overlay" style="display: flex;">
     <div class="modal-content2">
-      <div class="modal-header">
-        <div class="modal-title">歡迎來到 <span id="owner-name">玩家</span> 的書櫃</div>
-        <div class="modal-tools">
-          <select id="student-filter"></select>
+      <div class="modal-header">歡迎來到 <span id="owner-name">玩家</span> 的書櫃 +
+          <select id="student-filter" style="padding:.4rem .6rem;border-radius:.5rem;border:1px solid var(--panel-stroke);background:#fff;"></select>
           <a id="manage-btn" class="manage-btn" href="./manage.html" style="display:none;">管理</a>
-        </div>
       </div>
       <div class="modal-body">
-        <div id="book-list" class="book-list"></div>
+                <div id="book-list" class="book-list"></div>
       </div>
     </div>
   </div>
@@ -244,7 +214,7 @@
   window.addEventListener('load', resizeAllTexts);
   window.addEventListener('resize', resizeAllTexts);
 
-  // ====== 強制橫向（沿用你的邏輯，不更動）======
+  // ====== 強制橫向（使用你的 Modal）======
   function isPortrait(){
     return window.matchMedia('(orientation: portrait)').matches || window.innerHeight > window.innerWidth;
   }
@@ -381,7 +351,6 @@
   // =============================
   function renderFilterOptions(){
     const sel = $('#student-filter');
-    if (!sel) return;
     sel.innerHTML = '';
 
     // 只列出有 student_code 的學生
@@ -404,7 +373,6 @@
 
   function renderBookList(books){
     const box = $('#book-list');
-    if (!box) return;
     box.innerHTML = '';
     if (!books.length){
       box.innerHTML = `<div style="padding:12px;color:#6b7280;">沒有找到符合的書籍。</div>`;
@@ -529,8 +497,7 @@
       }
 
       // 更新標題
-      const ownerNameEl = $('#owner-name');
-      if (ownerNameEl) ownerNameEl.textContent = OWNER_PLAYER?.username || '玩家';
+      $('#owner-name').textContent = OWNER_PLAYER?.username || '玩家';
 
       // 取得持有者的所有「有 student_code」的學生清單
       if (OWNER_PLAYER?.id){
@@ -552,24 +519,22 @@
       await refreshBooks();
 
       // 監聽下拉切換
-      const filterSel = $('#student-filter');
-      if (filterSel) filterSel.addEventListener('change', refreshBooks);
+      $('#student-filter').addEventListener('change', refreshBooks);
 
       // 書架彈窗開啟按鈕（點書櫃）
       const openBtn = document.querySelector('.book-btn');
-      const libModal = document.getElementById('library-modal');
-      if (openBtn && libModal){
+      if (openBtn){
         openBtn.addEventListener('click', () => {
-          libModal.style.display = 'flex';
+          const modal = $('#library-modal');
+          if (modal) modal.style.display = 'flex';
         });
       }
 
       // 點背景關閉（如不想關，註解掉）
-      if (libModal){
-        libModal.addEventListener('click', (e) => {
-          if (e.target === libModal) libModal.style.display = 'none';
-        });
-      }
+      const libModal = document.getElementById('library-modal');
+      libModal.addEventListener('click', (e) => {
+        if (e.target === libModal) libModal.style.display = 'none';
+      });
 
       // 啟用 Realtime 監聽
       if (OWNER_PLAYER?.id) setupRealtime(OWNER_PLAYER.id);
