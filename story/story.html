@@ -2,9 +2,7 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="utf-8" />
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>謝爾夏|休息室</title>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
   <!-- Supabase JS v2 -->
@@ -16,9 +14,6 @@
       --panel-stroke: rgba(0,0,0,.08);
       --text: #1f2937;
       --radius-2xl: 24px;
-      /* 工具列統一高 */
-      --ctrl-h: 38px;
-      --ctrl-pad-x: .8rem;
     }
     * { box-sizing: border-box; }
     html, body { height: 100%; }
@@ -69,7 +64,7 @@
       cursor: pointer;
     }
 
-    /* ===== Modal 基礎樣式 ===== */
+    /* ===== 你的彈窗樣式（保留原樣） ===== */
     .modal-overlay {
       position: fixed;
       inset: 0;
@@ -111,43 +106,25 @@
       from { opacity: 0; transform: scale(0.92); }
       to   { opacity: 1; transform: scale(1); }
     }
-
-    /* 原本 header 樣式基底 */
     .modal-header {
       background: none;
-      padding: 15px 20px 8px 24px;
+      padding: 15px 20px 0px 24px;
       font-size: 1.5em; font-weight: bold;
-      letter-spacing: 1px;
-      /* 讓標題與工具列左右排列 */
-      display: flex;
-      align-items: center;
-      gap: 12px;
+      letter-spacing: 1px; 
     }
-    /* 關閉原先畫在整個 header 下方的底線，改畫在標題自身 */
-    .modal-header::after { display: none !important; }
-
-    /* 標題（左） */
-    .modal-title{
-      flex: 1 1 auto;
-      color: #fff;
-      text-shadow: 0 1px 4px #000a;
-      position: relative;
-      padding-right: 12px;
-    }
-    .modal-title::after{
+    .modal-header::after {
       content: ""; display: block; height: 5px; width: 70%;
       margin:.5rem 0 0; border-radius: 2px;
       background: linear-gradient(to right,#53e2ff99 65%,#53e2ff00 100%);
       pointer-events: none;
     }
-
-    /* 工具列（右） */
-    .modal-tools{
-      margin-left: auto;
-      display: flex;
-      align-items: center;
-      gap: 10px;
+    .modal-body {
+      color:#fff; padding: 12px 24px 24px 24px;
+      font-size: 1.2em; line-height:1.5; text-shadow:0 1px 4px #0008;
+      overflow-y:auto; max-height:240px; white-space: pre-line;
+      scrollbar-width:none;
     }
+    .modal-body::-webkit-scrollbar { display:none; }
 
     /* 書卡片 */
     .book-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
@@ -155,6 +132,7 @@
       display:flex;gap:12px;align-items:center;
       background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:12px;
       padding:10px 12px;
+      color:#111827;               /* 只在卡片內改深字色，避免白字白底 */
     }
     .book-icon{
       width:56px;height:70px;flex:0 0 auto;border-radius:6px;overflow:hidden;
@@ -162,7 +140,7 @@
     }
     .book-icon img{max-width:100%;max-height:100%;display:block;}
     .book-meta{min-width:0;display:flex;flex-direction:column;gap:4px;}
-    .book-title{font-weight:700;line-height:1.2;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;}
+    .book-title{font-weight:700;line-height:1.2;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;color:#111827;}
     .book-sub{font-size:.88rem;color:#6b7280;}
     .book-actions{margin-left:auto;}
     .go-btn,.manage-btn{
@@ -173,63 +151,61 @@
       .book-list{grid-template-columns:1fr;}
     }
 
-    /* 工具列：下拉與按鈕高度統一 */
-    #student-filter,
-    .manage-btn{
-      height: var(--ctrl-h);
-      line-height: calc(var(--ctrl-h) - 2px);
-      padding: 0 var(--ctrl-pad-x);
-      border-radius: .55rem;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      box-sizing: border-box;
+    /* ===== 只針對「書庫彈窗」的工具列樣式（最小範圍，不影響其他彈窗） ===== */
+    #library-modal .modal-header{
+      display:flex;
+      align-items:center;
+      gap:12px;
     }
-    #student-filter{
-      border: 1px solid var(--panel-stroke);
-      background: #fff;
-      color: #111827;
-      appearance: none;
-      -webkit-appearance: none;
-      -moz-appearance: none;
+    #library-modal .modal-title{
+      flex:1 1 auto;
     }
-
-    /* 小螢幕工具列自動換行（可選） */
-    @media (max-width: 560px){
-      .modal-tools{ flex-wrap: wrap; justify-content: flex-end; }
+    #library-modal .modal-tools{
+      margin-left:auto;
+      display:flex;
+      align-items:center;
+      gap:10px;
+      font-size:14px;              /* 工具列字變小，不跟 header 的 1.5em 放大 */
     }
-
-    .modal-body {
-      color:#fff; padding: 12px 24px 24px 24px;
-      font-size: 1.2em; line-height:1.5; text-shadow:0 1px 4px #0008;
-      overflow-y:auto; max-height:240px; white-space: pre-line;
-      scrollbar-width:none;
-      color: #111; /* 書庫為淺底，改深字色 */
-      text-shadow: none;
-      max-height: none; /* 書單需要更高的滾動空間 */
+    #library-modal #student-filter,
+    #library-modal .manage-btn{
+      height:34px;
+      line-height:32px;
+      padding:0 .75rem;
+      border-radius:.55rem;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      box-sizing:border-box;
     }
-    .modal-body::-webkit-scrollbar { display:none; }
+    #library-modal #student-filter{
+      border:1px solid var(--panel-stroke);
+      background:#fff;
+      color:#111827;
+      min-width:180px;
+      appearance:none;
+      -webkit-appearance:none;
+      -moz-appearance:none;
+    }
   </style>
 </head>
 <body>
 
-  <!-- 旋轉提示（不可關閉；預設隱藏，直向才顯示） -->
-  <div id="orientation-modal" class="modal-overlay" style="display:none;">
+  <!-- 旋轉提示（不可關閉；保持你原本的一進頁就顯示，交由 JS 判斷直橫向切換） -->
+  <div id="orientation-modal" class="modal-overlay" style="display: flex;">
     <div class="modal-content">
       <div class="modal-header" style="color:#fff;text-shadow:0 1px 4px #000a;">請旋轉螢幕</div>
       <div class="modal-body">為了最佳體驗，請將裝置轉成橫向模式</div>
     </div>
   </div>
 
-  <!-- 書櫃彈窗（預設開啟；沿用你的 modal 樣式） -->
+  <!-- 書櫃彈窗（僅把重複的 id 換成 library-modal，其餘邏輯不動） -->
   <div id="library-modal" class="modal-overlay" style="display: flex;">
     <div class="modal-content2">
       <div class="modal-header">
-        <div class="modal-title">
-          歡迎來到 <span id="owner-name">玩家</span> 的書櫃
-        </div>
+        <div class="modal-title">歡迎來到 <span id="owner-name">玩家</span> 的書櫃</div>
         <div class="modal-tools">
-          <select id="student-filter" style="min-width: 180px;"></select>
+          <select id="student-filter"></select>
           <a id="manage-btn" class="manage-btn" href="./manage.html" style="display:none;">管理</a>
         </div>
       </div>
@@ -268,7 +244,7 @@
   window.addEventListener('load', resizeAllTexts);
   window.addEventListener('resize', resizeAllTexts);
 
-  // ====== 強制橫向（使用你的 Modal）======
+  // ====== 強制橫向（沿用你的邏輯，不更動）======
   function isPortrait(){
     return window.matchMedia('(orientation: portrait)').matches || window.innerHeight > window.innerWidth;
   }
@@ -441,7 +417,7 @@
 
       const icon = document.createElement('div');
       icon.className = 'book-icon';
-      // 只套用 DB 的 cover_color（若以 "filter:" 開頭）
+      // 不加任何多餘濾鏡；只套用 DB 的 cover_color（可能是 "filter: ..."）
       const filterStr = (b.cover_color || '').trim();
       icon.innerHTML = `<img alt="book" src="${bookImg(b)}" style="${/^filter:/.test(filterStr) ? filterStr : ''}">`;
 
