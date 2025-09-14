@@ -9,194 +9,215 @@
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
   <!-- Supabase JS v2 -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <style>
-    :root{
-      --room-bg: url("https://shierusha.github.io/library/img/ROOM.webp");
-      --panel-bg: #ffffffec;
-      --panel-stroke: rgba(0,0,0,.08);
-      --text: #1f2937;
-      --radius-2xl: 24px;
-      --control-h: 38px; /* 讓下拉與按鈕等高 */
-    }
-    * { box-sizing: border-box; }
-    html, body { height: 100%; }
-    body{
-      margin: 0;
-      font-family: "Noto Sans TC",ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue","PingFang TC","Microsoft JhengHei",sans-serif;
-      color: var(--text);
-      background: #393c47;
-    }
+ <style>
+  :root{
+    --room-bg: url("https://shierusha.github.io/library/img/ROOM.webp");
+    --panel-bg: #ffffffec;
+    --panel-stroke: rgba(0,0,0,.08);
+    --text: #1f2937;
+    --radius-2xl: 24px;
+    --control-h: 38px; /* 基本等高，會被 .modal-content2 .modal-header 內的 clamp 覆蓋 */
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body{
+    margin: 0;
+    font-family: "Noto Sans TC",ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue","PingFang TC","Microsoft JhengHei",sans-serif;
+    color: var(--text);
+    background: #393c47;
+  }
 
-    /* 中央房間容器 */
-    .room-wrap{
-      width: 90vw;
-      max-width: 1600px;
-      aspect-ratio: 3/2;
-      margin: 4vh auto;
-      position: relative;
-      background-image: var(--room-bg);
-      background-size: cover;
-      background-position: center;
-      border-radius: var(--radius-2xl);
-      box-shadow: 0 10px 40px rgba(0,0,0,.35);
-      overflow: hidden;
-    }
+  /* 中央房間容器 */
+  .room-wrap{
+    width: 90vw;
+    max-width: 1600px;
+    aspect-ratio: 3/2;
+    margin: 4vh auto;
+    position: relative;
+    background-image: var(--room-bg);
+    background-size: cover;
+    background-position: center;
+    border-radius: var(--radius-2xl);
+    box-shadow: 0 10px 40px rgba(0,0,0,.35);
+    overflow: hidden;
+  }
 
-    /* 書架上的書群組容器 */
-    .book{
-      position: absolute;
-      left: 5.5%;
-      width: 23%;
-      height: 12%;
-    }
-    .book img{
-      position: absolute;
-      bottom: 0%;
-      width: 20%;
-    }
+  /* 書架上的書群組容器 */
+  .book{
+    position: absolute;
+    left: 5.5%;
+    width: 23%;
+    height: 12%;
+  }
+  .book img{
+    position: absolute;
+    bottom: 0%;
+    width: 20%;
+  }
 
-    .book-btn{
-      position: absolute;
-      bottom: 65%;
-      width: 24%;
-      left: 5%;
-      height: 27%;
-      background: transparent;
-      border: 0;
-      padding: 0;
-      cursor: pointer;
-    }
+  .book-btn{
+    position: absolute;
+    bottom: 65%;
+    width: 24%;
+    left: 5%;
+    height: 27%;
+    background: transparent;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+  }
 
-    /* ===== Modal（沿用你的視覺，僅調整排版） ===== */
-    .modal-overlay {
-      position: fixed;
-      inset: 0;
-      z-index: 2000;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      animation: modal-fadein-bg 0.25s;
-    }
-    @keyframes modal-fadein-bg {
-      from { background: rgba(0,0,0,0); }
-      to   { background: rgba(0,0,0,0.45); }
-    }
-    .modal-content {
-      background: rgb(13 27 77 / 82%);
-      border-radius: 18px;
-      border: 2px solid #1eb5e5;
-      box-shadow: 0 0 16px 2px #62f1fe88, 0 8px 32px #1eb5e5aa;
-      width: 500px; max-width: 93vw;
-      height: 340px; max-height: 80vh;
-      display: flex; flex-direction: column;
-      overflow: hidden;
-      animation: modal-pop 0.32s cubic-bezier(.42,1.4,.51,1.01);
-    }
-    .modal-content2 {
-      background: rgb(255 255 255 / 69%);
-      border-radius: 18px;
-      border: 2px solid #1eb5e5;
-      box-shadow: 0 0 16px 2px #62f1fe88, 0 8px 32px #1eb5e5aa;
-      width: 75vw;
-      max-width: 1200px;
-      min-height: 75vh;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      animation: modal-pop 0.32s cubic-bezier(.42, 1.4, .51, 1.01);
-    }
+  /* ===== Modal（沿用你的視覺，調整排版） ===== */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: modal-fadein-bg 0.25s;
+  }
+  @keyframes modal-fadein-bg {
+    from { background: rgba(0,0,0,0); }
+    to   { background: rgba(0,0,0,0.45); }
+  }
+  .modal-content {
+    background: rgb(13 27 77 / 82%);
+    border-radius: 18px;
+    border: 2px solid #1eb5e5;
+    box-shadow: 0 0 16px 2px #62f1fe88, 0 8px 32px #1eb5e5aa;
+    width: 500px; max-width: 93vw;
+    height: 340px; max-height: 80vh;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+    animation: modal-pop 0.32s cubic-bezier(.42,1.4,.51,1.01);
+  }
+  .modal-content2 {
+    background: rgb(255 255 255 / 69%);
+    border-radius: 18px;
+    border: 2px solid #1eb5e5;
+    box-shadow: 0 0 16px 2px #62f1fe88, 0 8px 32px #1eb5e5aa;
+    width: 75vw;
+    max-width: 1200px;
+    min-height: 75vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: modal-pop 0.32s cubic-bezier(.42, 1.4, .51, 1.01);
+  }
 
-    @keyframes modal-pop {
-      from { opacity: 0; transform: scale(0.92); }
-      to   { opacity: 1; transform: scale(1); }
-    }
+  @keyframes modal-pop {
+    from { opacity: 0; transform: scale(0.92); }
+    to   { opacity: 1; transform: scale(1); }
+  }
 
-    /* ===== Header：改成左右區塊、右側等高並靠右、下方分界線滿寬 ===== */
-    .modal-header {
-      background: none;
-      padding: 15px 20px 0px 24px;
-      font-size: 1.5em; font-weight: bold;
-      letter-spacing: 1px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      flex-wrap: wrap;            /* 讓分界線可換行到下一行 */
-    }
-    .modal-header::after {
-      content: "";
-      display: block;
-      height: 5px;
-      width: 100%;                /* 滿寬分界線 */
-      margin:.5rem 0 0;
-      border-radius: 2px;
-      background: linear-gradient(to right,#53e2ff99 65%,#53e2ff00 100%);
-      pointer-events: none;
-      flex-basis: 100%;           /* 讓分界線獨佔一行 */
-    }
-    .header-title { flex: 1; }    /* 標題靠左，撐開空間 */
-    .header-actions{
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-left: auto;          /* 右側貼齊 */
-    }
-    /* 等高：選單與按鈕高度一致 */
-    #student-filter{
-      height: var(--control-h);
-      padding: 0 .6rem;
-      border-radius: .5rem;
-      border: 1px solid var(--panel-stroke);
-      background: #fff;
-      font: inherit;
-    }
-    .manage-btn{
-      display: inline-flex;
-      align-items: center;
-      height: var(--control-h);
-      padding: 0 .9rem;
-      border-radius: .55rem;
-      border: 1px solid #d1d5db;
-      background: #f9fafb;
-      cursor: pointer;
-      text-decoration: none;
-      color: #111827;
-      line-height: 1;
-    }
-    .manage-btn:hover{ background:#eef2f7; }
+  /* ===== Header：左右區塊、右側等高並靠右、分界線滿寬 ===== */
+  .modal-header {
+    background: none;
+    padding: 15px 20px 0px 24px;
+    font-size: 1.5em; font-weight: bold;
+    letter-spacing: 1px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;            /* 需要時允許換行；若想永遠單行可改為 nowrap */
+  }
+  .modal-header::after {
+    content: "";
+    display: block;
+    height: 5px;
+    width: 100%;                /* 滿寬分界線 */
+    margin:.5rem 0 0;
+    border-radius: 2px;
+    background: linear-gradient(to right,#53e2ff99 65%,#53e2ff00 100%);
+    pointer-events: none;
+    flex-basis: 100%;           /* 讓分界線獨佔一行 */
+  }
+  .header-title {
+    flex: 1; 
+    min-width: 0;               /* 讓省略號生效 */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .header-actions{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: auto;          /* 右側貼齊 */
+  }
 
-    .modal-body {
-      color:#fff; padding: 12px 24px 24px 24px;
-      font-size: 1.2em; line-height:1.5; text-shadow:0 1px 4px #0008;
-      overflow-y:auto; max-height:240px; white-space: pre-line;
-      scrollbar-width:none;
-    }
-    .modal-body::-webkit-scrollbar { display:none; }
+  /* === 讓標題/下拉/按鈕字級與高度隨寬度縮放（重點） === */
+  .modal-content2 .modal-header{
+    /* 基準字級：最小14px、最大24px，隨視窗寬度流動 */
+    font-size: clamp(14px, 2.2vw, 24px);
+    /* 控件高度也跟著縮放，避免字變小但高度過大 */
+    --control-h: clamp(30px, 5.5vw, 42px);
+  }
 
-    /* 書卡片 */
-    .book-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
-    .book-card{
-      display:flex;gap:12px;align-items:center;
-      background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:12px;
-      padding:10px 12px;
-      color:#111827;
-    }
-    .book-icon{
-      width:56px;height:70px;flex:0 0 auto;border-radius:6px;overflow:hidden;
-      display:grid;place-items:center;border:1px solid rgba(0,0,0,.08);
-    }
-    .book-icon img{max-width:100%;max-height:100%;display:block;}
-    .book-meta{min-width:0;display:flex;flex-direction:column;gap:4px;}
-    .book-title{font-weight:700;line-height:1.2;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;}
-    .book-sub{font-size:.88rem;color:#6b7280;}
-    .book-actions{margin-left:auto;}
-    .go-btn{
-      display:inline-block;padding:.45rem .7rem;border-radius:.55rem;border:1px solid #d1d5db;background:#f9fafb;cursor:pointer;text-decoration:none;color:#111827;
-    }
-    .go-btn:hover{background:#eef2f7;}
-    @media (max-width: 640px){
-      .book-list{grid-template-columns:1fr;}
-    }
-  </style>
+  /* 等高：選單與按鈕高度一致；字級跟 header 繼承 */
+  #student-filter{
+    font-size: 1em;
+    height: var(--control-h);
+    padding: 0 0.8em;               /* 用 em，隨字級縮放 */
+    border-radius: .5rem;
+    border: 1px solid var(--panel-stroke);
+    background: #fff;
+  }
+  .manage-btn{
+    display: inline-flex;
+    align-items: center;
+    height: var(--control-h);
+    padding: 0 1em;                 /* 用 em，隨字級縮放 */
+    border-radius: .55rem;
+    border: 1px solid #d1d5db;
+    background: #f9fafb;
+    cursor: pointer;
+    text-decoration: none;
+    color: #111827;
+    line-height: 1;
+  }
+  .manage-btn:hover{ background:#eef2f7; }
+
+  .modal-body {
+    color:#fff; padding: 12px 24px 24px 24px;
+    font-size: 1.2em; line-height:1.5; text-shadow:0 1px 4px #0008;
+    overflow-y:auto; max-height:240px; white-space: pre-line;
+    scrollbar-width:none;
+  }
+  .modal-body::-webkit-scrollbar { display:none; }
+
+  /* 書卡片 */
+  .book-list{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:12px;
+  }
+  .book-card{
+    display:flex;gap:12px;align-items:center;
+    background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:12px;
+    padding:10px 12px;
+    color:#111827;
+  }
+  .book-icon{
+    width:56px;height:70px;flex:0 0 auto;border-radius:6px;overflow:hidden;
+    display:grid;place-items:center;border:1px solid rgba(0,0,0,.08);
+  }
+  .book-icon img{max-width:100%;max-height:100%;display:block;}
+  .book-meta{min-width:0;display:flex;flex-direction:column;gap:4px;}
+  .book-title{font-weight:700;line-height:1.2;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;}
+  .book-sub{font-size:.88rem;color:#6b7280;}
+  .book-actions{margin-left:auto;}
+  .go-btn{
+    display:inline-block;padding:.45rem .7rem;border-radius:.55rem;border:1px solid #d1d5db;background:#f9fafb;cursor:pointer;text-decoration:none;color:#111827;
+  }
+  .go-btn:hover{background:#eef2f7;}
+
+  @media (max-width: 640px){
+    .book-list{grid-template-columns:1fr;}
+  }
+</style>
+
 </head>
 <body>
 
