@@ -2,7 +2,9 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>謝爾夏|休息室</title>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
   <!-- Supabase JS v2 -->
@@ -14,152 +16,203 @@
       --panel-stroke: rgba(0,0,0,.08);
       --text: #1f2937;
       --radius-2xl: 24px;
-      --control-h: 38px; /* 右側控制區統一高度 */
+      --control-h: 38px; /* 讓下拉與按鈕等高 */
     }
-    *{ box-sizing:border-box; }
-    html,body{ height:100%; }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
     body{
-      margin:0;
-      font-family:"Noto Sans TC",ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue","PingFang TC","Microsoft JhengHei",sans-serif;
-      color:var(--text);
-      background:#393c47;
+      margin: 0;
+      font-family: "Noto Sans TC",ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue","PingFang TC","Microsoft JhengHei",sans-serif;
+      color: var(--text);
+      background: #393c47;
     }
 
     /* 中央房間容器 */
     .room-wrap{
-      width:90vw; max-width:1600px; aspect-ratio:3/2;
-      margin:4vh auto; position:relative;
-      background-image:var(--room-bg);
-      background-size:cover; background-position:center;
-      border-radius:var(--radius-2xl);
-      box-shadow:0 10px 40px rgba(0,0,0,.35);
-      overflow:hidden;
+      width: 90vw;
+      max-width: 1600px;
+      aspect-ratio: 3/2;
+      margin: 4vh auto;
+      position: relative;
+      background-image: var(--room-bg);
+      background-size: cover;
+      background-position: center;
+      border-radius: var(--radius-2xl);
+      box-shadow: 0 10px 40px rgba(0,0,0,.35);
+      overflow: hidden;
     }
 
     /* 書架上的書群組容器 */
-    .book{ position:absolute; left:5.5%; width:23%; height:12%; }
-    .book img{ position:absolute; bottom:0%; width:20%; }
+    .book{
+      position: absolute;
+      left: 5.5%;
+      width: 23%;
+      height: 12%;
+    }
+    .book img{
+      position: absolute;
+      bottom: 0%;
+      width: 20%;
+    }
 
     .book-btn{
-      position:absolute; bottom:65%; width:24%; left:5%;
-      height:27%; background:transparent; border:0; padding:0; cursor:pointer;
+      position: absolute;
+      bottom: 65%;
+      width: 24%;
+      left: 5%;
+      height: 27%;
+      background: transparent;
+      border: 0;
+      padding: 0;
+      cursor: pointer;
     }
 
-    /* ===== Modal 樣式（旋轉提示 / 書櫃共用） ===== */
-    .modal-overlay{
-      position:fixed; inset:0; z-index:2000;
-      display:flex; align-items:center; justify-content:center;
-      animation:modal-fadein-bg .25s;
+    /* ===== Modal（沿用你的視覺，僅調整排版） ===== */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 2000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: modal-fadein-bg 0.25s;
     }
-    @keyframes modal-fadein-bg{ from{background:rgba(0,0,0,0);} to{background:rgba(0,0,0,.45);} }
-    .modal-content{
-      background:rgb(13 27 77 / 82%);
-      border-radius:18px; border:2px solid #1eb5e5;
-      box-shadow:0 0 16px 2px #62f1fe88, 0 8px 32px #1eb5e5aa;
-      width:500px; max-width:93vw; height:340px; max-height:80vh;
-      display:flex; flex-direction:column; overflow:hidden;
-      animation:modal-pop .32s cubic-bezier(.42,1.4,.51,1.01);
+    @keyframes modal-fadein-bg {
+      from { background: rgba(0,0,0,0); }
+      to   { background: rgba(0,0,0,0.45); }
     }
-    .modal-content2{
-      background:rgb(255 255 255 / 69%);
-      border-radius:18px; border:2px solid #1eb5e5;
-      box-shadow:0 0 16px 2px #62f1fe88, 0 8px 32px #1eb5e5aa;
-      width:75vw; max-width:1200px; min-height:75vh;
-      display:flex; flex-direction:column; overflow:hidden;
-      animation:modal-pop .32s cubic-bezier(.42,1.4,.51,1.01);
+    .modal-content {
+      background: rgb(13 27 77 / 82%);
+      border-radius: 18px;
+      border: 2px solid #1eb5e5;
+      box-shadow: 0 0 16px 2px #62f1fe88, 0 8px 32px #1eb5e5aa;
+      width: 500px; max-width: 93vw;
+      height: 340px; max-height: 80vh;
+      display: flex; flex-direction: column;
+      overflow: hidden;
+      animation: modal-pop 0.32s cubic-bezier(.42,1.4,.51,1.01);
     }
-    @keyframes modal-pop{ from{opacity:0; transform:scale(.92);} to{opacity:1; transform:scale(1);} }
+    .modal-content2 {
+      background: rgb(255 255 255 / 69%);
+      border-radius: 18px;
+      border: 2px solid #1eb5e5;
+      box-shadow: 0 0 16px 2px #62f1fe88, 0 8px 32px #1eb5e5aa;
+      width: 75vw;
+      max-width: 1200px;
+      min-height: 75vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      animation: modal-pop 0.32s cubic-bezier(.42, 1.4, .51, 1.01);
+    }
 
-    .modal-header{
-      background:none; padding:15px 20px 0 24px;
-      font-size:1.5em; font-weight:bold; letter-spacing:1px;
+    @keyframes modal-pop {
+      from { opacity: 0; transform: scale(0.92); }
+      to   { opacity: 1; transform: scale(1); }
     }
-    .modal-header::after{
-      content:""; display:block; height:5px; width:70%;
-      margin:.5rem 0 0; border-radius:2px;
-      background:linear-gradient(to right,#53e2ff99 65%,#53e2ff00 100%);
-      pointer-events:none;
+
+    /* ===== Header：改成左右區塊、右側等高並靠右、下方分界線滿寬 ===== */
+    .modal-header {
+      background: none;
+      padding: 15px 20px 0px 24px;
+      font-size: 1.5em; font-weight: bold;
+      letter-spacing: 1px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;            /* 讓分界線可換行到下一行 */
     }
-    .modal-body{
-      color:#fff; padding:12px 24px 24px 24px;
-      font-size:1.2em; line-height:1.5; text-shadow:0 1px 4px #0008;
-      overflow-y:auto; max-height:240px; white-space:pre-line;
+    .modal-header::after {
+      content: "";
+      display: block;
+      height: 5px;
+      width: 100%;                /* 滿寬分界線 */
+      margin:.5rem 0 0;
+      border-radius: 2px;
+      background: linear-gradient(to right,#53e2ff99 65%,#53e2ff00 100%);
+      pointer-events: none;
+      flex-basis: 100%;           /* 讓分界線獨佔一行 */
+    }
+    .header-title { flex: 1; }    /* 標題靠左，撐開空間 */
+    .header-actions{
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-left: auto;          /* 右側貼齊 */
+    }
+    /* 等高：選單與按鈕高度一致 */
+    #student-filter{
+      height: var(--control-h);
+      padding: 0 .6rem;
+      border-radius: .5rem;
+      border: 1px solid var(--panel-stroke);
+      background: #fff;
+      font: inherit;
+    }
+    .manage-btn{
+      display: inline-flex;
+      align-items: center;
+      height: var(--control-h);
+      padding: 0 .9rem;
+      border-radius: .55rem;
+      border: 1px solid #d1d5db;
+      background: #f9fafb;
+      cursor: pointer;
+      text-decoration: none;
+      color: #111827;
+      line-height: 1;
+    }
+    .manage-btn:hover{ background:#eef2f7; }
+
+    .modal-body {
+      color:#fff; padding: 12px 24px 24px 24px;
+      font-size: 1.2em; line-height:1.5; text-shadow:0 1px 4px #0008;
+      overflow-y:auto; max-height:240px; white-space: pre-line;
       scrollbar-width:none;
     }
-    .modal-body::-webkit-scrollbar{ display:none; }
-
-    /* ===== 書櫃彈窗專屬 header 右側對齊 + 等高 ===== */
-    .modal-content2 .modal-header{
-      display:flex; align-items:center; gap:12px;
-      color:#0f172a; text-shadow:none;  /* 書櫃是淺底，改深色字 */
-    }
-    .modal-content2 .modal-header::after{ width:100%; } /* 分界線拉滿 */
-    .modal-header-title{
-      flex:1 1 auto; min-width:0;
-      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-    }
-    .header-actions{
-      display:flex; align-items:center; gap:8px; margin-left:auto;
-    }
-    #student-filter{
-      height:var(--control-h);
-      padding:0 .9rem;
-      border:1px solid var(--panel-stroke);
-      border-radius:.55rem;
-      background:#fff; color:#111827; outline:none;
-    }
-    .modal-header .manage-btn{
-      height:var(--control-h);
-      display:inline-flex; align-items:center; justify-content:center;
-      padding:0 .9rem;
-      border:1px solid #d1d5db; background:#f9fafb; border-radius:.55rem;
-      text-decoration:none; color:#111827; cursor:pointer;
-    }
-    .modal-header .manage-btn:hover{ background:#eef2f7; }
-
-    /* 書櫃彈窗內容：用深色字、去除 text-shadow、讓內容可滾動 */
-    .modal-content2 .modal-body{
-      color:#111827; text-shadow:none;
-      max-height:none; flex:1 1 auto; overflow:auto;
-    }
+    .modal-body::-webkit-scrollbar { display:none; }
 
     /* 書卡片 */
-    .book-list{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+    .book-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
     .book-card{
-      display:flex; gap:12px; align-items:center;
-      background:#fff; border:1px solid rgba(0,0,0,.06); border-radius:12px;
+      display:flex;gap:12px;align-items:center;
+      background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:12px;
       padding:10px 12px;
+      color:#111827;
     }
     .book-icon{
-      width:56px; height:70px; flex:0 0 auto; border-radius:6px; overflow:hidden;
-      display:grid; place-items:center; border:1px solid rgba(0,0,0,.08);
+      width:56px;height:70px;flex:0 0 auto;border-radius:6px;overflow:hidden;
+      display:grid;place-items:center;border:1px solid rgba(0,0,0,.08);
     }
-    .book-icon img{ max-width:100%; max-height:100%; display:block; }
-    .book-meta{ min-width:0; display:flex; flex-direction:column; gap:4px; }
-    .book-title{ font-weight:700; line-height:1.2; white-space:nowrap; text-overflow:ellipsis; overflow:hidden; }
-    .book-sub{ font-size:.88rem; color:#6b7280; }
-    .book-actions{ margin-left:auto; }
-    .go-btn{ display:inline-block; padding:.45rem .7rem; border-radius:.55rem; border:1px solid #d1d5db; background:#f9fafb; cursor:pointer; text-decoration:none; color:#111827; }
-    .go-btn:hover{ background:#eef2f7; }
-
-    @media (max-width:640px){ .book-list{ grid-template-columns:1fr; } }
+    .book-icon img{max-width:100%;max-height:100%;display:block;}
+    .book-meta{min-width:0;display:flex;flex-direction:column;gap:4px;}
+    .book-title{font-weight:700;line-height:1.2;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;}
+    .book-sub{font-size:.88rem;color:#6b7280;}
+    .book-actions{margin-left:auto;}
+    .go-btn{
+      display:inline-block;padding:.45rem .7rem;border-radius:.55rem;border:1px solid #d1d5db;background:#f9fafb;cursor:pointer;text-decoration:none;color:#111827;
+    }
+    .go-btn:hover{background:#eef2f7;}
+    @media (max-width: 640px){
+      .book-list{grid-template-columns:1fr;}
+    }
   </style>
 </head>
 <body>
 
   <!-- 旋轉提示（不可關閉） -->
-  <div id="orientation-modal" class="modal-overlay" style="display:flex;">
+  <div id="orientation-modal" class="modal-overlay" style="display: flex;">
     <div class="modal-content">
-      <div class="modal-header" style="color:#fff; text-shadow:0 1px 4px #000a;">請旋轉螢幕</div>
+      <div class="modal-header"style="color:#fff;text-shadow:0 1px 4px #000a;">請旋轉螢幕</div>
       <div class="modal-body">為了最佳體驗，請將裝置轉成橫向模式</div>
     </div>
   </div>
 
-  <!-- 書櫃彈窗（預設開啟；注意 id 是 library-modal） -->
-  <div id="library-modal" class="modal-overlay" style="display:flex;">
+  <!-- 書櫃彈窗（預設開啟；id 修正為 library-modal） -->
+  <div id="library-modal" class="modal-overlay" style="display: flex;">
     <div class="modal-content2">
       <div class="modal-header">
-        <div class="modal-header-title">歡迎來到 <span id="owner-name">玩家</span> 的書櫃</div>
+        <div class="header-title">歡迎來到 <span id="owner-name">玩家</span> 的書櫃</div>
         <div class="header-actions">
           <select id="student-filter"></select>
           <a id="manage-btn" class="manage-btn" href="./manage.html" style="display:none;">管理</a>
@@ -173,296 +226,371 @@
 
   <!-- 房間背景 & 書籍清單 -->
   <div class="room-wrap">
-    <div class="book book1-12" style="bottom:78.2%;"></div>
-    <div class="book book13-24" style="bottom:64.2%;"></div>
+    <!-- 第 1–12 本 -->
+    <div class="book book1-12" style="bottom: 78.2%;"></div>
+    <!-- 第 13–24 本 -->
+    <div class="book book13-24" style="bottom: 64.2%;"></div>
 
-    <!-- 書櫃上層覆蓋 -->
-    <img style="position:absolute; height:100%; width:100%;" src="https://shierusha.github.io/library/img/ROOM-TOP.png" alt="bookshelf overlay">
+    <!-- 蓋在書本上方的書櫃 -->
+    <img style="position: absolute; height: 100%; width: 100%;" src="https://shierusha.github.io/library/img/ROOM-TOP.png" alt="bookshelf overlay">
+
+    <!-- 可點擊的隱形大按鈕（打開彈窗） -->
     <button class="book-btn" aria-label="打開書櫃"></button>
   </div>
 
-  <!-- 若用檔案結構，取消註解並提供正確路徑 -->
-   <script">
-// ===== 快捷選擇器 =====
-const $  = (s, r=document) => r.querySelector(s);
-const $$ = (s, r=document) => [...r.querySelectorAll(s)];
+<script>
+  // ====== 快捷選擇器 ======
+  const $  = (s, r=document) => r.querySelector(s);
+  const $$ = (s, r=document) => [...r.querySelectorAll(s)];
 
-// ===== 自動字級（若有 .auto-resize）=====
-function resizeAllTexts(){
-  $$('.auto-resize').forEach(el=>{
-    const h = el.offsetHeight || el.getBoundingClientRect().height || 20;
-    el.style.fontSize = (h * 0.50) + 'px';
-  });
-}
-window.addEventListener('load', resizeAllTexts);
-window.addEventListener('resize', resizeAllTexts);
-
-// ===== 強制橫向（旋轉提示）=====
-function isPortrait(){ return window.matchMedia('(orientation: portrait)').matches || window.innerHeight > window.innerWidth; }
-const orientationModal = document.getElementById('orientation-modal');
-function enforceLandscape(){
-  const portrait = isPortrait();
-  if (orientationModal) orientationModal.style.display = portrait ? 'flex' : 'none';
-  document.body.style.overflow = portrait ? 'hidden' : '';
-}
-enforceLandscape();
-window.addEventListener('resize', enforceLandscape);
-window.addEventListener('orientationchange', enforceLandscape);
-if (orientationModal) orientationModal.addEventListener('click', e => e.stopPropagation()); // 不可關閉
-
-// ===== Supabase：兩個專案 =====
-const BOOKS_URL  = 'https://ogzpfrkwnqqaitytncla.supabase.co';
-const BOOKS_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nenBmcmt3bnFxYWl0eXRuY2xhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxODQzNzEsImV4cCI6MjA3MDc2MDM3MX0.Ls83xOXcKIW7FUcavr8_sOs37I18VGFWYNW3sNFRS24';
-const booksClient = window.supabase.createClient(BOOKS_URL, BOOKS_ANON);
-
-const client = window.supabase.createClient(
-  'https://wfhwhvodgikpducrhgda.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmaHdodm9kZ2lrcGR1Y3JoZ2RhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgwMTAwNjEsImV4cCI6MjA2MzU4NjA2MX0.P6P-x4SxjiR4VdWH6VFgY_ktgMac_OzuI4Bl7HWskz8'
-);
-
-const BOOK_ICON = 'https://shierusha.github.io/school-battle/images/book.png';
-
-// ===== 小工具 =====
-function fDate(x){
-  if(!x) return '';
-  const d = new Date(x);
-  if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleDateString('zh-TW', { year:'numeric', month:'2-digit', day:'2-digit' });
-}
-function bookImg(b){ return b?.cover_image || BOOK_ICON; }
-
-// ===== 主要流程狀態 =====
-let CURRENT_PLAYER = null;
-let OWNER_PLAYER   = null;
-let PLAYER_STUDENTS = [];
-let DEFAULT_STUDENT = null;
-let ALL_BOOKS = [];
-let booksChannel = null;
-
-// ===== 讀取登入玩家 & 角色 =====
-async function getCurrentPlayer(){
-  const { data: userRes, error: uErr } = await client.auth.getUser();
-  if (uErr) throw uErr;
-  const user = userRes?.user;
-  if (!user) return null;
-
-  const { data: p, error: pErr } = await client
-    .from('players').select('player_id, username, email')
-    .eq('player_id', user.id).maybeSingle();
-  if (pErr) throw pErr;
-
-  return { id:user.id, username: p?.username || user.user_metadata?.name || (p?.email ?? '玩家') };
-}
-
-async function getStudentByCode(code){
-  if (!code) return null;
-  const { data, error } = await client
-    .from('students')
-    .select('student_id, name, student_code, player_id')
-    .eq('student_code', code).maybeSingle();
-  if (error) throw error;
-  return data || null;
-}
-
-async function getPlayerProfile(playerId){
-  const { data, error } = await client
-    .from('players')
-    .select('player_id, username, email')
-    .eq('player_id', playerId).maybeSingle();
-  if (error) throw error;
-  if (!data) return { id:playerId, username:'玩家' };
-  return { id:data.player_id, username:data.username || data.email || '玩家' };
-}
-
-async function getOwnerStudents(playerId){
-  const { data, error } = await client
-    .from('students')
-    .select('student_id, name, student_code')
-    .eq('player_id', playerId)
-    .not('student_code', 'is', null)
-    .order('name', { ascending:true });
-  if (error) throw error;
-  return data || [];
-}
-
-// ===== 依分類抓書（books 專案）=====
-async function fetchBooksByFilter(ownerId, filterStudentId){
-  let q = booksClient
-    .from('books')
-    .select('id, title, cover_image, cover_color, updated_at, sort_order, student_id')
-    .eq('owner_id', ownerId)
-    .order('sort_order', { ascending:true })
-    .order('updated_at', { ascending:false });
-
-  if (filterStudentId && filterStudentId !== 'OTHER'){
-    q = q.eq('student_id', filterStudentId);
-  }else if (filterStudentId === 'OTHER'){
-    q = q.is('student_id', null);
-  }
-  const { data, error } = await q;
-  if (error) throw error;
-  return data || [];
-}
-
-// ===== UI：下拉 & 書單 & 書架 =====
-function renderFilterOptions(){
-  const sel = $('#student-filter');
-  if (!sel) return;
-  sel.innerHTML = '';
-
-  PLAYER_STUDENTS.forEach(s=>{
-    const opt = new Option(s.name, s.student_id, false, false);
-    sel.appendChild(opt);
-  });
-  sel.appendChild(new Option('其他', 'OTHER', false, false));
-
-  if (DEFAULT_STUDENT){
-    sel.value = DEFAULT_STUDENT.student_id;
-  }else{
-    sel.value = PLAYER_STUDENTS[0]?.student_id || 'OTHER';
-  }
-}
-
-function renderBookList(books){
-  const box = $('#book-list');
-  if (!box) return;
-  box.innerHTML = '';
-  if (!books.length){
-    box.innerHTML = `<div style="padding:12px;color:#6b7280;">沒有找到符合的書籍。</div>`;
-    return;
-  }
-  const frag = document.createDocumentFragment();
-  books.forEach(b=>{
-    const card = document.createElement('div'); card.className='book-card';
-    const icon = document.createElement('div'); icon.className='book-icon';
-    const filterStr = (b.cover_color || '').trim();
-    icon.innerHTML = `<img alt="book" src="${bookImg(b)}" style="${/^filter:/.test(filterStr) ? filterStr : ''}">`;
-    const meta = document.createElement('div'); meta.className='book-meta';
-    meta.innerHTML = `
-      <div class="book-title" title="${b.title}">${b.title}</div>
-      <div class="book-sub">最後更新日：${fDate(b.updated_at) || '—'}</div>`;
-    const actions = document.createElement('div'); actions.className='book-actions';
-    const link = document.createElement('a'); link.className='go-btn'; link.textContent='前往閱讀';
-    link.href = `./reader.html?book_id=${encodeURIComponent(b.id)}`;
-    actions.appendChild(link);
-    card.append(icon, meta, actions);
-    frag.appendChild(card);
-  });
-  box.appendChild(frag);
-}
-
-function renderShelves(books){
-  const shelf1 = document.querySelector('.book1-12');
-  const shelf2 = document.querySelector('.book13-24');
-  if (!shelf1 || !shelf2) return;
-
-  const leftStart = 3, delta = 8;
-  const heights = [75,80,85,90,95,100];
-
-  function renderShelf(el, slice){
-    el.innerHTML = '';
-    slice.forEach((b, i)=>{
-      const img = document.createElement('img');
-      const left = leftStart + i*delta;
-      const h = heights[Math.floor(Math.random()*heights.length)];
-      img.src = bookImg(b);
-      img.style.left   = left + '%';
-      img.style.height = h + '%';
-      img.style.position = 'absolute';
-      img.style.bottom = '0%';
-      img.style.width  = '20%';
-      img.title = b.title;
-      img.style.cursor = 'pointer';
-      const filterStr = (b.cover_color || '').trim();
-      if (/^filter:/.test(filterStr)) img.style.cssText += ';' + filterStr;
-      img.addEventListener('click',()=>{ window.location.href = `./reader.html?book_id=${encodeURIComponent(b.id)}`; });
-      el.appendChild(img);
+  // ====== 自動字級（若有 .auto-resize）======
+  function resizeAllTexts() {
+    $$('.auto-resize').forEach(el => {
+      const h = el.offsetHeight || el.getBoundingClientRect().height || 20;
+      el.style.fontSize = (h * 0.50) + 'px';
     });
   }
-  renderShelf(shelf1, books.slice(0,12));
-  renderShelf(shelf2, books.slice(12,24));
-}
+  window.addEventListener('load', resizeAllTexts);
+  window.addEventListener('resize', resizeAllTexts);
 
-async function refreshBooks(){
-  if (!OWNER_PLAYER?.id){ renderBookList([]); return; }
-  const sel = $('#student-filter');
-  const filter = sel?.value || 'OTHER';
-  const books = await fetchBooksByFilter(OWNER_PLAYER.id, filter);
-  ALL_BOOKS = books;
-  renderBookList(books);
-  renderShelves(books);
-}
+  // ====== 強制橫向（使用你的 Modal）======
+  function isPortrait(){
+    return window.matchMedia('(orientation: portrait)').matches || window.innerHeight > window.innerWidth;
+  }
+  const orientationModal = document.getElementById('orientation-modal');
+  function enforceLandscape(){
+    const portrait = isPortrait();
+    if (orientationModal) orientationModal.style.display = portrait ? 'flex' : 'none';
+    document.body.style.overflow = portrait ? 'hidden' : '';
+  }
+  enforceLandscape();
+  window.addEventListener('resize', enforceLandscape);
+  window.addEventListener('orientationchange', enforceLandscape);
+  if (orientationModal) orientationModal.addEventListener('click', e => e.stopPropagation()); // 不可關閉，只阻止冒泡
 
-// ===== Realtime：books 變化就刷新 =====
-function setupRealtime(ownerId){
-  if (booksChannel){ booksClient.removeChannel(booksChannel); booksChannel = null; }
-  booksChannel = booksClient
-    .channel('books-room-' + ownerId)
-    .on('postgres_changes', { event:'*', schema:'public', table:'books', filter:`owner_id=eq.${ownerId}` },
-      payload => { refreshBooks(); })
-    .subscribe();
-}
+  // =============================
+  // Supabase：兩個專案
+  // =============================
+  // 顯示「書」的專案（books）
+  const BOOKS_URL  = 'https://ogzpfrkwnqqaitytncla.supabase.co';
+  const BOOKS_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nenBmcmt3bnFxYWl0eXRuY2xhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxODQzNzEsImV4cCI6MjA3MDc2MDM3MX0.Ls83xOXcKIW7FUcavr8_sOs37I18VGFWYNW3sNFRS24';
+  const booksClient = window.supabase.createClient(BOOKS_URL, BOOKS_ANON);
 
-// ===== 初始化 =====
-async function init(){
-  try{
-    const params = new URLSearchParams(location.search);
-    const stuCode = params.get('stu');
+  // 登入/角色 專案（players/students）
+  const client = window.supabase.createClient(
+    'https://wfhwhvodgikpducrhgda.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmaHdodm9kZ2lrcGR1Y3JoZ2RhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgwMTAwNjEsImV4cCI6MjA2MzU4NjA2MX0.P6P-x4SxjiR4VdWH6VFgY_ktgMac_OzuI4Bl7HWskz8'
+  );
 
-    CURRENT_PLAYER = await getCurrentPlayer();
+  // 常數：書 ICON
+  const BOOK_ICON = 'https://shierusha.github.io/school-battle/images/book.png';
 
-    if (stuCode){
-      const stu = await getStudentByCode(stuCode);
-      if (stu){
-        DEFAULT_STUDENT = stu;
-        OWNER_PLAYER = await getPlayerProfile(stu.player_id);
-      }
+  // =============================
+  // 小工具
+  // =============================
+  function fDate(x){
+    if(!x) return '';
+    const d = new Date(x);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toLocaleDateString('zh-TW', { year:'numeric', month:'2-digit', day:'2-digit' });
+  }
+  function bookImg(b){
+    return b?.cover_image || BOOK_ICON;
+  }
+
+  // =============================
+  // 主要流程狀態
+  // =============================
+  let CURRENT_PLAYER = null;      // 目前登入者 { id, username }
+  let OWNER_PLAYER   = null;      // 房間持有者 { id, username }
+  let PLAYER_STUDENTS = [];       // 持有者的學生（有 student_code）
+  let DEFAULT_STUDENT = null;     // 由 ?stu 找到的學生 { student_id, name, student_code }
+  let ALL_BOOKS = [];
+
+  // =============================
+  // 讀取登入玩家 & 角色
+  // =============================
+  async function getCurrentPlayer(){
+    const { data: userRes, error: uErr } = await client.auth.getUser();
+    if (uErr) throw uErr;
+    const user = userRes?.user;
+    if (!user) return null;
+
+    const { data: p, error: pErr } = await client
+      .from('players')
+      .select('player_id, username, email')
+      .eq('player_id', user.id)
+      .maybeSingle();
+    if (pErr) throw pErr;
+
+    return {
+      id: user.id,
+      username: p?.username || user.user_metadata?.name || (p?.email ?? '玩家')
+    };
+  }
+
+  async function getStudentByCode(code){
+    if (!code) return null;
+    const { data, error } = await client
+      .from('students')
+      .select('student_id, name, student_code, player_id')
+      .eq('student_code', code)
+      .maybeSingle();
+    if (error) throw error;
+    return data || null;
+  }
+
+  async function getPlayerProfile(playerId){
+    const { data, error } = await client
+      .from('players')
+      .select('player_id, username, email')
+      .eq('player_id', playerId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return { id: playerId, username: '玩家' };
+    return { id: data.player_id, username: data.username || data.email || '玩家' };
+  }
+
+  async function getOwnerStudents(playerId){
+    const { data, error } = await client
+      .from('students')
+      .select('student_id, name, student_code')
+      .eq('player_id', playerId)
+      .not('student_code', 'is', null)     // 只要有 student_code 的
+      .order('name', { ascending: true });
+    if (error) throw error;
+    return data || [];
+  }
+
+  // =============================
+  // 依分類抓書（books 專案）
+  // =============================
+  async function fetchBooksByFilter(ownerId, filterStudentId){
+    let q = booksClient
+      .from('books')
+      .select('id, title, cover_image, cover_color, updated_at, sort_order, student_id')
+      .eq('owner_id', ownerId)
+      .order('sort_order', { ascending: true })
+      .order('updated_at', { ascending: false });
+
+    if (filterStudentId && filterStudentId !== 'OTHER'){
+      q = q.eq('student_id', filterStudentId);
+    } else if (filterStudentId === 'OTHER'){
+      q = q.is('student_id', null);
     }
-    if (!OWNER_PLAYER && CURRENT_PLAYER){
-      OWNER_PLAYER = { id:CURRENT_PLAYER.id, username:CURRENT_PLAYER.username };
-    }
+    const { data, error } = await q;
+    if (error) throw error;
+    return data || [];
+  }
 
-    $('#owner-name').textContent = OWNER_PLAYER?.username || '玩家';
-
-    if (OWNER_PLAYER?.id){
-      PLAYER_STUDENTS = await getOwnerStudents(OWNER_PLAYER.id);
-    }else{
-      PLAYER_STUDENTS = [];
-    }
-
-    renderFilterOptions();
-
-    const manageBtn = $('#manage-btn');
-    if (manageBtn){
-      manageBtn.style.display = (CURRENT_PLAYER && OWNER_PLAYER && CURRENT_PLAYER.id === OWNER_PLAYER.id) ? 'inline-flex' : 'none';
-    }
-
-    await refreshBooks();
-
+  // =============================
+  // UI：下拉 & 書單 & 書架
+  // =============================
+  function renderFilterOptions(){
     const sel = $('#student-filter');
-    if (sel) sel.addEventListener('change', refreshBooks);
+    if (!sel) return;
+    sel.innerHTML = '';
 
-    const libraryModal = document.getElementById('library-modal');
-    const openBtn = document.querySelector('.book-btn');
-    if (openBtn && libraryModal){
-      openBtn.addEventListener('click', ()=>{ libraryModal.style.display = 'flex'; });
+    // 只列出有 student_code 的學生
+    PLAYER_STUDENTS.forEach(s => {
+      const opt = new Option(s.name, s.student_id, false, false);
+      sel.appendChild(opt);
+    });
+
+    // 額外的「其他」
+    sel.appendChild(new Option('其他', 'OTHER', false, false));
+
+    // 預設選到 ?stu 的學生
+    if (DEFAULT_STUDENT){
+      sel.value = DEFAULT_STUDENT.student_id;
+    }else{
+      // 若沒有就選第一個或「其他」
+      sel.value = PLAYER_STUDENTS[0]?.student_id || 'OTHER';
     }
-    if (libraryModal){
-      libraryModal.addEventListener('click', (e)=>{
-        if (e.target === libraryModal) libraryModal.style.display = 'none';
+  }
+
+  function renderBookList(books){
+    const box = $('#book-list');
+    if (!box) return;
+    box.innerHTML = '';
+    if (!books.length){
+      box.innerHTML = `<div style="padding:12px;color:#6b7280;">沒有找到符合的書籍。</div>`;
+      return;
+    }
+    const frag = document.createDocumentFragment();
+    books.forEach(b => {
+      const card = document.createElement('div');
+      card.className = 'book-card';
+
+      const icon = document.createElement('div');
+      icon.className = 'book-icon';
+      const filterStr = (b.cover_color || '').trim();
+      icon.innerHTML = `<img alt="book" src="${bookImg(b)}" style="${/^filter:/.test(filterStr) ? filterStr : ''}">`;
+
+      const meta = document.createElement('div');
+      meta.className = 'book-meta';
+      meta.innerHTML = `
+        <div class="book-title" title="${b.title}">${b.title}</div>
+        <div class="book-sub">最後更新日：${fDate(b.updated_at) || '—'}</div>
+      `;
+
+      const actions = document.createElement('div');
+      actions.className = 'book-actions';
+      const link = document.createElement('a');
+      link.className = 'go-btn';
+      link.textContent = '前往閱讀';
+      link.href = `./reader.html?book_id=${encodeURIComponent(b.id)}`;
+      actions.appendChild(link);
+
+      card.append(icon, meta, actions);
+      frag.appendChild(card);
+    });
+    box.appendChild(frag);
+  }
+
+  // 把最多 24 本書渲染到兩層書架上
+  function renderShelves(books){
+    const shelf1 = document.querySelector('.book1-12');
+    const shelf2 = document.querySelector('.book13-24');
+    if (!shelf1 || !shelf2) return;
+
+    const leftStart = 3;    // 第一本 left%
+    const delta = 8;        // 每本 +8%（3,11,19…）
+    const heights = [75,80,85,90,95,100];
+
+    function renderShelf(el, slice){
+      el.innerHTML = '';
+      slice.forEach((b, i) => {
+        const img = document.createElement('img');
+        const left = leftStart + i*delta;
+        const h = heights[Math.floor(Math.random()*heights.length)];
+        img.src = bookImg(b);
+        img.style.left = left + '%';
+        img.style.height = h + '%';
+        img.style.position = 'absolute';
+        img.style.bottom = '0%';
+        img.style.width = '20%';
+        img.title = b.title;
+        img.style.cursor = 'pointer';
+        const filterStr = (b.cover_color || '').trim();
+        if (/^filter:/.test(filterStr)) img.style.cssText += ';' + filterStr;
+
+        img.addEventListener('click', () => {
+          window.location.href = `./reader.html?book_id=${encodeURIComponent(b.id)}`;
+        });
+        el.appendChild(img);
       });
     }
 
-    if (OWNER_PLAYER?.id) setupRealtime(OWNER_PLAYER.id);
-
-  }catch(err){
-    console.error('[Init Error]', err);
-    renderBookList([]);
+    renderShelf(shelf1, books.slice(0, 12));
+    renderShelf(shelf2, books.slice(12, 24));
   }
-}
-window.addEventListener('load', init);
 
+  async function refreshBooks(){
+    if (!OWNER_PLAYER?.id) { renderBookList([]); return; }
+    const sel = $('#student-filter');
+    const filter = sel?.value || 'OTHER';
+    const books = await fetchBooksByFilter(OWNER_PLAYER.id, filter);
+    ALL_BOOKS = books;
+    renderBookList(books);
+    renderShelves(books);
+  }
 
-</script> 
+  // =============================
+  // Realtime：books 有變化就自動刷新（同一位 owner）
+  // =============================
+  let booksChannel = null;
+  function setupRealtime(ownerId){
+    if (booksChannel) { booksClient.removeChannel(booksChannel); booksChannel = null; }
+    booksChannel = booksClient
+      .channel('books-room-' + ownerId)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'books', filter: `owner_id=eq.${ownerId}` },
+        payload => { refreshBooks(); })
+      .subscribe();
+  }
+
+  // =============================
+  // 初始化流程
+  // =============================
+  async function init(){
+    try{
+      const params = new URLSearchParams(location.search);
+      const stuCode = params.get('stu');          // ?stu=student_code
+
+      CURRENT_PLAYER = await getCurrentPlayer();
+
+      if (stuCode){
+        // 以 stuCode 找到房間持有者（該學生的 player_id）
+        const stu = await getStudentByCode(stuCode);
+        if (stu){
+          DEFAULT_STUDENT = stu;
+          OWNER_PLAYER = await getPlayerProfile(stu.player_id);
+        }
+      }
+
+      // 沒有 stu 或找不到 → 預設用登入者當持有者（若有登入）
+      if (!OWNER_PLAYER && CURRENT_PLAYER){
+        OWNER_PLAYER = { id: CURRENT_PLAYER.id, username: CURRENT_PLAYER.username };
+      }
+
+      // 更新標題
+      $('#owner-name').textContent = OWNER_PLAYER?.username || '玩家';
+
+      // 取得持有者的所有「有 student_code」的學生清單
+      if (OWNER_PLAYER?.id){
+        PLAYER_STUDENTS = await getOwnerStudents(OWNER_PLAYER.id);
+      }else{
+        PLAYER_STUDENTS = [];
+      }
+
+      // 下拉：只放有 student_code 的；預設選到 stuCode 指向的那位
+      renderFilterOptions();
+
+      // 管理按鈕：持有者 = 登入者 才顯示
+      const manageBtn = $('#manage-btn');
+      if (manageBtn){
+        manageBtn.style.display = (CURRENT_PLAYER && OWNER_PLAYER && CURRENT_PLAYER.id === OWNER_PLAYER.id) ? 'inline-flex' : 'none';
+      }
+
+      // 初次載入書籍 + 書架
+      await refreshBooks();
+
+      // 監聽下拉切換
+      const selEl = document.getElementById('student-filter');
+      if (selEl) selEl.addEventListener('change', refreshBooks);
+
+      // 書架彈窗開啟按鈕（點書櫃）
+      const openBtn = document.querySelector('.book-btn');
+      if (openBtn){
+        openBtn.addEventListener('click', () => {
+          const modal = document.getElementById('library-modal');
+          if (modal) modal.style.display = 'flex';
+        });
+      }
+
+      // 點背景關閉（如不想關可註解）
+      const libModal = document.getElementById('library-modal');
+      if (libModal){
+        libModal.addEventListener('click', (e) => {
+          if (e.target === libModal) libModal.style.display = 'none';
+        });
+      }
+
+      // 啟用 Realtime 監聽
+      if (OWNER_PLAYER?.id) setupRealtime(OWNER_PLAYER.id);
+
+    }catch(err){
+      console.error('[Init Error]', err);
+      renderBookList([]);
+    }
+  }
+
+  // 預設開啟彈窗 & 初始化
+  window.addEventListener('load', () => {
+    enforceLandscape();
+    init();
+  });
+</script>
+
 </body>
 </html>
