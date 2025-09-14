@@ -400,18 +400,25 @@ img {
   // 依分類抓書（books 專案）
   // =============================
   async function fetchBooksByFilter(ownerId, filterStudentId){
+    // 防呆：ownerId 缺失時不要組出 eq.undefined 造成 400
+    if (!ownerId) {
+      console.warn('[books] missing ownerId, skip querying');
+      return [];
+    }
+
     let q = booksClient
       .from('books')
-      .select('id, title, cover_image, cover_color, updated_at, sort_order, student_id')
+      .select('id, title, cover_image, cover_color, updated_at, sort_order, student_id, owner_id')
       .eq('owner_id', ownerId)
       .order('sort_order', { ascending: true })
       .order('updated_at', { ascending: false });
 
-    if (filterStudentId && filterStudentId !== 'OTHER'){
-      q = q.eq('student_id', filterStudentId);
-    } else if (filterStudentId === 'OTHER'){
+    if (filterStudentId === 'OTHER'){
       q = q.is('student_id', null);
+    } else if (filterStudentId){
+      q = q.eq('student_id', filterStudentId);
     }
+
     const { data, error } = await q;
     if (error) throw error;
     return data || [];
@@ -431,14 +438,13 @@ img {
       sel.appendChild(opt);
     });
 
-    // 額外的「其他」
+    // 額外的「其他」（沒有綁學生）
     sel.appendChild(new Option('其他', 'OTHER', false, false));
 
-    // 預設選到 ?stu 的學生
+    // 預設選到 ?stu 的學生；沒有就選第一個或「其他」
     if (DEFAULT_STUDENT){
       sel.value = DEFAULT_STUDENT.student_id;
     }else{
-      // 若沒有就選第一個或「其他」
       sel.value = PLAYER_STUDENTS[0]?.student_id || 'OTHER';
     }
   }
@@ -459,7 +465,7 @@ img {
       const icon = document.createElement('div');
       icon.className = 'book-icon';
       const filterStr = (b.cover_color || '').trim();
-icon.innerHTML = `<img draggable="false" alt="book" src="${bookImg(b)}" style="${/^filter:/.test(filterStr) ? filterStr : ''}">`;
+      icon.innerHTML = `<img draggable="false" alt="book" src="${bookImg(b)}" style="${/^filter:/.test(filterStr) ? filterStr : ''}">`;
 
       const meta = document.createElement('div');
       meta.className = 'book-meta';
@@ -489,14 +495,14 @@ icon.innerHTML = `<img draggable="false" alt="book" src="${bookImg(b)}" style="$
     if (!shelf1 || !shelf2) return;
 
     const leftStart = 3;    // 第一本 left%
-    const delta = 6;        // 每本 +8%（3,11,19…）
+    const delta = 6;        // 每本 +6%（3,9,15…）
     const heights = [75,80,85,90,95,100];
 
     function renderShelf(el, slice){
       el.innerHTML = '';
       slice.forEach((b, i) => {
         const img = document.createElement('img');
-        img.draggable = false;               
+        img.draggable = false;               // 禁拖
         const left = leftStart + i*delta;
         const h = heights[Math.floor(Math.random()*heights.length)];
         img.src = bookImg(b);
@@ -522,9 +528,14 @@ icon.innerHTML = `<img draggable="false" alt="book" src="${bookImg(b)}" style="$
   }
 
   async function refreshBooks(){
-    if (!OWNER_PLAYER?.id) { renderBookList([]); return; }
+    if (!OWNER_PLAYER?.id) {
+      console.warn('[books] refresh skipped: missing OWNER_PLAYER.id');
+      renderBookList([]);
+      return;
+    }
     const sel = $('#student-filter');
     const filter = sel?.value || 'OTHER';
+    console.log('[books] query with owner=', OWNER_PLAYER.id, 'student=', filter);
     const books = await fetchBooksByFilter(OWNER_PLAYER.id, filter);
     ALL_BOOKS = books;
     renderBookList(books);
@@ -568,6 +579,10 @@ icon.innerHTML = `<img draggable="false" alt="book" src="${bookImg(b)}" style="$
         OWNER_PLAYER = { id: CURRENT_PLAYER.id, username: CURRENT_PLAYER.username };
       }
 
+      // 將 OWNER 掛到 window 便於除錯
+      window.OWNER_PLAYER = OWNER_PLAYER;
+      console.log('[INIT] OWNER_PLAYER =', OWNER_PLAYER);
+
       // 更新標題
       $('#owner-name').textContent = OWNER_PLAYER?.username || '玩家';
 
@@ -580,6 +595,8 @@ icon.innerHTML = `<img draggable="false" alt="book" src="${bookImg(b)}" style="$
 
       // 下拉：只放有 student_code 的；預設選到 stuCode 指向的那位
       renderFilterOptions();
+      console.log('[DEBUG] selected student filter =', $('#student-filter')?.value);
+      console.log('[DEBUG] ownerId =', OWNER_PLAYER?.id);
 
       // 管理按鈕：持有者 = 登入者 才顯示
       const manageBtn = $('#manage-btn');
@@ -625,7 +642,15 @@ icon.innerHTML = `<img draggable="false" alt="book" src="${bookImg(b)}" style="$
     enforceLandscape();
     init();
   });
+
+  // ====== 全域保險：禁止拖曳所有 <img>（不影響點擊）======
+  document.addEventListener('dragstart', e => {
+    if (e.target && e.target.tagName === 'IMG') {
+      e.preventDefault();
+    }
+  });
 </script>
+
 
 </body>
 </html>
