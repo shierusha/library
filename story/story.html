@@ -5,7 +5,7 @@
   <meta
     name="viewport"
     content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>謝爾夏|休息室</title>
+  <title>我的書櫃</title>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
   <!-- Supabase JS v2 -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -78,4 +78,341 @@
       border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.35);
       overflow:hidden;max-width:920px;width:92%;
     }
-    .modal-header{padding:14px 16p
+    .modal-header{padding:14px 16px;border-bottom:1px solid var(--panel-stroke,rgba(0,0,0,.06));display:flex;align-items:center;gap:.75rem;}
+    .modal-body{padding:14px;}
+
+    /* 書卡片 */
+    .book-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
+    .book-card{
+      display:flex;gap:12px;align-items:center;
+      background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:12px;
+      padding:10px 12px;
+    }
+    .book-icon{
+      width:56px;height:70px;flex:0 0 auto;border-radius:6px;overflow:hidden;
+      display:grid;place-items:center;border:1px solid rgba(0,0,0,.08);
+    }
+    .book-icon img{max-width:100%;max-height:100%;display:block;}
+    .book-meta{min-width:0;display:flex;flex-direction:column;gap:4px;}
+    .book-title{font-weight:700;line-height:1.2;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;}
+    .book-sub{font-size:.88rem;color:#6b7280;}
+    .book-actions{margin-left:auto;}
+    .go-btn{
+      display:inline-block;padding:.45rem .7rem;border-radius:.55rem;border:1px solid #d1d5db;background:#f9fafb;cursor:pointer;text-decoration:none;color:#111827;
+    }
+    .go-btn:hover{background:#eef2f7;}
+    @media (max-width: 640px){
+      .book-list{grid-template-columns:1fr;}
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 旋轉提示（不可關閉） -->
+  <div id="orientation-modal" class="modal-overlay" style="display:none;">
+    <div class="modal-content">
+      <div class="modal-header">請旋轉螢幕</div>
+      <div class="modal-body">為了最佳體驗，請將裝置轉成橫向模式</div>
+    </div>
+  </div>
+
+  <!-- 書櫃彈窗（預設開啟） -->
+  <div id="library-modal" class="modal-overlay" style="display:flex;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div style="font-weight:700;font-size:1.2rem;">歡迎來到 <span id="owner-name">你的</span> 的書櫃</div>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:.5rem;">
+          <label for="student-filter" style="font-size:.95rem;">分類：</label>
+          <!-- 下拉：玩家所有角色 +「其他」 -->
+          <select id="student-filter" style="padding:.4rem .6rem;border-radius:.5rem;border:1px solid var(--panel-stroke);background:#fff;"></select>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div id="book-list" class="book-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 房間背景 & 書籍清單 -->
+  <div class="room-wrap">
+    <!-- 第 1–12 本 -->
+    <div class="book book1-12" style="bottom: 78.2%;"></div>
+    <!-- 第 13–24 本 -->
+    <div class="book book13-24" style="bottom: 64.2%;"></div>
+
+    <!-- 蓋在書本上方的書櫃 -->
+    <img style="position: absolute; height: 100%; width: 100%;" src="https://shierusha.github.io/library/img/ROOM-TOP.png" alt="bookshelf overlay">
+
+    <!-- 可點擊的隱形大按鈕（打開彈窗） -->
+    <button class="book-btn" aria-label="打開書櫃"></button>
+  </div>
+
+<script>
+  // ====== 快捷選擇器 ======
+  const $  = (s, r=document) => r.querySelector(s);
+  const $$ = (s, r=document) => [...r.querySelectorAll(s)];
+
+  // ====== 自動字級（若有 .auto-resize）======
+  function resizeAllTexts() {
+    $$('.auto-resize').forEach(el => {
+      const h = el.offsetHeight || el.getBoundingClientRect().height || 20;
+      el.style.fontSize = (h * 0.50) + 'px';
+    });
+  }
+  window.addEventListener('load', resizeAllTexts);
+  window.addEventListener('resize', resizeAllTexts);
+
+  // ====== 強制橫向（使用你的 Modal）======
+  function isPortrait(){
+    return window.matchMedia('(orientation: portrait)').matches || window.innerHeight > window.innerWidth;
+  }
+  const orientationModal = document.getElementById('orientation-modal');
+  function enforceLandscape(){
+    const portrait = isPortrait();
+    if (orientationModal) orientationModal.style.display = portrait ? 'flex' : 'none';
+    document.body.style.overflow = portrait ? 'hidden' : '';
+  }
+  enforceLandscape();
+  window.addEventListener('resize', enforceLandscape);
+  window.addEventListener('orientationchange', enforceLandscape);
+  if (orientationModal) orientationModal.addEventListener('click', e => e.stopPropagation()); // 不可關閉，只阻止冒泡
+
+  // =============================
+  // Supabase：兩個專案
+  // =============================
+  // 顯示「書」的專案（books）
+  const BOOKS_URL  = 'https://ogzpfrkwnqqaitytncla.supabase.co';
+  const BOOKS_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nenBmcmt3bnFxYWl0eXRuY2xhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxODQzNzEsImV4cCI6MjA3MDc2MDM3MX0.Ls83xOXcKIW7FUcavr8_sOs37I18VGFWYNW3sNFRS24';
+  const booksClient = window.supabase.createClient(BOOKS_URL, BOOKS_ANON);
+
+  // 登入/角色 專案（players/students），你已提供 client 設定：
+  const client = window.supabase.createClient(
+    'https://wfhwhvodgikpducrhgda.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmaHdodm9kZ2lrcGR1Y3JoZ2RhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgwMTAwNjEsImV4cCI6MjA2MzU4NjA2MX0.P6P-x4SxjiR4VdWH6VFgY_ktgMac_OzuI4Bl7HWskz8'
+  );
+
+  // =============================
+  // 小工具
+  // =============================
+  function fDate(x){
+    if(!x) return '';
+    const d = new Date(x);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toLocaleDateString('zh-TW', { year:'numeric', month:'2-digit', day:'2-digit' });
+  }
+  function defaultBookIcon(b){
+    return b?.cover_image || 'https://shierusha.github.io/library/img/book1.png';
+  }
+
+  // =============================
+  // 主要流程狀態
+  // =============================
+  let CURRENT_PLAYER = null;    // { id, username }
+  let PLAYER_STUDENTS = [];     // [{student_id, name}]
+  let ALL_BOOKS = [];           // 目前拉回的書
+
+  // =============================
+  // 讀取登入玩家 & 角色
+  // =============================
+  async function getCurrentPlayer(){
+    const { data: userRes, error: uErr } = await client.auth.getUser();
+    if (uErr) throw uErr;
+    const user = userRes?.user;
+    if (!user) return null;
+
+    const { data: p, error: pErr } = await client
+      .from('players')
+      .select('player_id, username, email')
+      .eq('player_id', user.id)
+      .maybeSingle();
+    if (pErr) throw pErr;
+
+    return {
+      id: user.id,
+      username: p?.username || user.user_metadata?.name || (p?.email ?? '玩家')
+    };
+  }
+
+  async function getMyStudents(playerId){
+    const { data, error } = await client
+      .from('students')
+      .select('student_id, name')
+      .eq('player_id', playerId)
+      .order('name', { ascending: true });
+    if (error) throw error;
+    return data || [];
+  }
+
+  // =============================
+  // 依分類抓書（books 專案）
+  // filterStudentId: <uuid> | 'OTHER'
+  // 排序：照你需求 → sort_order ASC，再 updated_at DESC
+  // =============================
+  async function fetchBooksByFilter(ownerId, filterStudentId){
+    let q = booksClient
+      .from('books')
+      .select('id, title, cover_image, cover_color, updated_at, sort_order, student_id')
+      .eq('owner_id', ownerId)
+      .order('sort_order', { ascending: true })
+      .order('updated_at', { ascending: false });
+
+    if (filterStudentId && filterStudentId !== 'OTHER'){
+      q = q.eq('student_id', filterStudentId);
+    } else if (filterStudentId === 'OTHER'){
+      q = q.is('student_id', null);
+    }
+    const { data, error } = await q;
+    if (error) throw error;
+    return data || [];
+  }
+
+  // =============================
+  // UI：下拉 & 書單 & 書架
+  // =============================
+  function renderFilterOptions(){
+    const sel = $('#student-filter');
+    sel.innerHTML = '';
+    // 只放「所有角色名稱 + 一個『其他』」
+    if (PLAYER_STUDENTS.length){
+      PLAYER_STUDENTS.forEach((s, idx) => {
+        sel.appendChild(new Option(s.name, s.student_id, idx===0, idx===0));
+      });
+      sel.appendChild(new Option('其他', 'OTHER', false, false));
+    }else{
+      // 沒有角色：只顯示「其他」
+      sel.appendChild(new Option('其他', 'OTHER', true, true));
+    }
+  }
+
+  function renderBookList(books){
+    const box = $('#book-list');
+    box.innerHTML = '';
+    if (!books.length){
+      box.innerHTML = `<div style="padding:12px;color:#6b7280;">沒有找到符合的書籍。</div>`;
+      return;
+    }
+    const frag = document.createDocumentFragment();
+    books.forEach(b => {
+      const card = document.createElement('div');
+      card.className = 'book-card';
+
+      const icon = document.createElement('div');
+      icon.className = 'book-icon';
+      icon.style.background = b.cover_color || '#f3f4f6';
+      icon.innerHTML = `<img alt="book" src="${defaultBookIcon(b)}">`;
+
+      const meta = document.createElement('div');
+      meta.className = 'book-meta';
+      meta.innerHTML = `
+        <div class="book-title" title="${b.title}">${b.title}</div>
+        <div class="book-sub">最後更新日：${fDate(b.updated_at) || '—'}</div>
+      `;
+
+      const actions = document.createElement('div');
+      actions.className = 'book-actions';
+      const link = document.createElement('a');
+      link.className = 'go-btn';
+      link.textContent = '前往閱讀';
+      link.href = `./reader.html?book_id=${encodeURIComponent(b.id)}`;
+      actions.appendChild(link);
+
+      card.append(icon, meta, actions);
+      frag.appendChild(card);
+    });
+    box.appendChild(frag);
+  }
+
+  // （可選）把最多 24 本書渲染到你的兩層書架上
+  function renderShelves(books){
+    const shelf1 = document.querySelector('.book1-12');
+    const shelf2 = document.querySelector('.book13-24');
+    if (!shelf1 || !shelf2) return;
+
+    const leftStart = 3;   // 第一本 left%
+    const delta = 8;       // 每本 +8%
+    const heights = [75,80,85,90,95,100];
+
+    function renderShelf(el, slice){
+      el.innerHTML = '';
+      slice.forEach((b, i) => {
+        const img = document.createElement('img');
+        const left = leftStart + i*delta;
+        const h = heights[Math.floor(Math.random()*heights.length)];
+        img.src = defaultBookIcon(b);
+        img.style.left = left + '%';
+        img.style.height = h + '%';
+        img.style.position = 'absolute';
+        img.style.bottom = '0%';
+        img.style.width = '20%';
+        img.title = b.title;
+        img.style.cursor = 'pointer';
+        img.addEventListener('click', () => {
+          window.location.href = `./reader.html?book_id=${encodeURIComponent(b.id)}`;
+        });
+        el.appendChild(img);
+      });
+    }
+
+    renderShelf(shelf1, books.slice(0, 12));
+    renderShelf(shelf2, books.slice(12, 24));
+  }
+
+  async function refreshBooks(){
+    const sel = $('#student-filter');
+    const filter = sel?.value || 'OTHER';
+    const books = await fetchBooksByFilter(CURRENT_PLAYER.id, filter);
+    ALL_BOOKS = books;
+    renderBookList(books);
+    // 若想同步更新房間書架 → 取消註解：
+    // renderShelves(books);
+  }
+
+  // =============================
+  // 初始化流程
+  // =============================
+  async function initLibraryModal(){
+    try{
+      CURRENT_PLAYER = await getCurrentPlayer();
+      if (!CURRENT_PLAYER){
+        $('#owner-name').textContent = '訪客';
+        PLAYER_STUDENTS = [];
+        renderFilterOptions();
+        renderBookList([]);
+        return;
+      }
+
+      $('#owner-name').textContent = CURRENT_PLAYER.username || '玩家';
+      PLAYER_STUDENTS = await getMyStudents(CURRENT_PLAYER.id);
+      renderFilterOptions();
+      await refreshBooks();
+
+      // 下拉切換
+      $('#student-filter').addEventListener('change', refreshBooks);
+
+      // 房間上的大按鈕 → 打開彈窗
+      const openBtn = document.querySelector('.book-btn');
+      if (openBtn){
+        openBtn.addEventListener('click', () => {
+          const modal = $('#library-modal');
+          if (modal) modal.style.display = 'flex';
+        });
+      }
+
+      // 點背景關閉（如不想關，註解掉）
+      const libModal = document.getElementById('library-modal');
+      libModal.addEventListener('click', (e) => {
+        if (e.target === libModal) libModal.style.display = 'none';
+      });
+
+    }catch(err){
+      console.error('[Library Modal Init Error]', err);
+      renderBookList([]);
+    }
+  }
+
+  // 預設開啟彈窗 & 初始化
+  window.addEventListener('load', initLibraryModal);
+</script>
+
+</body>
+</html>
