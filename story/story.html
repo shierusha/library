@@ -91,6 +91,24 @@
   overflow: hidden;
   animation: modal-pop 0.32s cubic-bezier(.42,1.4,.51,1.01);
 }
+.modal-content2 {
+    background: rgb(255 255 255 / 69%);
+    border-radius: 18px;
+    border: 2px solid #1eb5e5;
+    box-shadow: 0 0 16px 2px #62f1fe88, 0 8px 32px #1eb5e5aa;
+    width: 75vw;
+    max-width: 1200px;
+    min-height: 75vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: modal-pop 0.32s 
+cubic-bezier(.42, 1.4, .51, 1.01);
+}
+
+
+
+
 @keyframes modal-pop {
   from { opacity: 0; transform: scale(0.92); }
   to   { opacity: 1; transform: scale(1); }
@@ -98,8 +116,8 @@
 .modal-header {
   background: none;
   padding: 15px 20px 0px 24px;
-  color: #fff; font-size: 1.5em; font-weight: bold;
-  letter-spacing: 1px; text-shadow: 0 1px 4px #000a;
+  font-size: 1.5em; font-weight: bold;
+  letter-spacing: 1px; 
 }
 .modal-header::after {
   content: ""; display: block; height: 5px; width: 70%;
@@ -146,7 +164,9 @@
   <!-- 旋轉提示（不可關閉） -->
 <div id="orientation-modal" class="modal-overlay" style="display: flex;">
     <div class="modal-content">
-      <div class="modal-header">請旋轉螢幕</div>
+      <div class="modal-header"style="
+    color: #fff;
+    text-shadow: 0 1px 4px #000a;">請旋轉螢幕</div>
       <div class="modal-body">為了最佳體驗，請將裝置轉成橫向模式</div>
     </div>
   </div>
@@ -154,7 +174,7 @@
   <!-- 書櫃彈窗（預設開啟；沿用你的 modal 樣式） -->
 
 <div id="orientation-modal" class="modal-overlay" style="display: flex;">
-    <div class="modal-content">
+    <div class="modal-content2">
       <div class="modal-header">歡迎來到 <span id="owner-name">玩家</span> 的書櫃 +
           <select id="student-filter" style="padding:.4rem .6rem;border-radius:.5rem;border:1px solid var(--panel-stroke);background:#fff;"></select>
           <a id="manage-btn" class="manage-btn" href="./manage.html" style="display:none;">管理</a>
