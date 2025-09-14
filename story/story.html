@@ -272,7 +272,8 @@ img {
     <button class="book-btn" aria-label="打開書櫃"></button>
   </div>
 
-<script>
+
+  <script>
   // ====== 快捷選擇器 ======
   const $  = (s, r=document) => r.querySelector(s);
   const $$ = (s, r=document) => [...r.querySelectorAll(s)];
@@ -318,6 +319,9 @@ img {
 
   // 常數：書 ICON
   const BOOK_ICON = 'https://shierusha.github.io/school-battle/images/book.png';
+
+  // Debug 開關（網址加 ?debug=1 啟用）
+  const DEBUG = new URLSearchParams(location.search).get('debug') === '1';
 
   // =============================
   // 小工具
@@ -402,7 +406,7 @@ img {
   async function fetchBooksByFilter(ownerId, filterStudentId){
     // 防呆：ownerId 缺失時不要組出 eq.undefined 造成 400
     if (!ownerId) {
-      console.warn('[books] missing ownerId, skip querying');
+      if (DEBUG) console.warn('[books] missing ownerId, skip querying');
       return [];
     }
 
@@ -529,17 +533,19 @@ img {
 
   async function refreshBooks(){
     if (!OWNER_PLAYER?.id) {
-      console.warn('[books] refresh skipped: missing OWNER_PLAYER.id');
+      if (DEBUG) console.warn('[books] refresh skipped: missing OWNER_PLAYER.id');
       renderBookList([]);
       return;
     }
     const sel = $('#student-filter');
     const filter = sel?.value || 'OTHER';
-    console.log('[books] query with owner=', OWNER_PLAYER.id, 'student=', filter);
+    if (DEBUG) console.log('[books] query with owner=', OWNER_PLAYER.id, 'student=', filter);
     const books = await fetchBooksByFilter(OWNER_PLAYER.id, filter);
     ALL_BOOKS = books;
     renderBookList(books);
     renderShelves(books);
+
+    if (DEBUG) await runDiagnostics(); // 只在 debug 模式下執行深度檢查
   }
 
   // =============================
@@ -553,6 +559,56 @@ img {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'books', filter: `owner_id=eq.${ownerId}` },
         payload => { refreshBooks(); })
       .subscribe();
+  }
+
+  // =============================
+  // 診斷工具（?debug=1）
+  // =============================
+  async function runDiagnostics(){
+    const ownerId = OWNER_PLAYER?.id;
+    const stuId = $('#student-filter')?.value;
+
+    console.log('%c[diag] ownerId / studentId', 'color:#0aa', ownerId, stuId);
+
+    // 1) owner + student
+    const q1 = await booksClient
+      .from('books')
+      .select('id,owner_id,student_id,title', { count: 'exact' })
+      .eq('owner_id', ownerId)
+      .eq('student_id', stuId)
+      .limit(5);
+    console.log('[diag] owner+student → count=', q1.count, 'error=', q1.error);
+    if (q1.data?.length) console.table(q1.data);
+
+    // 2) only student
+    const q2 = await booksClient
+      .from('books')
+      .select('id,owner_id,student_id,title', { count: 'exact' })
+      .eq('student_id', stuId)
+      .limit(5);
+    console.log('[diag] only student → count=', q2.count, 'error=', q2.error);
+    if (q2.data?.length) console.table(q2.data);
+
+    // 3) only owner
+    const q3 = await booksClient
+      .from('books')
+      .select('id,owner_id,student_id,title', { count: 'exact' })
+      .eq('owner_id', ownerId)
+      .limit(5);
+    console.log('[diag] only owner → count=', q3.count, 'error=', q3.error);
+    if (q3.data?.length) console.table(q3.data);
+
+    // 4) sample
+    const q4 = await booksClient
+      .from('books')
+      .select('id,owner_id,student_id,title', { count: 'exact' })
+      .limit(5);
+    console.log('[diag] sample(any) → count=', q4.count, 'error=', q4.error);
+    if (q4.data?.length) console.table(q4.data);
+
+    // 5) books 專案的 auth 狀態（純顯示，與 public read 無關）
+    const auth = await booksClient.auth.getUser();
+    console.log('[diag] books auth user =', auth?.data?.user ?? null);
   }
 
   // =============================
@@ -581,7 +637,7 @@ img {
 
       // 將 OWNER 掛到 window 便於除錯
       window.OWNER_PLAYER = OWNER_PLAYER;
-      console.log('[INIT] OWNER_PLAYER =', OWNER_PLAYER);
+      if (DEBUG) console.log('[INIT] OWNER_PLAYER =', OWNER_PLAYER);
 
       // 更新標題
       $('#owner-name').textContent = OWNER_PLAYER?.username || '玩家';
@@ -595,8 +651,10 @@ img {
 
       // 下拉：只放有 student_code 的；預設選到 stuCode 指向的那位
       renderFilterOptions();
-      console.log('[DEBUG] selected student filter =', $('#student-filter')?.value);
-      console.log('[DEBUG] ownerId =', OWNER_PLAYER?.id);
+      if (DEBUG) {
+        console.log('[DEBUG] selected student filter =', $('#student-filter')?.value);
+        console.log('[DEBUG] ownerId =', OWNER_PLAYER?.id);
+      }
 
       // 管理按鈕：持有者 = 登入者 才顯示
       const manageBtn = $('#manage-btn');
@@ -650,6 +708,7 @@ img {
     }
   });
 </script>
+
 
 
 </body>
