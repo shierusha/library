@@ -16,6 +16,9 @@
       --panel-stroke: rgba(0,0,0,.08);
       --text: #1f2937;
       --radius-2xl: 24px;
+      /* 工具列統一高 */
+      --ctrl-h: 38px;
+      --ctrl-pad-x: .8rem;
     }
     * { box-sizing: border-box; }
     html, body { height: 100%; }
@@ -66,73 +69,85 @@
       cursor: pointer;
     }
 
-    /* ===== 你的彈窗樣式沿用原本 class（無花俏濾鏡） ===== */
-   .modal-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 2000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  animation: modal-fadein-bg 0.25s;
-}
-@keyframes modal-fadein-bg {
-  from { background: rgba(0,0,0,0); }
-  to   { background: rgba(0,0,0,0.45); }
-}
-.modal-content {
-  background: rgb(13 27 77 / 82%);
-  border-radius: 18px;
-  border: 2px solid #1eb5e5;
-  box-shadow: 0 0 16px 2px #62f1fe88, 0 8px 32px #1eb5e5aa;
-  width: 500px; max-width: 93vw;
-  height: 340px; max-height: 80vh;
-  display: flex; flex-direction: column;
-  overflow: hidden;
-  animation: modal-pop 0.32s cubic-bezier(.42,1.4,.51,1.01);
-}
-.modal-content2 {
-    background: rgb(255 255 255 / 69%);
-    border-radius: 18px;
-    border: 2px solid #1eb5e5;
-    box-shadow: 0 0 16px 2px #62f1fe88, 0 8px 32px #1eb5e5aa;
-    width: 75vw;
-    max-width: 1200px;
-    min-height: 75vh;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    animation: modal-pop 0.32s 
-cubic-bezier(.42, 1.4, .51, 1.01);
-}
+    /* ===== Modal 基礎樣式 ===== */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 2000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: modal-fadein-bg 0.25s;
+    }
+    @keyframes modal-fadein-bg {
+      from { background: rgba(0,0,0,0); }
+      to   { background: rgba(0,0,0,0.45); }
+    }
+    .modal-content {
+      background: rgb(13 27 77 / 82%);
+      border-radius: 18px;
+      border: 2px solid #1eb5e5;
+      box-shadow: 0 0 16px 2px #62f1fe88, 0 8px 32px #1eb5e5aa;
+      width: 500px; max-width: 93vw;
+      height: 340px; max-height: 80vh;
+      display: flex; flex-direction: column;
+      overflow: hidden;
+      animation: modal-pop 0.32s cubic-bezier(.42,1.4,.51,1.01);
+    }
+    .modal-content2 {
+      background: rgb(255 255 255 / 69%);
+      border-radius: 18px;
+      border: 2px solid #1eb5e5;
+      box-shadow: 0 0 16px 2px #62f1fe88, 0 8px 32px #1eb5e5aa;
+      width: 75vw;
+      max-width: 1200px;
+      min-height: 75vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      animation: modal-pop 0.32s cubic-bezier(.42, 1.4, .51, 1.01);
+    }
+    @keyframes modal-pop {
+      from { opacity: 0; transform: scale(0.92); }
+      to   { opacity: 1; transform: scale(1); }
+    }
 
+    /* 原本 header 樣式基底 */
+    .modal-header {
+      background: none;
+      padding: 15px 20px 8px 24px;
+      font-size: 1.5em; font-weight: bold;
+      letter-spacing: 1px;
+      /* 讓標題與工具列左右排列 */
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    /* 關閉原先畫在整個 header 下方的底線，改畫在標題自身 */
+    .modal-header::after { display: none !important; }
 
+    /* 標題（左） */
+    .modal-title{
+      flex: 1 1 auto;
+      color: #fff;
+      text-shadow: 0 1px 4px #000a;
+      position: relative;
+      padding-right: 12px;
+    }
+    .modal-title::after{
+      content: ""; display: block; height: 5px; width: 70%;
+      margin:.5rem 0 0; border-radius: 2px;
+      background: linear-gradient(to right,#53e2ff99 65%,#53e2ff00 100%);
+      pointer-events: none;
+    }
 
-
-@keyframes modal-pop {
-  from { opacity: 0; transform: scale(0.92); }
-  to   { opacity: 1; transform: scale(1); }
-}
-.modal-header {
-  background: none;
-  padding: 15px 20px 0px 24px;
-  font-size: 1.5em; font-weight: bold;
-  letter-spacing: 1px; 
-}
-.modal-header::after {
-  content: ""; display: block; height: 5px; width: 70%;
-  margin:.5rem 0 0; border-radius: 2px;
-  background: linear-gradient(to right,#53e2ff99 65%,#53e2ff00 100%);
-  pointer-events: none;
-}
-.modal-body {
-  color:#fff; padding: 12px 24px 24px 24px;
-  font-size: 1.2em; line-height:1.5; text-shadow:0 1px 4px #0008;
-  overflow-y:auto; max-height:240px; white-space: pre-line;
-  scrollbar-width:none;
-}
-.modal-body::-webkit-scrollbar { display:none; }
-
+    /* 工具列（右） */
+    .modal-tools{
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
 
     /* 書卡片 */
     .book-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
@@ -157,30 +172,69 @@ cubic-bezier(.42, 1.4, .51, 1.01);
     @media (max-width: 640px){
       .book-list{grid-template-columns:1fr;}
     }
+
+    /* 工具列：下拉與按鈕高度統一 */
+    #student-filter,
+    .manage-btn{
+      height: var(--ctrl-h);
+      line-height: calc(var(--ctrl-h) - 2px);
+      padding: 0 var(--ctrl-pad-x);
+      border-radius: .55rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      box-sizing: border-box;
+    }
+    #student-filter{
+      border: 1px solid var(--panel-stroke);
+      background: #fff;
+      color: #111827;
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+    }
+
+    /* 小螢幕工具列自動換行（可選） */
+    @media (max-width: 560px){
+      .modal-tools{ flex-wrap: wrap; justify-content: flex-end; }
+    }
+
+    .modal-body {
+      color:#fff; padding: 12px 24px 24px 24px;
+      font-size: 1.2em; line-height:1.5; text-shadow:0 1px 4px #0008;
+      overflow-y:auto; max-height:240px; white-space: pre-line;
+      scrollbar-width:none;
+      color: #111; /* 書庫為淺底，改深字色 */
+      text-shadow: none;
+      max-height: none; /* 書單需要更高的滾動空間 */
+    }
+    .modal-body::-webkit-scrollbar { display:none; }
   </style>
 </head>
 <body>
 
-  <!-- 旋轉提示（不可關閉） -->
-<div id="orientation-modal" class="modal-overlay" style="display: flex;">
+  <!-- 旋轉提示（不可關閉；預設隱藏，直向才顯示） -->
+  <div id="orientation-modal" class="modal-overlay" style="display:none;">
     <div class="modal-content">
-      <div class="modal-header"style="
-    color: #fff;
-    text-shadow: 0 1px 4px #000a;">請旋轉螢幕</div>
+      <div class="modal-header" style="color:#fff;text-shadow:0 1px 4px #000a;">請旋轉螢幕</div>
       <div class="modal-body">為了最佳體驗，請將裝置轉成橫向模式</div>
     </div>
   </div>
 
   <!-- 書櫃彈窗（預設開啟；沿用你的 modal 樣式） -->
-
-<div id="orientation-modal" class="modal-overlay" style="display: flex;">
+  <div id="library-modal" class="modal-overlay" style="display: flex;">
     <div class="modal-content2">
-      <div class="modal-header">歡迎來到 <span id="owner-name">玩家</span> 的書櫃 +
-          <select id="student-filter" style="padding:.4rem .6rem;border-radius:.5rem;border:1px solid var(--panel-stroke);background:#fff;"></select>
+      <div class="modal-header">
+        <div class="modal-title">
+          歡迎來到 <span id="owner-name">玩家</span> 的書櫃
+        </div>
+        <div class="modal-tools">
+          <select id="student-filter" style="min-width: 180px;"></select>
           <a id="manage-btn" class="manage-btn" href="./manage.html" style="display:none;">管理</a>
+        </div>
       </div>
       <div class="modal-body">
-                <div id="book-list" class="book-list"></div>
+        <div id="book-list" class="book-list"></div>
       </div>
     </div>
   </div>
@@ -351,6 +405,7 @@ cubic-bezier(.42, 1.4, .51, 1.01);
   // =============================
   function renderFilterOptions(){
     const sel = $('#student-filter');
+    if (!sel) return;
     sel.innerHTML = '';
 
     // 只列出有 student_code 的學生
@@ -373,6 +428,7 @@ cubic-bezier(.42, 1.4, .51, 1.01);
 
   function renderBookList(books){
     const box = $('#book-list');
+    if (!box) return;
     box.innerHTML = '';
     if (!books.length){
       box.innerHTML = `<div style="padding:12px;color:#6b7280;">沒有找到符合的書籍。</div>`;
@@ -385,7 +441,7 @@ cubic-bezier(.42, 1.4, .51, 1.01);
 
       const icon = document.createElement('div');
       icon.className = 'book-icon';
-      // 不加任何多餘濾鏡；只套用 DB 的 cover_color（可能是 "filter: ..."）
+      // 只套用 DB 的 cover_color（若以 "filter:" 開頭）
       const filterStr = (b.cover_color || '').trim();
       icon.innerHTML = `<img alt="book" src="${bookImg(b)}" style="${/^filter:/.test(filterStr) ? filterStr : ''}">`;
 
@@ -497,7 +553,8 @@ cubic-bezier(.42, 1.4, .51, 1.01);
       }
 
       // 更新標題
-      $('#owner-name').textContent = OWNER_PLAYER?.username || '玩家';
+      const ownerNameEl = $('#owner-name');
+      if (ownerNameEl) ownerNameEl.textContent = OWNER_PLAYER?.username || '玩家';
 
       // 取得持有者的所有「有 student_code」的學生清單
       if (OWNER_PLAYER?.id){
@@ -519,22 +576,24 @@ cubic-bezier(.42, 1.4, .51, 1.01);
       await refreshBooks();
 
       // 監聽下拉切換
-      $('#student-filter').addEventListener('change', refreshBooks);
+      const filterSel = $('#student-filter');
+      if (filterSel) filterSel.addEventListener('change', refreshBooks);
 
       // 書架彈窗開啟按鈕（點書櫃）
       const openBtn = document.querySelector('.book-btn');
-      if (openBtn){
+      const libModal = document.getElementById('library-modal');
+      if (openBtn && libModal){
         openBtn.addEventListener('click', () => {
-          const modal = $('#library-modal');
-          if (modal) modal.style.display = 'flex';
+          libModal.style.display = 'flex';
         });
       }
 
       // 點背景關閉（如不想關，註解掉）
-      const libModal = document.getElementById('library-modal');
-      libModal.addEventListener('click', (e) => {
-        if (e.target === libModal) libModal.style.display = 'none';
-      });
+      if (libModal){
+        libModal.addEventListener('click', (e) => {
+          if (e.target === libModal) libModal.style.display = 'none';
+        });
+      }
 
       // 啟用 Realtime 監聽
       if (OWNER_PLAYER?.id) setupRealtime(OWNER_PLAYER.id);
