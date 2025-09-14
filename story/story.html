@@ -220,6 +220,15 @@
   @media (max-width: 640px){
     .book-list{grid-template-columns:1fr;}
   }
+
+
+/* 禁止所有 <img> 被拖移（含 Safari、行動裝置） */
+img {
+  -webkit-user-drag: none;
+  user-select: none;
+  -webkit-touch-callout: none; /* iOS 長按避免呼叫選單 */
+}
+
 </style>
 
 </head>
@@ -257,7 +266,7 @@
     <div class="book book13-24" style="bottom: 64.2%;"></div>
 
     <!-- 蓋在書本上方的書櫃 -->
-    <img style="position: absolute; height: 100%; width: 100%;" src="https://shierusha.github.io/library/img/ROOM-TOP.png" alt="bookshelf overlay">
+<img draggable="false" style="position: absolute; height: 100%; width: 100%;" src="https://shierusha.github.io/library/img/ROOM-TOP.png" alt="bookshelf overlay">
 
     <!-- 可點擊的隱形大按鈕（打開彈窗） -->
     <button class="book-btn" aria-label="打開書櫃"></button>
@@ -450,7 +459,7 @@
       const icon = document.createElement('div');
       icon.className = 'book-icon';
       const filterStr = (b.cover_color || '').trim();
-      icon.innerHTML = `<img alt="book" src="${bookImg(b)}" style="${/^filter:/.test(filterStr) ? filterStr : ''}">`;
+icon.innerHTML = `<img draggable="false" alt="book" src="${bookImg(b)}" style="${/^filter:/.test(filterStr) ? filterStr : ''}">`;
 
       const meta = document.createElement('div');
       meta.className = 'book-meta';
@@ -487,6 +496,7 @@
       el.innerHTML = '';
       slice.forEach((b, i) => {
         const img = document.createElement('img');
+        img.draggable = false;               
         const left = leftStart + i*delta;
         const h = heights[Math.floor(Math.random()*heights.length)];
         img.src = bookImg(b);
