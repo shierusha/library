@@ -2,9 +2,7 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="utf-8" />
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>謝爾夏|休息室</title>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
   <!-- Supabase JS v2 -->
@@ -16,6 +14,8 @@
       --panel-stroke: rgba(0,0,0,.08);
       --text: #1f2937;
       --radius-2xl: 24px;
+      --ctrl-h: 38px;       /* 書庫彈窗右側工具列高度 */
+      --ctrl-pad-x: .8rem;
     }
     * { box-sizing: border-box; }
     html, body { height: 100%; }
@@ -41,146 +41,125 @@
       overflow: hidden;
     }
 
-    /* 書架上的書群組容器 */
-    .book{
-      position: absolute;
-      left: 5.5%;
-      width: 23%;
-      height: 12%;
-    }
-    .book img{
-      position: absolute;
-      bottom: 0%;
-      width: 20%;
-    }
+    /* 書架上的書群組容器（保持原樣） */
+    .book{ position: absolute; left: 5.5%; width: 23%; height: 12%; }
+    .book img{ position: absolute; bottom: 0%; width: 20%; }
 
     .book-btn{
-      position: absolute;
-      bottom: 65%;
-      width: 24%;
-      left: 5%;
-      height: 27%;
-      background: transparent;
-      border: 0;
-      padding: 0;
-      cursor: pointer;
+      position: absolute; bottom: 65%; width: 24%; left: 5%;
+      height: 27%; background: transparent; border: 0; padding: 0; cursor: pointer;
     }
 
-    /* ===== 你的彈窗樣式沿用原本 class（無花俏濾鏡） ===== */
-   .modal-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 2000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  animation: modal-fadein-bg 0.25s;
-}
-@keyframes modal-fadein-bg {
-  from { background: rgba(0,0,0,0); }
-  to   { background: rgba(0,0,0,0.45); }
-}
-.modal-content {
-  background: rgb(13 27 77 / 82%);
-  border-radius: 18px;
-  border: 2px solid #1eb5e5;
-  box-shadow: 0 0 16px 2px #62f1fe88, 0 8px 32px #1eb5e5aa;
-  width: 500px; max-width: 93vw;
-  height: 340px; max-height: 80vh;
-  display: flex; flex-direction: column;
-  overflow: hidden;
-  animation: modal-pop 0.32s cubic-bezier(.42,1.4,.51,1.01);
-}
-.modal-content2 {
-    background: rgb(255 255 255 / 69%);
-    border-radius: 18px;
-    border: 2px solid #1eb5e5;
-    box-shadow: 0 0 16px 2px #62f1fe88, 0 8px 32px #1eb5e5aa;
-    width: 75vw;
-    max-width: 1200px;
-    min-height: 75vh;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    animation: modal-pop 0.32s 
-cubic-bezier(.42, 1.4, .51, 1.01);
-}
-
-
-
-
-@keyframes modal-pop {
-  from { opacity: 0; transform: scale(0.92); }
-  to   { opacity: 1; transform: scale(1); }
-}
-.modal-header {
-  background: none;
-  padding: 15px 20px 0px 24px;
-  font-size: 1.5em; font-weight: bold;
-  letter-spacing: 1px; 
-}
-.modal-header::after {
-  content: ""; display: block; height: 5px; width: 70%;
-  margin:.5rem 0 0; border-radius: 2px;
-  background: linear-gradient(to right,#53e2ff99 65%,#53e2ff00 100%);
-  pointer-events: none;
-}
-.modal-body {
-  color:#fff; padding: 12px 24px 24px 24px;
-  font-size: 1.2em; line-height:1.5; text-shadow:0 1px 4px #0008;
-  overflow-y:auto; max-height:240px; white-space: pre-line;
-  scrollbar-width:none;
-}
-.modal-body::-webkit-scrollbar { display:none; }
-
-
-    /* 書卡片 */
-    .book-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
-    .book-card{
-      display:flex;gap:12px;align-items:center;
-      background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:12px;
-      padding:10px 12px;
+    /* ===== 原本彈窗樣式，保持不動 ===== */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 2000; display: flex; align-items: center; justify-content: center;
+      animation: modal-fadein-bg 0.25s;
     }
-    .book-icon{
-      width:56px;height:70px;flex:0 0 auto;border-radius:6px;overflow:hidden;
-      display:grid;place-items:center;border:1px solid rgba(0,0,0,.08);
+    @keyframes modal-fadein-bg { from { background: rgba(0,0,0,0);} to { background: rgba(0,0,0,0.45);} }
+    .modal-content {
+      background: rgb(13 27 77 / 82%); border-radius: 18px; border: 2px solid #1eb5e5;
+      box-shadow: 0 0 16px 2px #62f1fe88, 0 8px 32px #1eb5e5aa;
+      width: 500px; max-width: 93vw; height: 340px; max-height: 80vh;
+      display: flex; flex-direction: column; overflow: hidden;
+      animation: modal-pop 0.32s cubic-bezier(.42,1.4,.51,1.01);
     }
-    .book-icon img{max-width:100%;max-height:100%;display:block;}
-    .book-meta{min-width:0;display:flex;flex-direction:column;gap:4px;}
-    .book-title{font-weight:700;line-height:1.2;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;}
-    .book-sub{font-size:.88rem;color:#6b7280;}
-    .book-actions{margin-left:auto;}
-    .go-btn,.manage-btn{
-      display:inline-block;padding:.45rem .7rem;border-radius:.55rem;border:1px solid #d1d5db;background:#f9fafb;cursor:pointer;text-decoration:none;color:#111827;
+    .modal-content2 {
+      background: rgb(255 255 255 / 69%); border-radius: 18px; border: 2px solid #1eb5e5;
+      box-shadow: 0 0 16px 2px #62f1fe88, 0 8px 32px #1eb5e5aa;
+      width: 75vw; max-width: 1200px; min-height: 75vh;
+      display: flex; flex-direction: column; overflow: hidden;
+      animation: modal-pop 0.32s cubic-bezier(.42, 1.4, .51, 1.01);
     }
-    .go-btn:hover,.manage-btn:hover{background:#eef2f7;}
+    @keyframes modal-pop { from { opacity: 0; transform: scale(0.92);} to { opacity: 1; transform: scale(1);} }
+    .modal-header {
+      background: none; padding: 15px 20px 0px 24px;
+      font-size: 1.5em; font-weight: bold; letter-spacing: 1px;
+    }
+    .modal-header::after {
+      content: ""; display: block; height: 5px; width: 70%;
+      margin:.5rem 0 0; border-radius: 2px;
+      background: linear-gradient(to right,#53e2ff99 65%,#53e2ff00 100%);
+      pointer-events: none;
+    }
+    .modal-body {
+      color:#fff; padding: 12px 24px 24px 24px;
+      font-size: 1.2em; line-height:1.5; text-shadow:0 1px 4px #0008;
+      overflow-y:auto; max-height:240px; white-space: pre-line;
+      scrollbar-width:none;
+    }
+    .modal-body::-webkit-scrollbar { display:none; }
+
+    /* ===== 書庫彈窗專用：僅作用 #library-modal，不影響轉向彈窗 ===== */
+    #library-modal .modal-header{
+      display:flex; align-items:center; gap:12px;
+    }
+    #library-modal .modal-title{ flex:1 1 auto; color:#000; text-shadow:none; }
+    #library-modal .modal-tools{
+      margin-left:auto; display:flex; align-items:center; gap:10px;
+    }
+    #library-modal #student-filter,
+    #library-modal .manage-btn{
+      height: var(--ctrl-h);
+      line-height: calc(var(--ctrl-h) - 2px);
+      padding: 0 var(--ctrl-pad-x);
+      border-radius: .55rem;
+      display: inline-flex; align-items:center; justify-content:center;
+      box-sizing: border-box;
+    }
+    #library-modal #student-filter{
+      border: 1px solid var(--panel-stroke); background:#fff; color:#111827;
+      appearance:none; -webkit-appearance:none; -moz-appearance:none;
+    }
+    #library-modal .manage-btn{
+      border:1px solid #d1d5db; background:#f9fafb; color:#111827; text-decoration:none; cursor:pointer;
+    }
+    #library-modal .manage-btn:hover{ background:#eef2f7; }
+
+    /* 書單以三欄表格樣式呈現（名稱｜更新｜按鈕） */
+    #book-list{ display:block; }
+    .book-table{ width:100%; border-collapse: collapse; font-size:1rem; color:#111827; }
+    .book-header, .book-row{
+      display:grid; grid-template-columns: 1fr 180px 140px; gap:12px; align-items:center;
+      background:#fff; border:1px solid rgba(0,0,0,.06); border-radius:12px; padding:10px 12px;
+      margin-bottom:10px;
+    }
+    .book-header{ font-weight:700; background:#f6f7fb; }
+    .cell-title{ overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+    .cell-date{ color:#6b7280; }
+    .cell-actions{ text-align:right; }
+    .go-btn{
+      display:inline-flex; align-items:center; justify-content:center;
+      padding:.45rem .7rem; border-radius:.55rem; border:1px solid #d1d5db; background:#f9fafb; color:#111827; text-decoration:none; cursor:pointer;
+    }
+    .go-btn:hover{ background:#eef2f7; }
+
     @media (max-width: 640px){
-      .book-list{grid-template-columns:1fr;}
+      .book-header, .book-row{ grid-template-columns: 1fr 120px 110px; }
     }
   </style>
 </head>
 <body>
 
-  <!-- 旋轉提示（不可關閉） -->
-<div id="orientation-modal" class="modal-overlay" style="display: flex;">
+  <!-- 旋轉提示（不可關閉；保持原樣） -->
+  <div id="orientation-modal" class="modal-overlay" style="display: flex;">
     <div class="modal-content">
-      <div class="modal-header"style="
-    color: #fff;
-    text-shadow: 0 1px 4px #000a;">請旋轉螢幕</div>
+      <div class="modal-header" style="color:#fff;text-shadow:0 1px 4px #000a;">請旋轉螢幕</div>
       <div class="modal-body">為了最佳體驗，請將裝置轉成橫向模式</div>
     </div>
   </div>
 
-  <!-- 書櫃彈窗（預設開啟；沿用你的 modal 樣式） -->
-
-<div id="orientation-modal" class="modal-overlay" style="display: flex;">
+  <!-- 書櫃彈窗（預設開啟；新 id：library-modal） -->
+  <div id="library-modal" class="modal-overlay" style="display: flex;">
     <div class="modal-content2">
-      <div class="modal-header">歡迎來到 <span id="owner-name">玩家</span> 的書櫃 +
+      <div class="modal-header">
+        <div class="modal-title">歡迎來到 <span id="owner-name">玩家</span> 的書櫃</div>
+        <div class="modal-tools">
           <select id="student-filter" style="padding:.4rem .6rem;border-radius:.5rem;border:1px solid var(--panel-stroke);background:#fff;"></select>
           <a id="manage-btn" class="manage-btn" href="./manage.html" style="display:none;">管理</a>
+        </div>
       </div>
       <div class="modal-body">
-                <div id="book-list" class="book-list"></div>
+        <div id="book-list"></div>
       </div>
     </div>
   </div>
@@ -214,11 +193,11 @@ cubic-bezier(.42, 1.4, .51, 1.01);
   window.addEventListener('load', resizeAllTexts);
   window.addEventListener('resize', resizeAllTexts);
 
-  // ====== 強制橫向（使用你的 Modal）======
+  // ====== 強制橫向（保持原流程，不改）======
   function isPortrait(){
     return window.matchMedia('(orientation: portrait)').matches || window.innerHeight > window.innerWidth;
   }
-  const orientationModal = document.getElementById('orientation-modal');
+  const orientationModal = document.getElementById('orientation-modal'); // 旋轉提示用
   function enforceLandscape(){
     const portrait = isPortrait();
     if (orientationModal) orientationModal.style.display = portrait ? 'flex' : 'none';
@@ -255,9 +234,7 @@ cubic-bezier(.42, 1.4, .51, 1.01);
     if (Number.isNaN(d.getTime())) return '';
     return d.toLocaleDateString('zh-TW', { year:'numeric', month:'2-digit', day:'2-digit' });
   }
-  function bookImg(b){
-    return b?.cover_image || BOOK_ICON;
-  }
+  function bookImg(b){ return b?.cover_image || BOOK_ICON; }
 
   // =============================
   // 主要流程狀態
@@ -325,8 +302,7 @@ cubic-bezier(.42, 1.4, .51, 1.01);
 
   // =============================
   // 依分類抓書（books 專案）
-  // filterStudentId: <uuid> | 'OTHER'
-  // 排序：sort_order ASC，再 updated_at DESC
+  // 排序：sort_order ASC，再 updated_at DESC（保持原資料庫排序）
   // =============================
   async function fetchBooksByFilter(ownerId, filterStudentId){
     let q = booksClient
@@ -351,6 +327,7 @@ cubic-bezier(.42, 1.4, .51, 1.01);
   // =============================
   function renderFilterOptions(){
     const sel = $('#student-filter');
+    if (!sel) return;
     sel.innerHTML = '';
 
     // 只列出有 student_code 的學生
@@ -366,58 +343,62 @@ cubic-bezier(.42, 1.4, .51, 1.01);
     if (DEFAULT_STUDENT){
       sel.value = DEFAULT_STUDENT.student_id;
     }else{
-      // 若沒有就選第一個或「其他」
       sel.value = PLAYER_STUDENTS[0]?.student_id || 'OTHER';
     }
   }
 
   function renderBookList(books){
     const box = $('#book-list');
+    if (!box) return;
     box.innerHTML = '';
+
+    // 表頭
+    const table = document.createElement('div');
+    table.className = 'book-table';
+
+    const header = document.createElement('div');
+    header.className = 'book-header';
+    header.innerHTML = `
+      <div class="cell-title">書籍名稱</div>
+      <div class="cell-date">更新日期</div>
+      <div class="cell-actions">操作</div>
+    `;
+    table.appendChild(header);
+
     if (!books.length){
-      box.innerHTML = `<div style="padding:12px;color:#6b7280;">沒有找到符合的書籍。</div>`;
+      const empty = document.createElement('div');
+      empty.className = 'book-row';
+      empty.innerHTML = `<div class="cell-title" style="color:#6b7280;">沒有找到符合的書籍。</div><div></div><div></div>`;
+      table.appendChild(empty);
+      box.appendChild(table);
       return;
     }
-    const frag = document.createDocumentFragment();
+
+    // 資料列（依 fetchBooksByFilter 的順序）
     books.forEach(b => {
-      const card = document.createElement('div');
-      card.className = 'book-card';
-
-      const icon = document.createElement('div');
-      icon.className = 'book-icon';
-      // 不加任何多餘濾鏡；只套用 DB 的 cover_color（可能是 "filter: ..."）
-      const filterStr = (b.cover_color || '').trim();
-      icon.innerHTML = `<img alt="book" src="${bookImg(b)}" style="${/^filter:/.test(filterStr) ? filterStr : ''}">`;
-
-      const meta = document.createElement('div');
-      meta.className = 'book-meta';
-      meta.innerHTML = `
-        <div class="book-title" title="${b.title}">${b.title}</div>
-        <div class="book-sub">最後更新日：${fDate(b.updated_at) || '—'}</div>
+      const row = document.createElement('div');
+      row.className = 'book-row';
+      row.innerHTML = `
+        <div class="cell-title" title="${b.title}">${b.title}</div>
+        <div class="cell-date">${fDate(b.updated_at) || '—'}</div>
+        <div class="cell-actions">
+          <a class="go-btn" href="./reader.html?book_id=${encodeURIComponent(b.id)}">前往閱讀</a>
+        </div>
       `;
-
-      const actions = document.createElement('div');
-      actions.className = 'book-actions';
-      const link = document.createElement('a');
-      link.className = 'go-btn';
-      link.textContent = '前往閱讀';
-      link.href = `./reader.html?book_id=${encodeURIComponent(b.id)}`;
-      actions.appendChild(link);
-
-      card.append(icon, meta, actions);
-      frag.appendChild(card);
+      table.appendChild(row);
     });
-    box.appendChild(frag);
+
+    box.appendChild(table);
   }
 
-  // 把最多 24 本書渲染到你的兩層書架上（資料庫同步）
+  // 書架（隨機高度與位移：保持原樣）
   function renderShelves(books){
     const shelf1 = document.querySelector('.book1-12');
     const shelf2 = document.querySelector('.book13-24');
     if (!shelf1 || !shelf2) return;
 
     const leftStart = 3;    // 第一本 left%
-    const delta = 8;        // 每本 +8%（你的示例為 3,11,19…）
+    const delta = 8;        // 每本 +8%
     const heights = [75,80,85,90,95,100];
 
     function renderShelf(el, slice){
@@ -434,7 +415,7 @@ cubic-bezier(.42, 1.4, .51, 1.01);
         img.style.width = '20%';
         img.title = b.title;
         img.style.cursor = 'pointer';
-        // 只套用 DB 的 cover_color（如果有且以 "filter:" 開頭）
+        // DB 指定濾鏡（僅在以 "filter:" 開頭時套用）
         const filterStr = (b.cover_color || '').trim();
         if (/^filter:/.test(filterStr)) img.style.cssText += ';' + filterStr;
 
@@ -468,7 +449,7 @@ cubic-bezier(.42, 1.4, .51, 1.01);
     booksChannel = booksClient
       .channel('books-room-' + ownerId)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'books', filter: `owner_id=eq.${ownerId}` },
-        payload => { refreshBooks(); })
+        () => { refreshBooks(); })
       .subscribe();
   }
 
@@ -497,7 +478,8 @@ cubic-bezier(.42, 1.4, .51, 1.01);
       }
 
       // 更新標題
-      $('#owner-name').textContent = OWNER_PLAYER?.username || '玩家';
+      const ownerSpan = $('#owner-name');
+      if (ownerSpan) ownerSpan.textContent = OWNER_PLAYER?.username || '玩家';
 
       // 取得持有者的所有「有 student_code」的學生清單
       if (OWNER_PLAYER?.id){
@@ -512,29 +494,29 @@ cubic-bezier(.42, 1.4, .51, 1.01);
       // 管理按鈕：持有者 = 登入者 才顯示
       const manageBtn = $('#manage-btn');
       if (manageBtn){
-        manageBtn.style.display = (CURRENT_PLAYER && OWNER_PLAYER && CURRENT_PLAYER.id === OWNER_PLAYER.id) ? 'inline-block' : 'none';
+        manageBtn.style.display = (CURRENT_PLAYER && OWNER_PLAYER && CURRENT_PLAYER.id === OWNER_PLAYER.id) ? 'inline-flex' : 'none';
       }
 
       // 初次載入書籍 + 書架
       await refreshBooks();
 
       // 監聽下拉切換
-      $('#student-filter').addEventListener('change', refreshBooks);
+      const filterSel = $('#student-filter');
+      if (filterSel) filterSel.addEventListener('change', refreshBooks);
 
       // 書架彈窗開啟按鈕（點書櫃）
       const openBtn = document.querySelector('.book-btn');
-      if (openBtn){
+      const libModal = document.getElementById('library-modal'); // 新彈窗
+      if (openBtn && libModal){
         openBtn.addEventListener('click', () => {
-          const modal = $('#library-modal');
-          if (modal) modal.style.display = 'flex';
+          libModal.style.display = 'flex';
+        });
+
+        // 點背景關閉（如不想關，註解掉）
+        libModal.addEventListener('click', (e) => {
+          if (e.target === libModal) libModal.style.display = 'none';
         });
       }
-
-      // 點背景關閉（如不想關，註解掉）
-      const libModal = document.getElementById('library-modal');
-      libModal.addEventListener('click', (e) => {
-        if (e.target === libModal) libModal.style.display = 'none';
-      });
 
       // 啟用 Realtime 監聽
       if (OWNER_PLAYER?.id) setupRealtime(OWNER_PLAYER.id);
