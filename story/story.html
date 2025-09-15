@@ -184,10 +184,12 @@
   .manage-btn:hover{ background:#eef2f7; }
 
   .modal-body {
-    color:#fff; padding: 12px 24px 24px 24px;
-    font-size: 1.2em; line-height:1.5; text-shadow:0 1px 4px #0008;
-    overflow-y:auto; max-height:240px; white-space: pre-line;
-    scrollbar-width:none;
+    color: #fff;
+    padding: 12px 24px 24px 24px;
+    font-size: 1em;
+    overflow-y: auto;
+    max-height: 60vh;
+
   }
   .modal-body::-webkit-scrollbar { display:none; }
 
@@ -196,9 +198,12 @@
     display:grid;
   }
   .book-card{
-    display:flex;gap:12px;align-items:center;
-    padding:10px 12px;
-    color:#111827;
+    display: grid;
+    grid-template-columns: 54px 60% 1fr;
+    gap: 15px;
+    align-items: center;
+    padding: 7px 12px;
+    color: #111827;
   }
   .book-icon{
     width:56px;
