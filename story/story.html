@@ -319,6 +319,8 @@ img {
 
   // 常數：書 ICON
   const BOOK_ICON = 'https://shierusha.github.io/school-battle/images/book.png';
+const BOOK_SHELF_1_12  = 'https://shierusha.github.io/library/img/book1.png';
+const BOOK_SHELF_13_24 = 'https://shierusha.github.io/library/img/book2.png';
 
   // Debug 開關（網址加 ?debug=1 啟用）
   const DEBUG = new URLSearchParams(location.search).get('debug') === '1';
@@ -332,9 +334,10 @@ img {
     if (Number.isNaN(d.getTime())) return '';
     return d.toLocaleDateString('zh-TW', { year:'numeric', month:'2-digit', day:'2-digit' });
   }
-  function bookImg(b){
-    return b?.cover_image || BOOK_ICON;
-  }
+function bookImg(b, fallback = BOOK_ICON){
+  const src = (b?.cover_image || '').trim();
+  return src || fallback;
+}
 
   // =============================
   // 主要流程狀態
@@ -514,43 +517,47 @@ async function getPlayerProfile(playerId){
   }
 
   // 把最多 24 本書渲染到兩層書架上
-  function renderShelves(books){
-    const shelf1 = document.querySelector('.book1-12');
-    const shelf2 = document.querySelector('.book13-24');
-    if (!shelf1 || !shelf2) return;
+ function renderShelves(books){
+  const shelf1 = document.querySelector('.book1-12');
+  const shelf2 = document.querySelector('.book13-24');
+  if (!shelf1 || !shelf2) return;
 
-    const leftStart = 3;    // 第一本 left%
-    const delta = 6;        // 每本 +6%（3,9,15…）
-    const heights = [75,80,85,90,95,100];
+  const leftStart = 3;    // 第一本 left%
+  const delta = 6;        // 每本 +6%
+  const heights = [75,80,85,90,95,100];
 
-    function renderShelf(el, slice){
-      el.innerHTML = '';
-      slice.forEach((b, i) => {
-        const img = document.createElement('img');
-        img.draggable = false;               // 禁拖
-        const left = leftStart + i*delta;
-        const h = heights[Math.floor(Math.random()*heights.length)];
-        img.src = bookImg(b);
-        img.style.left = left + '%';
-        img.style.height = h + '%';
-        img.style.position = 'absolute';
-        img.style.bottom = '0%';
-        img.style.width = '20%';
-        img.title = b.title;
-        img.style.cursor = 'pointer';
-        const filterStr = (b.cover_color || '').trim();
-        if (/^filter:/.test(filterStr)) img.style.cssText += ';' + filterStr;
+  function renderShelf(el, slice, fallbackUrl){
+    el.innerHTML = '';
+    slice.forEach((b, i) => {
+      const img = document.createElement('img');
+      img.draggable = false;
+      const left = leftStart + i*delta;
+      const h = heights[Math.floor(Math.random()*heights.length)];
 
-        img.addEventListener('click', () => {
-          window.location.href = `./reader.html?book_id=${encodeURIComponent(b.id)}`;
-        });
-        el.appendChild(img);
+      // ✅ 有 cover_image 用 cover；沒有就用這層的 fallback
+      img.src = bookImg(b, fallbackUrl);
+
+      img.style.left = left + '%';
+      img.style.height = h + '%';
+      img.title = b.title;
+      img.style.cursor = 'pointer';
+
+      const filterStr = (b.cover_color || '').trim();
+      if (/^filter:/.test(filterStr)) {
+        img.style.cssText += ';' + filterStr;  // 支援你的 filter: ... 設計
+      }
+
+      img.addEventListener('click', () => {
+        window.location.href = `./reader.html?book_id=${encodeURIComponent(b.id)}`;
       });
-    }
-
-    renderShelf(shelf1, books.slice(0, 12));
-    renderShelf(shelf2, books.slice(12, 24));
+      el.appendChild(img);
+    });
   }
+
+  // 第一層（1~12）：book1.png；第二層（13~24）：book2.png
+  renderShelf(shelf1, books.slice(0, 12),  BOOK_SHELF_1_12);
+  renderShelf(shelf2, books.slice(12, 24), BOOK_SHELF_13_24);
+}
 
   async function refreshBooks(){
     if (!OWNER_PLAYER?.id) {
