@@ -349,23 +349,39 @@ img {
   // 讀取登入玩家 & 角色
   // =============================
   async function getCurrentPlayer(){
-    const { data: userRes, error: uErr } = await client.auth.getUser();
-    if (uErr) throw uErr;
-    const user = userRes?.user;
-    if (!user) return null;
-
-    const { data: p, error: pErr } = await client
-      .from('players')
-      .select('player_id, username')
-      .eq('player_id', user.id)
-      .maybeSingle();
-    if (pErr) throw pErr;
-
-    return {
-      id: user.id,
-      username: p?.username || user.user_metadata?.name || (p?.email ?? '玩家')
-    };
+  const res = await client.auth.getUser();
+  // 沒登入時 v2 會回 error=AuthSessionMissingError；把它當作未登入即可
+  if (res.error) {
+    if (res.error.name === 'AuthSessionMissingError' ||
+        /Auth session missing/i.test(res.error.message || '')) {
+      return null; // ✅ 關鍵：不要 throw
+    }
+    console.warn('[auth.getUser] unexpected error:', res.error);
+    return null; // 其他錯也別炸整個 init
   }
+
+  const user = res.data?.user;
+  if (!user) return null;
+
+  // 只有真的有登入才去查 players（避免匿名去打 A.players）
+  const { data: p, error: pErr } = await client
+    .from('players')
+    .select('player_id, username')
+    .eq('player_id', user.id)
+    .maybeSingle();
+
+  if (pErr) {
+    console.warn('[getCurrentPlayer] players query error:', pErr);
+    // 讀不到 profile 也不致命，至少回 user.id
+    return { id: user.id, username: user.user_metadata?.name || '玩家' };
+  }
+
+  return {
+    id: user.id,
+    username: p?.username || user.user_metadata?.name || '玩家'
+  };
+}
+
 
   async function getStudentByCode(code){
     if (!code) return null;
@@ -378,16 +394,21 @@ img {
     return data || null;
   }
 
-  async function getPlayerProfile(playerId){
-    const { data, error } = await client
-      .from('players')
-      .select('player_id, username, email')
-      .eq('player_id', playerId)
-      .maybeSingle();
-    if (error) throw error;
-    if (!data) return { id: playerId, username: '玩家' };
-    return { id: data.player_id, username: data.username || data.email || '玩家' };
+async function getPlayerProfile(playerId){
+  const { data, error } = await client
+    .from('players')
+    .select('player_id, username')   
+    .eq('player_id', playerId)
+    .maybeSingle();
+
+  if (error) {
+    console.warn('[getPlayerProfile] error:', error);
+    return { id: playerId, username: '玩家' };
   }
+  if (!data) return { id: playerId, username: '玩家' };
+  return { id: data.player_id, username: data.username || '玩家' };
+}
+
 
   async function getOwnerStudents(playerId){
     const { data, error } = await client
