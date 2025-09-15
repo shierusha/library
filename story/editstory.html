@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <title>謝爾夏｜電子書編輯器 (A5)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- 字體 -->
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&family=Noto+Sans+TC:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ===== 佈景與按鈕（含背景圖、70% 透明導覽遮右上字） ===== */
+    :root{
+      --panel:#0f1830; --line:#2a3555; --ink:#e6ebff; --muted:#98a3c7;
+      --primary:#6f82ff; --radius:16px; --shadow:0 10px 30px rgba(16,24,40,.25);
+      --mm:3.7795275591; --paper-w-mm:148; --paper-h-mm:210;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; color:var(--ink);
+      font-family:'Noto Sans TC',system-ui,-apple-system,Segoe UI,sans-serif;
+      background:
+        linear-gradient(180deg, rgba(11,18,36,.25), rgba(16,25,54,.55)),
+        url('https://shierusha.github.io/school-battle/teachers/img/8.webp') center top / cover no-repeat fixed;
+    }
+    .appbar{
+      position:sticky; top:0; z-index:10;
+      display:flex; justify-content:space-between; align-items:center; gap:10px;
+      padding:10px 14px; background:rgba(15,27,51,.7);
+      backdrop-filter:saturate(1.1) blur(6px);
+      border-bottom:1px solid rgba(34,48,87,.7);
+    }
+    .brand{display:flex;gap:.6rem;align-items:center;font-weight:700}
+    .brand .dot{width:10px;height:10px;border-radius:999px;background:linear-gradient(135deg,#5aa7ff,#6ee7b7)}
+    .tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .tools .sp{width:12px}
+    .muted{color:var(--muted)}
+    .btn{border:1px solid #3a4a78;background:#16244a;color:#fff;padding:.5rem .9rem;border-radius:12px;cursor:pointer}
+    .btn.primary{background:var(--primary);border-color:var(--primary)}
+    .btn.ghost{background:#ffffff18;border-color:#ffffff33}
+    .btn.danger{background:#2a0f18;border-color:#6b1b2e;color:#ffb3c2}
+    /* 側欄工具列 */
+    .side{position:fixed;top:90px;display:flex;flex-direction:column;gap:8px}
+    .side.left{left:10px}
+    .side.right{right:10px}
+    /* 舞台與紙張 */
+    .stage{display:grid;place-items:center;padding:14px;min-height:calc(100vh - 180px)}
+    .scaler{transform-origin:top center}
+    .paper{
+      position:relative;background:#fff;box-shadow:0 8px 30px rgba(0,0,0,.25);
+      overflow:hidden;border-radius:10px;
+      width:calc(var(--paper-w-mm)*var(--mm));height:calc(var(--paper-h-mm)*var(--mm));
+    }
+    .papers{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .page{position:absolute;inset:0;padding:22mm 18mm 20mm;display:flex;flex-direction:column}
+    .tpl-paper{color:#111827}
+    .tpl-paper .page-body{white-space:pre-wrap;line-height:1.8;font-size:1.02rem;margin-top:6mm;flex:1}
+    .tpl-paper .page-foot{position:absolute;bottom:10mm;left:18mm;right:18mm;text-align:center;color:#9aa3b2}
+    .vertical .page-body{writing-mode:vertical-rl;text-orientation:upright;line-height:1.9}
+    /* 分隔頁與圖片頁 */
+    .tpl-divider-dark{background:#555;color:#fff}
+    .tpl-divider-light{background:#fff;color:#111827}
+    .tpl-illustration{padding:0}
+    .tpl-illustration .fill{position:absolute;inset:0;display:grid;place-items:center}
+    .tpl-illustration img{width:100%;height:100%;object-fit:cover;display:block}
+    /* 長邊翻頁（橫向紙）：切寬高並旋轉插圖 */
+    .landscape .paper{ width:calc(var(--paper-h-mm)*var(--mm)); height:calc(var(--paper-w-mm)*var(--mm)); }
+    .landscape .tpl-illustration img{ transform:rotate(90deg); object-fit:contain; width:auto; height:100%; }
+    /* 章節角標 */
+    .chapter-chip{position:absolute;top:10mm;right:18mm;font-size:.85rem;color:#c0c7d4}
+    /* 下方 Dock */
+    .dock{display:flex;gap:10px;justify-content:center;align-items:center;padding:10px}
+    /* contenteditable placeholder */
+    .ph:empty::before{content:attr(data-ph); color:#95a0c2}
+  </style>
+</head>
+<body>
+  <!-- 頂端導覽 -->
+  <div class="appbar">
+    <div class="brand"><span class="dot"></span><span id="bookTitle">未命名書籍</span></div>
+    <div class="tools">
+      <span class="muted">頁面數：</span><b id="lblCount">1</b>
+      <button class="btn" id="btnInsertPage">插入頁面</button>
+      <button class="btn danger" id="btnDeleteBlank">刪除空白頁</button>
+      <span class="sp"></span>
+      <button class="btn ghost" id="btnPrev">上一頁</button>
+      <button class="btn ghost" id="btnNext">下一頁</button>
+      <button class="btn primary" id="btnSave">儲存</button>
+      <button class="btn" id="btnBack">回書單</button>
+    </div>
+  </div>
+
+  <!-- 左側工具列 -->
+  <div class="side left">
+    <button class="btn ghost" id="btnTOC">目錄</button>
+    <button class="btn ghost" id="btnFontUp">字級＋</button>
+    <button class="btn ghost" id="btnFontDown">字級－</button>
+    <button class="btn ghost" id="btnBold">粗體</button>
+    <button class="btn ghost" id="btnItalic">斜體</button>
+    <button class="btn ghost" id="btnUnderline">底線</button>
+  </div>
+
+  <!-- 右側工具列 -->
+  <div class="side right">
+    <button class="btn ghost" id="btnToggleDir">切換橫/直式</button>
+    <button class="btn ghost" id="btnToggleBind">切換長短邊</button>
+    <button class="btn ghost" id="btnToggleView" title="手機僅單頁">切換單頁/雙頁</button>
+  </div>
+
+  <!-- 中央 A5 舞台 -->
+  <div class="stage">
+    <div class="scaler" id="edScaler">
+      <div class="paper" id="edSingle"></div>
+      <div class="papers" id="edDouble" style="display:none">
+        <div class="paper" id="edLeft"></div>
+        <div class="paper" id="edRight"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 下方 Dock -->
+  <div class="dock">
+    <button class="btn" id="btnInsertChapter" style="margin:0 auto;min-width:128px">插入章節</button>
+  </div>
+  <div class="dock">
+    <button class="btn" data-style="novel">文本頁面</button>
+    <button class="btn" data-style="divider-light">白色中間頁</button>
+    <button class="btn" data-style="divider-dark">黑色中間頁</button>
+    <button class="btn" data-style="illustration">圖片頁</button>
+  </div>
+
+  <!-- 目錄導覽 -->
+  <dialog id="tocDialog">
+    <form method="dialog" style="padding:14px 16px">
+      <h3 style="margin:.2rem 0 1rem">目錄</h3>
+      <div id="tocList" style="max-height:60vh;overflow:auto;border:1px solid #2a3555;border-radius:12px"></div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
+        <button>關閉</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script>
+    /* ============ Editor（單檔離線版；localStorage）============ */
+    (() => {
+      // --------- Book 狀態（localStorage） ---------
+      const Store = {
+        KEY_PREFIX: 'xer_book_',
+        get(id){ try{ return JSON.parse(localStorage.getItem(this.KEY_PREFIX+id))||null }catch{ return null } },
+        set(book){ localStorage.setItem(this.KEY_PREFIX+book.id, JSON.stringify(book)); }
+      };
+
+      // 讀 URL：?book_id=xxx&title=...
+      const qp = new URLSearchParams(location.search);
+      const bookId = qp.get('book_id') || ('local_'+Math.random().toString(36).slice(2,9));
+      const titleFromUrl = qp.get('title');
+
+      // --------- 初始化書本 ---------
+      let book = Store.get(bookId) || {
+        id: bookId, title: titleFromUrl || '未命名書籍',
+        direction: 'ltr', binding: 'short', viewMode: 'single',
+        pages: []
+      };
+      if (!Array.isArray(book.pages)) book.pages = [];
+      if (book.pages.length === 0) book.pages.push(newPage(1));
+
+      // --------- 狀態與 DOM ---------
+      let cur = 0;
+      const forceSingle = isMobile();
+      let viewMode = forceSingle ? 'single' : (book.viewMode || 'single');
+      const TOC_PER_PAGE = 20;
+
+      const $ = (s,r=document)=>r.querySelector(s);
+      const esc = s=>(s||'').replace(/[&<>"']/g,c=>({'&':'&','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+      // 顯示書名
+      $('#bookTitle').textContent = book.title;
+      if (forceSingle) $('#btnToggleView').disabled = true;
+
+      // 綁定按鈕
+      $('#btnInsertPage').onclick = insertPageAfter;
+      $('#btnDeleteBlank').onclick = deleteBlank;
+      $('#btnPrev').onclick = ()=>goto(cur-1,true);
+      $('#btnNext').onclick = ()=>goto(cur+1,true);
+      $('#btnSave').onclick = saveAll;
+      $('#btnBack').onclick = ()=>{ saveAll(); if(history.length>1) history.back(); };
+      $('#btnInsertChapter').onclick = insertChapter;
+
+      $('#btnBold').onclick = ()=>document.execCommand('bold',false,null);
+      $('#btnItalic').onclick = ()=>document.execCommand('italic',false,null);
+      $('#btnUnderline').onclick = ()=>document.execCommand('underline',false,null);
+      $('#btnFontUp').onclick = ()=>wrapFont(1.15);
+      $('#btnFontDown').onclick = ()=>wrapFont(0.87);
+
+      $('#btnToggleDir').onclick = ()=>{ book.direction = (book.direction==='rtl'?'ltr':'rtl'); render(); };
+      $('#btnToggleBind').onclick = ()=>{ book.binding = (book.binding==='short'?'long':'short'); render(); };
+      $('#btnToggleView').onclick = ()=>{ if(forceSingle) return; viewMode = (viewMode==='single'?'double':'single'); book.viewMode=viewMode; render(); };
+
+      document.querySelectorAll('[data-style]').forEach(b=>{
+        b.addEventListener('click',()=>{ setType(book.pages[cur], b.dataset.style); render(); });
+      });
+
+      document.addEventListener('keydown',(e)=>{
+        if(e.key==='ArrowLeft') $('#btnPrev').click();
+        if(e.key==='ArrowRight') $('#btnNext').click();
+      });
+
+      $('#btnTOC').onclick = ()=>{ buildTOC(); $('#tocDialog').showModal(); };
+
+      render(); fit(); window.addEventListener('resize', fit);
+
+      /* ---------- 渲染 ---------- */
+      function render(){
+        $('#lblCount').textContent = book.pages.length;
+
+        const scaler = $('#edScaler');
+        scaler.classList.toggle('vertical', book.direction==='rtl');
+        scaler.classList.toggle('landscape', book.binding==='long');
+
+        const single = $('#edSingle'), dbl = $('#edDouble');
+        const mode = forceSingle ? 'single' : viewMode;
+        single.style.display = (mode==='single')?'block':'none';
+        dbl.style.display = (mode==='double')?'grid':'none';
+
+        single.innerHTML=''; $('#edLeft').innerHTML=''; $('#edRight').innerHTML='';
+        cur = clamp(cur, 0, book.pages.length-1);
+
+        if(mode==='single'){
+          single.appendChild(renderPage(book.pages[cur], cur));
+        }else{
+          let L,R, total=book.pages.length, one=cur+1;
+          if(book.direction==='rtl'){
+            if(one%2===1){ L=cur; R=Math.min(total-1,cur+1); }
+            else { R=cur; L=Math.max(0,cur-1); }
+          }else{
+            if(one%2===1){ R=cur; L=Math.max(0,cur-1); }
+            else { L=cur; R=Math.min(total-1,cur+1); }
+          }
+          $('#edLeft').appendChild(renderPage(book.pages[L],L));
+          $('#edRight').appendChild(renderPage(book.pages[R],R));
+        }
+        buildTOC();
+        fit();
+      }
+
+      function renderPage(p, idx){
+        const el = document.createElement('div');
+        el.className = 'page tpl-paper';
+
+        // 章節角標（就近向上找）
+        const ch = nearChapter(idx);
+        if (ch){
+          const chip = document.createElement('div');
+          chip.className='chapter-chip';
+          chip.textContent = ch;
+          if (isLeft(idx)) chip.style.left='18mm', chip.style.right='auto';
+          el.appendChild(chip);
+        }
+
+        const pageNo = displayPage(idx);
+
+        if (p.type==='illustration'){
+          el.classList.add('tpl-illustration');
+          el.innerHTML = `
+            <div class="fill">${ p.image_url ? `<img src="${esc(p.image_url)}" alt="illustration">`
+                                              : `<div class="muted">（雙擊貼上圖片網址）</div>`}</div>
+            <div class="page-foot">${pageNo}</div>`;
+          el.ondblclick = ()=>{
+            const url = prompt('圖片網址：', p.image_url||'')?.trim()||'';
+            p.image_url = url || null;
+            saveShadow(); render();
+          };
+          return el;
+        }
+
+        if (p.type==='divider-light' || p.type==='divider-dark'){
+          el.classList.add(p.type==='divider-dark' ? 'tpl-divider-dark' : 'tpl-divider-light');
+          el.innerHTML = `
+            <div class="page-body" style="display:grid;place-items:center;text-align:center;min-height:100%">
+              <div class="chapter-block" ${ensureChapterField(p)?'contenteditable':''} data-ph="章節名稱…"></div>
+              <div class="body-text ph" contenteditable data-ph="置中文字…"></div>
+            </div>
+            <div class="page-foot">${pageNo}</div>`;
+          bindEditable(el,p,idx,true);
+          return el;
+        }
+
+        // 文本頁
+        el.innerHTML = `
+          <div class="page-body">
+            ${ hasOwnChapter(p) ? `<div class="chapter-block ph" contenteditable data-ph="章節名稱…"></div>` : ``}
+            <div class="body-text ph" contenteditable data-ph="正文…"></div>
+          </div>
+          <div class="page-foot">${pageNo}</div>`;
+        bindEditable(el,p,idx,false);
+        return el;
+      }
+
+      function bindEditable(host,p,idx,center){
+        const body = host.querySelector('.body-text');
+        const chEl = host.querySelector('.chapter-block');
+        body.textContent = (p.content_json?.text||'');
+        if(chEl) chEl.textContent = (p.content_json?.chapter||'');
+
+        if (chEl){
+          chEl.addEventListener('input', ()=>{
+            p.content_json.chapter = chEl.textContent.trim();
+            saveShadow(); render(); // 章節變更要立即刷新 chip/目錄
+          });
+        }
+
+        let tmr=null;
+        body.addEventListener('input', ()=>{
+          p.content_json.text = body.textContent||'';
+          saveShadow();
+          if(center) return;
+          clearTimeout(tmr); tmr=setTimeout(()=>flowFrom(idx), 40);
+        });
+
+        // 直排
+        const pb = host.querySelector('.page-body');
+        pb.style.writingMode = (book.direction==='rtl'?'vertical-rl':'initial');
+        pb.style.textOrientation = (book.direction==='rtl'?'upright':'initial');
+      }
+
+      /* ---------- 溢位分頁 ---------- */
+      function flowFrom(start){
+        let i=start;
+        while(i<book.pages.length){
+          const body = currentBody(i);
+          if(!body) break;
+          if(body.scrollHeight <= body.clientHeight) break;
+
+          // 找下一個可寫文本頁（跳過圖片）
+          let j=i+1;
+          while(j<book.pages.length && book.pages[j].type==='illustration') j++;
+          if(j>=book.pages.length){ book.pages.push(newPage(book.pages.length+1)); j=book.pages.length-1; }
+
+          // 二分找 fit
+          const full = book.pages[i].content_json.text || '';
+          let lo=0, hi=full.length, fit=full.length;
+          while(lo<=hi){
+            const mid=(lo+hi>>1);
+            body.textContent = full.slice(0,mid);
+            if(body.scrollHeight<=body.clientHeight){ fit=mid; lo=mid+1; } else hi=mid-1;
+          }
+          const remain = full.slice(fit).trimStart();
+          book.pages[i].content_json.text = full.slice(0,fit);
+          const before = book.pages[j].content_json.text||'';
+          book.pages[j].content_json.text = remain + (before?('\n'+before):'');
+          saveShadow();
+
+          i=j; render(); // 重新量測
+        }
+      }
+      function currentBody(idx){
+        const mode = forceSingle ? 'single' : viewMode;
+        const root = (mode==='single') ? $('#edSingle') : (isLeft(idx)?$('#edLeft'):$('#edRight'));
+        return root.querySelector('.body-text');
+      }
+
+      /* ---------- 目錄 / 頁碼 ---------- */
+      function hasOwnChapter(p){ return p.content_json && typeof p.content_json.chapter==='string'; }
+      function ensureChapterField(p){ if(!p.content_json) p.content_json={}; if(p.content_json.chapter==null) p.content_json.chapter=''; return true; }
+      function nearChapter(idx){
+        for(let i=idx;i>=0;i--){ const t=(book.pages[i].content_json?.chapter||'').trim(); if(t) return t; }
+        return '';
+      }
+      function tocOffset(nChapters){
+        let n = Math.ceil(nChapters / TOC_PER_PAGE);
+        if(n%2===1) n+=1; // 一律偶數
+        return n;
+      }
+      function displayPage(idx){
+        const count = book.pages.filter(p=>(p.content_json?.chapter||'').trim()).length;
+        return tocOffset(count) + (idx+1);
+      }
+      function buildTOC(){
+        const list = book.pages.map((p,i)=>({i, ch:(p.content_json?.chapter||'').trim()})).filter(x=>x.ch);
+        const box = $('#tocList');
+        if(!list.length){ box.innerHTML='<div class="muted" style="padding:12px">尚無章節</div>'; return; }
+        const off = tocOffset(list.length);
+        box.innerHTML = list.map(x=>`
+          <div style="display:flex;justify-content:space-between;padding:10px 12px;border-bottom:1px dashed #2a3555;cursor:pointer">
+            <div>P${off + (x.i+1)}</div><div>${esc(x.ch)}</div>
+          </div>`).join('');
+        box.querySelectorAll('div[style*="cursor"]').forEach((row,k)=>{
+          row.onclick = ()=>{ cur = list[k].i; $('#tocDialog').close(); render(); };
+        });
+      }
+
+      /* ---------- 操作 ---------- */
+      function goto(n, autoExtend=false){
+        if(autoExtend && n>=book.pages.length){ book.pages.push(newPage(book.pages.length+1)); }
+        cur = clamp(n,0,book.pages.length-1); render();
+      }
+      function insertPageAfter(){
+        const at = cur+1;
+        book.pages.splice(at,0,newPage(at+1));
+        renumber(); cur = at; render();
+      }
+      function deleteBlank(){
+        const p = book.pages[cur];
+        const hasText=(p.content_json?.text||'').trim().length>0;
+        const hasCh=(p.content_json?.chapter||'').trim().length>0;
+        const hasImg=!!p.image_url;
+        if(hasText||hasCh||hasImg) return alert(`第 ${displayPage(cur)} 頁有內容，無法刪除`);
+        if(book.pages.length<=1)   return alert('至少需要保留一頁');
+        book.pages.splice(cur,1); renumber(); cur=Math.max(0,cur-1); render();
+      }
+      function insertChapter(){
+        const p = book.pages[cur];
+        ensureChapterField(p);
+        render();
+        const root = (forceSingle||viewMode==='single') ? $('#edSingle') : (isLeft(cur)?$('#edLeft'):$('#edRight'));
+        root.querySelector('.chapter-block')?.focus();
+      }
+      function setType(p,type){ p.type=type; saveShadow(); }
+
+      function renumber(){ for(let i=0;i<book.pages.length;i++) book.pages[i].page_index=i+1; }
+      function newPage(idx){ return { id:'local_'+Math.random().toString(36).slice(2,9), page_index:idx, type:'novel', content_json:{text:'',chapter:''}, image_url:null }; }
+      function isLeft(idx){
+        if(forceSingle || viewMode==='single') return false;
+        const one=idx+1;
+        if(book.direction==='rtl') return (one%2===1);
+        return (one%2===0);
+      }
+
+      /* ---------- 儲存（LocalStorage） ---------- */
+      function saveAll(){
+        // 刪掉「圖片頁沒網址」
+        const filtered = book.pages.filter(p=> !(p.type==='illustration' && !p.image_url));
+        if(filtered.length!==book.pages.length){ book.pages=filtered; renumber(); cur=clamp(cur,0,book.pages.length-1); }
+        Store.set(book);
+        alert('已儲存（LocalStorage）');
+        render();
+      }
+      function saveShadow(){ Store.set(book); } // 小步存
+
+      /* ---------- 版面縮放 ---------- */
+      function fit(){
+        const scaler = $('#edScaler'); const stage = $('.stage');
+        const paperWpx = 148 * 3.7795275591;
+        const pad=40, maxW = stage.clientWidth - pad;
+        let s = Math.min(1, maxW / paperWpx);
+        if(!isFinite(s) || s<=0) s=1;
+        scaler.style.transform = `scale(${s})`;
+      }
+
+      function clamp(n,a,b){ return Math.max(a, Math.min(b, n)); }
+      function isMobile(){ return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || Math.min(window.innerWidth, window.innerHeight) < 768; }
+    })();
+  </script>
+</body>
+</html>
