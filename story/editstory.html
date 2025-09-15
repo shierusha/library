@@ -2,20 +2,17 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="utf-8" />
-  <title>謝爾夏｜電子書編輯器</title>
+  <title>謝爾夏｜電子書編輯器（雙頁翻頁版）</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <!-- 字體 -->
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&family=Noto+Sans+TC:wght@400;600;700&display=swap" rel="stylesheet">
-  <!-- Supabase JS（可選；未設定也不會壞） -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    /* ===== 佈景與按鈕 ===== */
     :root{
       --panel:#0f1830; --line:#2a3555; --ink:#e6ebff; --muted:#98a3c7;
       --primary:#6f82ff; --radius:16px; --shadow:0 10px 30px rgba(16,24,40,.25);
-      /* 👇 mm→px 換算加上 px 單位，白紙才會出現！ */
-      --mm: 3.7795275591px;
-      --paper-w-mm:148; --paper-h-mm:210; /* A5直式 */
+      --mm: 3.7795275591px;                 /* mm→px 必須有單位 */
+      --paper-w-mm:148; --paper-h-mm:210;   /* A5 直式 */
+      --pad: 6%;                            /* 白紙內縮 6% */
     }
     *{box-sizing:border-box}
     html,body{height:100%}
@@ -44,69 +41,88 @@
     .btn.danger{background:#2a0f18;border-color:#6b1b2e;color:#ffb3c2}
     .btn:disabled{opacity:.5;cursor:not-allowed}
 
-    /* 側欄工具列 */
     .side{position:fixed;top:90px;display:flex;flex-direction:column;gap:8px;z-index:5}
     .side.left{left:10px}
     .side.right{right:10px}
 
-    /* 舞台與紙張 */
-    .stage{
-      display:grid;place-items:center;padding:14px;min-height:calc(100vh - 180px);
-      perspective: 1400px; /* 翻頁透視 */
-    }
+    .stage{display:grid;place-items:center;padding:14px;min-height:calc(100vh - 180px);perspective:1400px}
     .scaler{transform-origin:top center}
     .paper{
       position:relative;background:#fff;box-shadow:0 8px 30px rgba(0,0,0,.25);
       overflow:hidden;border-radius:10px;
       width:calc(var(--paper-w-mm)*var(--mm)); height:calc(var(--paper-h-mm)*var(--mm));
-      transform-style: preserve-3d; /* 翻頁需要 */
+      transform-style:preserve-3d;
     }
-    .papers{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-    .page{position:absolute;inset:0;padding:22mm 18mm 20mm;display:flex;flex-direction:column; backface-visibility:hidden}
-    .tpl-paper{color:#111827}
-    .tpl-paper .page-body{white-space:pre-wrap;line-height:1.8;font-size:1.02rem;margin-top:6mm;flex:1}
-    .tpl-paper .page-foot{position:absolute;bottom:10mm;left:18mm;right:18mm;text-align:center;color:#9aa3b2}
+    /* 兩張紙「無縫」：gap=0，內側圓角取消 */
+    .papers{display:grid;grid-template-columns:1fr 1fr;gap:0;position:relative}
+    .papers .paper:first-child{border-top-right-radius:0;border-bottom-right-radius:0}
+    .papers .paper:last-child{border-top-left-radius:0;border-bottom-left-radius:0}
+
+    .page{
+      position:absolute;inset:0;
+      padding: var(--pad);
+      display:flex;flex-direction:column;backface-visibility:hidden;color:#111827;
+    }
+    .page-body{white-space:pre-wrap;line-height:1.8;font-size:1.02rem;margin-top:.2rem;flex:1}
+
+    /* 章節角標：單頁固定右上；雙頁左/右頁 → 左上/右上 */
+    .chapter-chip{position:absolute;top:var(--pad);right:var(--pad);font-size:.85rem;color:#6b7280}
+    .chip-left{ right:auto; left:var(--pad); }
+
+    /* 頁碼左右角 */
+    .page-foot{position:absolute;bottom:var(--pad);font-variant-numeric:tabular-nums;color:#9aa3b2}
+    .foot-right{ right:var(--pad); text-align:right }
+    .foot-left{  left:var(--pad);  text-align:left  }
+
     .vertical .page-body{writing-mode:vertical-rl;text-orientation:upright;line-height:1.9}
 
     /* 分隔頁與圖片頁 */
-    .tpl-divider-dark{background:#222;color:#fff}
+    .tpl-divider-dark{background:#555;color:#fff}
     .tpl-divider-light{background:#fff;color:#111827}
     .tpl-illustration{padding:0}
     .tpl-illustration .fill{position:absolute;inset:0;display:grid;place-items:center}
     .tpl-illustration img{width:100%;height:100%;object-fit:cover;display:block}
 
-    /* 橫向紙（長邊翻） */
+    /* 橫向紙（長邊裝訂） */
     .landscape .paper{ width:calc(var(--paper-h-mm)*var(--mm)); height:calc(var(--paper-w-mm)*var(--mm)); }
-    .landscape .tpl-illustration img{ transform:rotate(90deg); object-fit:contain; width:auto; height:100%; }
+    .landscape .tpl-illustration img{ transform:rotate(90deg); width:100%; height:100%; object-fit:cover; }
 
-    /* 章節角標 */
-    .chapter-chip{position:absolute;top:10mm;right:18mm;font-size:.85rem;color:#6b7280}
-
-    /* 下方 Dock */
     .dock{display:flex;gap:10px;justify-content:center;align-items:center;padding:10px}
-
-    /* contenteditable placeholder */
     .ph:empty::before{content:attr(data-ph); color:#95a0c2}
 
-    /* ===== 翻頁動畫（單頁模式） ===== */
-    .turn-sheet{
-      position:absolute; inset:0; border-radius:10px; overflow:hidden; pointer-events:none;
-      box-shadow:0 8px 30px rgba(0,0,0,.25); background:#fff;
-      transform-origin: right center; /* 預設右翻 */
-      backface-visibility:hidden;
-    }
-    .turn-from-left{ transform-origin: left center; }
+    /* ====== 單頁翻頁（較輕） ====== */
+    .turn-sheet{position:absolute; inset:0; border-radius:10px; overflow:hidden; pointer-events:none;
+      box-shadow:0 8px 30px rgba(0,0,0,.25); background:#fff; transform-origin:right center; backface-visibility:hidden;}
+    .turn-from-left{ transform-origin:left center }
     @keyframes turnLeft { 0%{ transform:rotateY(0deg)} 100%{ transform:rotateY(-100deg)} }
     @keyframes turnRight{ 0%{ transform:rotateY(0deg)} 100%{ transform:rotateY(100deg)} }
 
-    /* 雙頁過場（輕量滑動） */
-    .double-slide-next{ animation: slideNext .28s ease both }
-    .double-slide-prev{ animation: slidePrev .28s ease both }
-    @keyframes slideNext{ from{opacity:.7; transform:translateX(20px)} to{opacity:1; transform:none} }
-    @keyframes slidePrev{ from{opacity:.7; transform:translateX(-20px)} to{opacity:1; transform:none} }
+    /* ====== 雙頁「完美半張紙翻頁」 ====== */
+    #edDouble{position:relative} /* 讓覆蓋層絕對定位 */
+    .turn-page{
+      position:absolute; top:0; transform-style:preserve-3d; pointer-events:none; /* 不擋編輯 */
+      width:0; height:0; /* 以 JS 設定真實尺寸 */
+    }
+    .turn-right{ transform-origin:left center; }   /* 右頁往左翻 */
+    .turn-left{  transform-origin:right center; }  /* 左頁往右翻 */
+    .turn-page .face{ position:absolute; inset:0; backface-visibility:hidden; overflow:hidden; background:#fff }
+    .turn-page .back{ transform: rotateY(180deg); }
+    .fold-shadow{ position:absolute; inset:0; pointer-events:none; opacity:.0 }
+    /* 翻頁動畫本體 */
+    @keyframes flipRightNext { from{ transform:rotateY(0deg) } to{ transform:rotateY(-180deg) } }
+    @keyframes flipLeftPrev  { from{ transform:rotateY(0deg) } to{ transform:rotateY(180deg) } }
+    /* 摺線陰影（翻的那半張紙上） */
+    @keyframes foldShade { 0%{opacity:.35} 50%{opacity:.12} 100%{opacity:.25} }
+    /* 對頁受影響陰影（靜止那半邊） */
+    .static-shadow-right::after,
+    .static-shadow-left::after{
+      content:""; position:absolute; top:0; bottom:0; width:16%;
+      pointer-events:none; opacity:.0; transition:opacity .12s ease;
+    }
+    .static-shadow-right::after{ right:0; background:linear-gradient(90deg, rgba(0,0,0,.18), transparent 70%) }
+    .static-shadow-left::after{ left:0;  background:linear-gradient(270deg, rgba(0,0,0,.18), transparent 70%) }
+    .shadow-on::after{ opacity:1 }
 
-    /* 臨時可見度保險：確認白紙出現後可刪 */
-    /* .paper{ outline:1px solid #dde3f0 } */
   </style>
 </head>
 <body>
@@ -114,7 +130,7 @@
   <div class="appbar">
     <div class="brand"><span class="dot"></span><span id="bookTitle">未命名書籍</span></div>
     <div class="tools">
-      <span class="muted">頁面數：</span><b id="lblCount">1</b>
+      <span class="muted">頁面數：</span><b id="lblCount">2</b>
       <button class="btn" id="btnInsertPage">插入頁面</button>
       <button class="btn danger" id="btnDeleteBlank">刪除空白頁</button>
       <span class="sp"></span>
@@ -169,23 +185,20 @@
     <form method="dialog" style="padding:14px 16px">
       <h3 style="margin:.2rem 0 1rem">目錄</h3>
       <div id="tocList" style="max-height:60vh;overflow:auto;border:1px solid #2a3555;border-radius:12px"></div>
-      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
-        <button>關閉</button>
-      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px"><button>關閉</button></div>
     </form>
   </dialog>
 
   <script>
-    /* ============ Editor（單檔：LocalStorage；可選連 Supabase）============ */
     (() => {
-      // ======（可選）你的 Supabase 專案；沒設也能用 ======
+      /* 可選 Supabase；未設定也能用 */
       const SUPABASE_URL = window.SUPABASE_URL || '';
       const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || '';
       const supabase = (window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY)
         ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
         : null;
 
-      // --------- LocalStorage 狀態 ---------
+      /* LocalStorage 狀態 */
       const LocalStore = {
         KEY_PREFIX: 'xer_book_',
         get(id){ try{ return JSON.parse(localStorage.getItem(this.KEY_PREFIX+id))||null }catch{ return null } },
@@ -193,40 +206,38 @@
       };
       const Store = LocalStore;
 
-      // 讀 URL：?book_id=xxx&title=...
       const qp = new URLSearchParams(location.search);
       const bookId = qp.get('book_id') || ('local_'+Math.random().toString(36).slice(2,9));
       const titleFromUrl = qp.get('title');
 
-      // --------- 初始化書本 ---------
       let book = Store.get(bookId) || {
         id: bookId, title: titleFromUrl || '未命名書籍',
-        direction: 'ltr', binding: 'short', viewMode: 'single',
+        direction: 'ltr', binding: 'short', viewMode: 'double', /* 預設顯示雙頁 */
         pages: [], fontScale: 1, db_id: null
       };
       if (!Array.isArray(book.pages)) book.pages = [];
-      if (book.pages.length === 0) book.pages.push(newPage(1));
+      if (book.pages.length < 2) { /* 最少 2 頁 */
+        while(book.pages.length<2) book.pages.push(newPage(book.pages.length+1));
+      }
 
-      // --------- 狀態與 DOM ---------
-      let cur = 0;
+      let cur = 0; // 以 page index 為基準
       const forceSingle = isMobile();
-      let viewMode = forceSingle ? 'single' : (book.viewMode || 'single');
+      let viewMode = forceSingle ? 'single' : (book.viewMode || 'double');
       const TOC_PER_PAGE = 20;
 
       const $ = (s,r=document)=>r.querySelector(s);
       const esc = s=>(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-      // 顯示書名
       $('#bookTitle').textContent = book.title;
       if (forceSingle) $('#btnToggleView').disabled = true;
 
-      // 綁定按鈕
+      /* 綁定 UI */
       $('#btnInsertPage').onclick = insertPageAfter;
       $('#btnDeleteBlank').onclick = deleteBlank;
-      $('#btnPrev').onclick = ()=>goto(cur-1,true);
-      $('#btnNext').onclick = ()=>goto(cur+1,true);
-      $('#btnSave').onclick = saveToDatabase;
-      $('#btnBack').onclick = saveAndBack;
+      $('#btnPrev').onclick  = ()=>goto(cur + stepDelta(-1), true);
+      $('#btnNext').onclick  = ()=>goto(cur + stepDelta(+1), true);
+      $('#btnSave').onclick  = saveToDatabase;
+      $('#btnBack').onclick  = saveAndBack;
       $('#btnInsertChapter').onclick = insertChapter;
 
       $('#btnBold').onclick = ()=>document.execCommand('bold',false,null);
@@ -252,8 +263,11 @@
 
       render(); fit(); window.addEventListener('resize', fit);
 
-      /* ---------- 渲染 ---------- */
+      /* ======= 渲染 ======= */
       function render(){
+        /* 最少 2 頁保障 */
+        if (book.pages.length < 2) while(book.pages.length<2) book.pages.push(newPage(book.pages.length+1));
+
         $('#lblCount').textContent = book.pages.length;
 
         const scaler = $('#edScaler');
@@ -263,112 +277,109 @@
         const single = $('#edSingle'), dbl = $('#edDouble');
         const mode = forceSingle ? 'single' : viewMode;
         single.style.display = (mode==='single')?'block':'none';
-        dbl.style.display = (mode==='double')?'grid':'none';
+        dbl.style.display    = (mode==='double')?'grid':'none';
 
         single.innerHTML=''; $('#edLeft').innerHTML=''; $('#edRight').innerHTML='';
         cur = clamp(cur, 0, book.pages.length-1);
 
         if(mode==='single'){
-          single.appendChild(renderPage(book.pages[cur], cur));
+          single.appendChild(renderPage(book.pages[cur], cur, 'single'));
         }else{
-          let L,R, total=book.pages.length, one=cur+1;
-          if(book.direction==='rtl'){
-            if(one%2===1){ L=cur; R=Math.min(total-1,cur+1); }
-            else { R=cur; L=Math.max(0,cur-1); }
-          }else{
-            if(one%2===1){ R=cur; L=Math.max(0,cur-1); }
-            else { L=cur; R=Math.min(total-1,cur+1); }
-          }
-          $('#edLeft').appendChild(renderPage(book.pages[L],L));
-          $('#edRight').appendChild(renderPage(book.pages[R],R));
+          const [L,R] = getSpread(cur);
+          $('#edLeft').appendChild(renderPage(book.pages[L],L,'left'));
+          $('#edRight').appendChild(renderPage(book.pages[R],R,'right'));
         }
         buildTOC();
         fit();
       }
 
-      function renderPage(p, idx){
+      function renderPage(p, idx, pos){
         const el = document.createElement('div');
-        el.className = 'page tpl-paper';
+        el.className = 'page';
 
-        // 章節角標（就近向上找）
-        const ch = nearChapter(idx);
-        if (ch){
+        /* 章節角標（只有「插入章節」後才會出現） */
+        const chName = nearChapter(idx);
+        if (chName){
           const chip = document.createElement('div');
-          chip.className='chapter-chip';
-          chip.textContent = ch;
-          if (isLeft(idx)) chip.style.left='18mm', chip.style.right='auto';
+          chip.className='chapter-chip' + (pos==='left' ? ' chip-left' : '');
+          chip.textContent = chName;
           el.appendChild(chip);
         }
 
         const pageNo = displayPage(idx);
+        const foot = document.createElement('div');
+        foot.className = 'page-foot ' + ((pos==='left') ? 'foot-left' : 'foot-right');
+        foot.textContent = pageNo;
+        el.appendChild(foot);
 
         if (p.type==='illustration'){
           el.classList.add('tpl-illustration');
-          el.innerHTML = `
+          el.innerHTML += `
             <div class="fill">${ p.image_url ? `<img src="${esc(p.image_url)}" alt="illustration">`
-                                              : `<div class="muted">（雙擊貼上圖片網址）</div>`}</div>
-            <div class="page-foot">${pageNo}</div>`;
+                                              : `<div class="muted">（雙擊貼上圖片網址）</div>`}</div>`;
           el.ondblclick = ()=>{
             const url = prompt('圖片網址：', p.image_url||'')?.trim()||'';
-            p.image_url = url || null;
-            saveShadow(); render();
+            p.image_url = url || null; saveShadow(); render();
           };
           return el;
         }
 
         if (p.type==='divider-light' || p.type==='divider-dark'){
           el.classList.add(p.type==='divider-dark' ? 'tpl-divider-dark' : 'tpl-divider-light');
-          el.innerHTML = `
+          el.innerHTML += `
             <div class="page-body" style="display:grid;place-items:center;text-align:center;min-height:100%">
-              <div class="chapter-block" ${ensureChapterField(p)?'contenteditable':''} data-ph="章節名稱…"></div>
+              ${ hasOwnChapter(p) ? `<div class="chapter-block ph" contenteditable data-ph="章節名稱…"></div>` : ``}
               <div class="body-text ph" contenteditable data-ph="置中文字…"></div>
-            </div>
-            <div class="page-foot">${pageNo}</div>`;
+            </div>`;
           el.querySelector('.page-body').style.fontSize = `calc(1.02rem * ${book.fontScale || 1})`;
           bindEditable(el,p,idx,true);
           return el;
         }
 
         // 文本頁
-        el.innerHTML = `
+        el.innerHTML += `
           <div class="page-body">
             ${ hasOwnChapter(p) ? `<div class="chapter-block ph" contenteditable data-ph="章節名稱…"></div>` : ``}
             <div class="body-text ph" contenteditable data-ph="正文…"></div>
-          </div>
-          <div class="page-foot">${pageNo}</div>`;
+          </div>`;
         el.querySelector('.page-body').style.fontSize = `calc(1.02rem * ${book.fontScale || 1})`;
         bindEditable(el,p,idx,false);
         return el;
       }
 
+      function hasOwnChapter(p){
+        return p.content_json && Object.prototype.hasOwnProperty.call(p.content_json,'chapter');
+      }
+
       function bindEditable(host,p,idx,center){
         const body = host.querySelector('.body-text');
         const chEl = host.querySelector('.chapter-block');
-        body.textContent = (p.content_json?.text||'');
+        body && (body.textContent = (p.content_json?.text||''));
         if(chEl) chEl.textContent = (p.content_json?.chapter||'');
 
         if (chEl){
           chEl.addEventListener('input', ()=>{
             p.content_json.chapter = chEl.textContent.trim();
-            saveShadow(); render(); // 章節變更要立刻刷新 chip/目錄
+            saveShadow(); render();
           });
         }
 
         let tmr=null;
-        body.addEventListener('input', ()=>{
+        body && body.addEventListener('input', ()=>{
           p.content_json.text = body.textContent||'';
           saveShadow();
           if(center) return;
           clearTimeout(tmr); tmr=setTimeout(()=>flowFrom(idx), 40);
         });
 
-        // 直排
         const pb = host.querySelector('.page-body');
-        pb.style.writingMode = (book.direction==='rtl'?'vertical-rl':'initial');
-        pb.style.textOrientation = (book.direction==='rtl'?'upright':'initial');
+        if (pb){
+          pb.style.writingMode = (book.direction==='rtl'?'vertical-rl':'initial');
+          pb.style.textOrientation = (book.direction==='rtl'?'upright':'initial');
+        }
       }
 
-      /* ---------- 文字溢位自動續頁 ---------- */
+      /* ======= 文字溢位自動續頁 ======= */
       function flowFrom(start){
         let i=start;
         while(i<book.pages.length){
@@ -376,12 +387,11 @@
           if(!body) break;
           if(body.scrollHeight <= body.clientHeight) break;
 
-          // skip 圖片頁
+          // 找下一個可寫頁（跳過圖片）
           let j=i+1;
           while(j<book.pages.length && book.pages[j].type==='illustration') j++;
           if(j>=book.pages.length){ book.pages.push(newPage(book.pages.length+1)); j=book.pages.length-1; }
 
-          // 二分找 fit
           const full = book.pages[i].content_json.text || '';
           let lo=0, hi=full.length, fit=full.length;
           while(lo<=hi){
@@ -395,7 +405,7 @@
           book.pages[j].content_json.text = remain + (before?('\n'+before):'');
           saveShadow();
 
-          i=j; render(); // 重新量測
+          i=j; render();
         }
       }
       function currentBody(idx){
@@ -404,24 +414,34 @@
         return root.querySelector('.body-text');
       }
 
-      /* ---------- 目錄 / 頁碼 ---------- */
-      function hasOwnChapter(p){ return p.content_json && typeof p.content_json.chapter==='string'; }
-      function ensureChapterField(p){ if(!p.content_json) p.content_json={}; if(p.content_json.chapter==null) p.content_json.chapter=''; return true; }
+      /* ======= 目錄 / 頁碼 ======= */
       function nearChapter(idx){
-        for(let i=idx;i>=0;i--){ const t=(book.pages[i].content_json?.chapter||'').trim(); if(t) return t; }
+        for(let i=idx;i>=0;i--){
+          const hasKey = Object.prototype.hasOwnProperty.call(book.pages[i].content_json||{},'chapter');
+          const t = hasKey ? (book.pages[i].content_json.chapter||'').trim() : '';
+          if(t) return t;
+        }
         return '';
       }
       function tocOffset(nChapters){
         let n = Math.ceil(nChapters / TOC_PER_PAGE);
-        if(n%2===1) n+=1; // 一律偶數
+        if(n%2===1) n+=1; // 目錄永遠偶數
         return n;
       }
       function displayPage(idx){
-        const count = book.pages.filter(p=>(p.content_json?.chapter||'').trim()).length;
+        const count = book.pages.filter(p=>{
+          const hasKey = Object.prototype.hasOwnProperty.call(p.content_json||{},'chapter');
+          return hasKey && (p.content_json.chapter||'').trim();
+        }).length;
         return tocOffset(count) + (idx+1);
       }
       function buildTOC(){
-        const list = book.pages.map((p,i)=>({i, ch:(p.content_json?.chapter||'').trim()})).filter(x=>x.ch);
+        const list = book.pages
+          .map((p,i)=>{
+            const hasKey = Object.prototype.hasOwnProperty.call(p.content_json||{},'chapter');
+            return {i, ch: hasKey ? (p.content_json.chapter||'').trim() : ''};
+          })
+          .filter(x=>x.ch);
         const box = $('#tocList');
         if(!list.length){ box.innerHTML='<div class="muted" style="padding:12px">尚無章節</div>'; return; }
         const off = tocOffset(list.length);
@@ -434,85 +454,184 @@
         });
       }
 
-      /* ---------- 操作 & 翻頁 ---------- */
+      /* ======= 翻頁控制 ======= */
+      function stepDelta(sign){
+        const mode = forceSingle ? 'single' : viewMode;
+        return sign * (mode==='double' ? 2 : 1);
+      }
+      function getSpread(idx){
+        // 回傳當前應該顯示的 [左,右] 頁 index
+        let L,R, total=book.pages.length, one=idx+1;
+        if(book.direction==='rtl'){ // 直式：奇數在左
+          if(one%2===1){ L=idx; R=Math.min(total-1,idx+1); }
+          else { R=idx; L=Math.max(0,idx-1); }
+        }else{ // 橫式：奇數在右
+          if(one%2===1){ R=idx; L=Math.max(0,idx-1); }
+          else { L=idx; R=Math.min(total-1,idx+1); }
+        }
+        return [L,R];
+      }
+
       function goto(n, animate=true){
+        const mode = forceSingle ? 'single' : viewMode;
         n = clamp(n, 0, Math.max(0, book.pages.length-1));
         if(n===cur) return;
 
         const dir = (n>cur) ? 'next' : 'prev';
-        const wasCur = cur;
-        const singleMode = forceSingle || viewMode==='single';
 
-        if (singleMode && animate){
-          // 抓舊頁 HTML（翻掉它），先 render 新頁，再把舊頁蓋上做翻頁動畫
+        if (mode==='double' && animate){
+          flipDouble(dir, n);
+          return;
+        }
+
+        // 單頁：保留原本簡單翻頁
+        if (mode==='single' && animate){
           const host = $('#edSingle');
-          const oldHTML = host.innerHTML; // 現在畫面
-          cur = n; render();              // 先把新頁放底層
-          makeTurnAnimation(host, oldHTML, dir);
-        }else if (!singleMode && animate){
+          const oldHTML = host.innerHTML;
           cur = n; render();
-          const dbl = $('#edDouble');
-          dbl.classList.remove('double-slide-next','double-slide-prev');
-          void dbl.offsetWidth; // reflow
-          dbl.classList.add(dir==='next'?'double-slide-next':'double-slide-prev');
+          makeTurnAnimationSingle(host, oldHTML, dir);
         }else{
           cur = n; render();
         }
       }
 
-      function makeTurnAnimation(host, oldHTML, dir){
+      function makeTurnAnimationSingle(host, oldHTML, dir){
         const sheet = document.createElement('div');
-        sheet.className = 'turn-sheet';
-        if(dir==='prev') sheet.classList.add('turn-from-left');
+        sheet.className = 'turn-sheet' + (dir==='prev' ? ' turn-from-left':'');
 
-        // 用舊頁內容蓋上去翻掉
         const wrap = document.createElement('div');
-        wrap.className='page tpl-paper';
+        wrap.className='page';
         wrap.innerHTML = oldHTML;
-        // 移除 wrap 裡多餘外層（oldHTML 是 .page）的小差異安全處理
         sheet.appendChild(wrap);
 
         host.appendChild(sheet);
-        // 讓動畫吃到初始狀態
         void sheet.offsetWidth;
-
         sheet.style.animation = (dir==='next') ? 'turnLeft .35s ease both' : 'turnRight .35s ease both';
         sheet.addEventListener('animationend', ()=> sheet.remove(), {once:true});
       }
 
+      function flipDouble(dir, targetIdx){
+        // 準備資料
+        const [L,R] = getSpread(cur);
+        const isRTL = (book.direction==='rtl');
+        // 決定翻哪一邊
+        let side, frontIdx, backIdx, nextCur;
+        if (!isRTL){
+          if (dir==='next'){ side='right'; frontIdx=R; backIdx=R+1; nextCur=cur+2; }
+          else { side='left'; frontIdx=L; backIdx=L-1; nextCur=cur-2; }
+        }else{
+          if (dir==='next'){ side='left'; frontIdx=L; backIdx=L+1; nextCur=cur+2; }
+          else { side='right'; frontIdx=R; backIdx=R-1; nextCur=cur-2; }
+        }
+
+        // 邊界：next 需要確保 backIdx 存在；prev 不小於 0
+        if (dir==='next'){
+          while (backIdx >= book.pages.length){ book.pages.push(newPage(book.pages.length+1)); }
+        }else{
+          if (backIdx < 0){ return; } // 最前面了，不能再往前
+        }
+
+        // 先渲染當前 spread（靜態），再覆蓋翻頁
+        render();
+
+        // 取得尺寸與定位
+        const dbl = $('#edDouble');
+        const pageW = $('#edLeft').getBoundingClientRect().width;  // 以實際縮放後尺寸為準
+        const pageH = $('#edLeft').getBoundingClientRect().height;
+        const dblRect = dbl.getBoundingClientRect();
+
+        // 建立翻頁覆蓋層
+        const turn = document.createElement('div');
+        turn.className = 'turn-page ' + (side==='right'?'turn-right':'turn-left');
+        turn.style.width  = pageW + 'px';
+        turn.style.height = pageH + 'px';
+        turn.style.left   = (side==='right' ? pageW : 0) + 'px'; // 右頁在右半
+        turn.style.top    = '0px';
+
+        // 前面 = 當前那頁；背面 = 下一（或前一）頁
+        const faceFront = document.createElement('div');
+        faceFront.className = 'face front';
+        faceFront.appendChild(renderPage(book.pages[frontIdx], frontIdx, side==='right'?'right':'left'));
+
+        const faceBack = document.createElement('div');
+        faceBack.className = 'face back';
+        // 背面要用翻過去後的位置（右翻→背面在左；左翻→背面在右）
+        faceBack.appendChild(renderPage(book.pages[backIdx], backIdx, side==='right'?'left':'right'));
+
+        // 摺線陰影
+        const shade = document.createElement('div');
+        shade.className = 'fold-shadow';
+        shade.style.background = side==='right'
+          ? 'linear-gradient(90deg, rgba(0,0,0,.25), rgba(0,0,0,0) 35%, rgba(0,0,0,0) 65%, rgba(0,0,0,.15))'
+          : 'linear-gradient(270deg, rgba(0,0,0,.25), rgba(0,0,0,0) 35%, rgba(0,0,0,0) 65%, rgba(0,0,0,.15))';
+
+        turn.appendChild(faceFront);
+        turn.appendChild(faceBack);
+        turn.appendChild(shade);
+
+        // 對頁加陰影（更像真的翻紙）
+        const leftPaper  = $('#edLeft');
+        const rightPaper = $('#edRight');
+        if (side==='right'){ leftPaper.classList.add('static-shadow-left','shadow-on'); }
+        else { rightPaper.classList.add('static-shadow-right','shadow-on'); }
+
+        dbl.appendChild(turn);
+        lockUI(true);
+
+        // 啟動動畫
+        void turn.offsetWidth; // reflow
+        shade.style.animation = 'foldShade .42s ease both';
+        turn.style.animation  = (side==='right') ? 'flipRightNext .42s ease both' : 'flipLeftPrev .42s ease both';
+
+        turn.addEventListener('animationend', ()=>{
+          // 換到下一個 spread
+          cur = clamp(nextCur, 0, book.pages.length-1);
+          render();
+          // 清理
+          turn.remove();
+          leftPaper.classList.remove('static-shadow-left','shadow-on');
+          rightPaper.classList.remove('static-shadow-right','shadow-on');
+          lockUI(false);
+        }, {once:true});
+      }
+
+      /* ======= 基本操作 ======= */
       function insertPageAfter(){
-        const at = cur+1;
+        const at = cur + 1;
         book.pages.splice(at,0,newPage(at+1));
         renumber(); cur = at; render();
       }
       function deleteBlank(){
         const p = book.pages[cur];
         const hasText=(p.content_json?.text||'').trim().length>0;
-        const hasCh=(p.content_json?.chapter||'').trim().length>0;
+        const hasCh = Object.prototype.hasOwnProperty.call(p.content_json||{},'chapter')
+                      && (p.content_json.chapter||'').trim().length>0;
         const hasImg=!!p.image_url;
         if(hasText||hasCh||hasImg) return alert(`第 ${displayPage(cur)} 頁有內容，無法刪除`);
-        if(book.pages.length<=1)   return alert('至少需要保留一頁');
-        book.pages.splice(cur,1); renumber(); cur=Math.max(0,cur-1); render();
+        book.pages.splice(cur,1);
+        if(book.pages.length<2){ while(book.pages.length<2) book.pages.push(newPage(book.pages.length+1)); }
+        renumber(); cur=Math.max(0,cur-1); render();
       }
       function insertChapter(){
         const p = book.pages[cur];
-        ensureChapterField(p);
-        render();
+        if(!p.content_json) p.content_json = {};
+        if(!Object.prototype.hasOwnProperty.call(p.content_json,'chapter')) p.content_json.chapter='';
+        saveShadow(); render();
         const root = (forceSingle||viewMode==='single') ? $('#edSingle') : (isLeft(cur)?$('#edLeft'):$('#edRight'));
         root.querySelector('.chapter-block')?.focus();
       }
       function setType(p,type){ p.type=type; saveShadow(); render(); }
 
       function renumber(){ for(let i=0;i<book.pages.length;i++) book.pages[i].page_index=i+1; }
-      function newPage(idx){ return { id:'local_'+Math.random().toString(36).slice(2,9), page_index:idx, type:'novel', content_json:{text:'',chapter:''}, image_url:null }; }
+      function newPage(idx){ return { id:'local_'+Math.random().toString(36).slice(2,9), page_index:idx, type:'novel', content_json:{text:''}, image_url:null }; }
       function isLeft(idx){
         if(forceSingle || viewMode==='single') return false;
         const one=idx+1;
-        if(book.direction==='rtl') return (one%2===1);
-        return (one%2===0);
+        if(book.direction==='rtl') return (one%2===1); // 直式：奇數在左
+        return (one%2===0);                             // 橫式：偶數在左
       }
 
-      /* ---------- 字級調整 ---------- */
+      /* ======= 字級 ======= */
       function wrapFont(mult){
         const MIN = 0.7, MAX = 1.8;
         const curS = book.fontScale || 1;
@@ -520,14 +639,15 @@
         if (!isFinite(next) || next <= 0) next = 1;
         next = Math.max(MIN, Math.min(MAX, next));
         book.fontScale = next;
-        saveShadow();
-        render();
+        saveShadow(); render();
       }
 
-      /* ---------- 儲存（LocalStorage + 可選 DB） ---------- */
+      /* ======= 儲存（Local + 可選 DB） ======= */
       function saveAll(){
+        // 清掉「沒有網址的圖片頁」
         const filtered = book.pages.filter(p=> !(p.type==='illustration' && !p.image_url));
         if(filtered.length!==book.pages.length){ book.pages=filtered; renumber(); cur=clamp(cur,0,book.pages.length-1); }
+        if(book.pages.length<2){ while(book.pages.length<2) book.pages.push(newPage(book.pages.length+1)); }
         Store.set(book);
       }
       function saveShadow(){ Store.set(book); }
@@ -538,7 +658,6 @@
           alert('未設定 Supabase 或 SDK 未載入，已先存到 LocalStorage。');
           return;
         }
-
         const { data:auth } = await supabase.auth.getUser();
         const user = auth?.user;
         if (!user){
@@ -569,16 +688,12 @@
           }
 
           const bid = book.db_id;
-
           await supabase.from('chapters').delete().eq('book_id', bid);
           await supabase.from('pages').delete().eq('book_id', bid);
 
           const pageRows = book.pages.map((p,i)=>({
-            book_id: bid,
-            page_index: i+1,
-            type: p.type || 'novel',
-            content_json: p.content_json || {},
-            image_url: p.image_url || null
+            book_id: bid, page_index: i+1, type: p.type || 'novel',
+            content_json: p.content_json || {}, image_url: p.image_url || null
           }));
           const { data: insertedPages, error: errPages } = await supabase
             .from('pages').insert(pageRows).select();
@@ -586,7 +701,8 @@
 
           const chapters = [];
           insertedPages.forEach((row, i)=>{
-            const title = (book.pages[i].content_json?.chapter || '').trim();
+            const hasKey = Object.prototype.hasOwnProperty.call(book.pages[i].content_json||{},'chapter');
+            const title = hasKey ? (book.pages[i].content_json.chapter || '').trim() : '';
             if (title) chapters.push({ book_id: bid, page_id: row.id, title });
           });
           if (chapters.length){
@@ -610,20 +726,20 @@
         else location.href = '/books'; // TODO: 替換成你的書單頁 URL
       }
 
-      /* ---------- 版面縮放 ---------- */
+      /* ======= 縮放 ======= */
       function fit(){
         const scaler = $('#edScaler'); const stage = $('.stage');
+        // 以左頁實際 px 畫面來估算縮放
         const paperWpx = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--paper-w-mm')) * parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--mm'));
         const pad=40, maxW = stage.clientWidth - pad;
-        let s = Math.min(1, maxW / paperWpx);
+        let s = Math.min(1, (forceSingle || viewMode==='single') ? (maxW / paperWpx) : (maxW / (paperWpx*2)));
         if(!isFinite(s) || s<=0) s=1;
         scaler.style.transform = `scale(${s})`;
       }
 
-      /* ---------- 小工具 ---------- */
+      /* ======= 小工具 ======= */
       function clamp(n,a,b){ return Math.max(a, Math.min(b, n)); }
       function isMobile(){ return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || Math.min(window.innerWidth, window.innerHeight) < 768; }
-
       function lockUI(on, msg){
         const dis = !!on;
         ['btnInsertPage','btnDeleteBlank','btnPrev','btnNext','btnSave','btnBack',
