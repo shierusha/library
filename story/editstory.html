@@ -6,6 +6,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <!-- 字體 -->
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&family=Noto+Sans+TC:wght@400;600;700&display=swap" rel="stylesheet">
+  <!-- Supabase JS（需要存 DB 時才會用到；沒設定也不會壞） -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     /* ===== 佈景與按鈕（含背景圖、70% 透明導覽遮右上字） ===== */
     :root{
@@ -140,14 +142,22 @@
   </dialog>
 
   <script>
-    /* ============ Editor（單檔離線版；localStorage）============ */
+    /* ============ Editor（單檔離線版；LocalStorage；可選擇連 Supabase）============ */
     (() => {
-      // --------- Book 狀態（localStorage） ---------
-      const Store = {
+      // ======（可選）自訂你的 Supabase 專案；也可在外部先設 window.SUPABASE_URL/ANON_KEY ======
+      const SUPABASE_URL = window.SUPABASE_URL || '';      // 例如 'https://xxxx.supabase.co'
+      const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || ''; // 你的 anon key
+      const supabase = (window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY)
+        ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+        : null;
+
+      // --------- Book 狀態（LocalStorage） ---------
+      const LocalStore = {
         KEY_PREFIX: 'xer_book_',
         get(id){ try{ return JSON.parse(localStorage.getItem(this.KEY_PREFIX+id))||null }catch{ return null } },
         set(book){ localStorage.setItem(this.KEY_PREFIX+book.id, JSON.stringify(book)); }
       };
+      const Store = LocalStore;
 
       // 讀 URL：?book_id=xxx&title=...
       const qp = new URLSearchParams(location.search);
@@ -158,10 +168,12 @@
       let book = Store.get(bookId) || {
         id: bookId, title: titleFromUrl || '未命名書籍',
         direction: 'ltr', binding: 'short', viewMode: 'single',
-        pages: []
+        pages: [], fontScale: 1
       };
+      if (book.fontScale == null) book.fontScale = 1; // 舊資料相容
       if (!Array.isArray(book.pages)) book.pages = [];
       if (book.pages.length === 0) book.pages.push(newPage(1));
+      if (book.db_id === undefined) book.db_id = null; // DB 的 UUID
 
       // --------- 狀態與 DOM ---------
       let cur = 0;
@@ -170,7 +182,8 @@
       const TOC_PER_PAGE = 20;
 
       const $ = (s,r=document)=>r.querySelector(s);
-      const esc = s=>(s||'').replace(/[&<>"']/g,c=>({'&':'&','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+      // 修正跳脫（& -> &amp;）
+      const esc = s=>(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
       // 顯示書名
       $('#bookTitle').textContent = book.title;
@@ -181,8 +194,9 @@
       $('#btnDeleteBlank').onclick = deleteBlank;
       $('#btnPrev').onclick = ()=>goto(cur-1,true);
       $('#btnNext').onclick = ()=>goto(cur+1,true);
-      $('#btnSave').onclick = saveAll;
-      $('#btnBack').onclick = ()=>{ saveAll(); if(history.length>1) history.back(); };
+      $('#btnSave').onclick = saveToDatabase; // ← 儲存到資料庫（會先存 LocalStorage）
+      $('#btnBack').onclick = saveAndBack;    // ← 先存再返回
+
       $('#btnInsertChapter').onclick = insertChapter;
 
       $('#btnBold').onclick = ()=>document.execCommand('bold',false,null);
@@ -280,6 +294,8 @@
               <div class="body-text ph" contenteditable data-ph="置中文字…"></div>
             </div>
             <div class="page-foot">${pageNo}</div>`;
+          // ← 套用字級縮放
+          el.querySelector('.page-body').style.fontSize = `calc(1.02rem * ${book.fontScale || 1})`;
           bindEditable(el,p,idx,true);
           return el;
         }
@@ -291,6 +307,8 @@
             <div class="body-text ph" contenteditable data-ph="正文…"></div>
           </div>
           <div class="page-foot">${pageNo}</div>`;
+        // ← 套用字級縮放
+        el.querySelector('.page-body').style.fontSize = `calc(1.02rem * ${book.fontScale || 1})`;
         bindEditable(el,p,idx,false);
         return el;
       }
@@ -425,16 +443,111 @@
         return (one%2===0);
       }
 
-      /* ---------- 儲存（LocalStorage） ---------- */
+      /* ---------- 字級調整（修復 wrapFont 未定義） ---------- */
+      function wrapFont(mult){
+        const MIN = 0.7, MAX = 1.8;
+        const cur = book.fontScale || 1;
+        let next = cur * mult;
+        if (!isFinite(next) || next <= 0) next = 1;
+        next = Math.max(MIN, Math.min(MAX, next));
+        book.fontScale = next;
+        saveShadow();
+        render();
+      }
+
+      /* ---------- 儲存（LocalStorage + 可選 DB） ---------- */
       function saveAll(){
         // 刪掉「圖片頁沒網址」
         const filtered = book.pages.filter(p=> !(p.type==='illustration' && !p.image_url));
         if(filtered.length!==book.pages.length){ book.pages=filtered; renumber(); cur=clamp(cur,0,book.pages.length-1); }
         Store.set(book);
-        alert('已儲存（LocalStorage）');
-        render();
       }
       function saveShadow(){ Store.set(book); } // 小步存
+
+      async function saveToDatabase(){
+        // 先確保 LocalStorage 同步
+        saveAll();
+
+        if (!supabase){
+          alert('未設定 Supabase 或 SDK 未載入，已先存到 LocalStorage。');
+          return;
+        }
+
+        // 需要登入，才能寫 owner_id
+        const { data:auth } = await supabase.auth.getUser();
+        const user = auth?.user;
+        if (!user){
+          alert('請先登入 Supabase 才能儲存到資料庫（已存 LocalStorage）。');
+          return;
+        }
+
+        const bookPayload = {
+          title: book.title || '未命名書籍',
+          binding: book.binding || 'short',
+          direction: book.direction || 'ltr',
+          page_count: book.pages.length,
+          owner_id: user.id
+        };
+
+        try{
+          lockUI(true, '儲存中…');
+
+          // 新書或更新
+          if (!book.db_id){
+            const { data: created, error: errCreate } = await supabase
+              .from('books').insert(bookPayload).select().single();
+            if (errCreate) throw errCreate;
+            book.db_id = created.id;
+          }else{
+            const { error: errUpd } = await supabase
+              .from('books').update(bookPayload).eq('id', book.db_id);
+            if (errUpd) throw errUpd;
+          }
+
+          const bid = book.db_id;
+
+          // 先刪 chapters 再刪 pages（清乾淨再重灌）
+          await supabase.from('chapters').delete().eq('book_id', bid);
+          await supabase.from('pages').delete().eq('book_id', bid);
+
+          // 插入 pages
+          const pageRows = book.pages.map((p,i)=>({
+            book_id: bid,
+            page_index: i+1,
+            type: p.type || 'novel',
+            content_json: p.content_json || {},
+            image_url: p.image_url || null
+          }));
+          const { data: insertedPages, error: errPages } = await supabase
+            .from('pages').insert(pageRows).select();
+          if (errPages) throw errPages;
+
+          // 插入 chapters（僅章首頁）
+          const chapters = [];
+          insertedPages.forEach((row, i)=>{
+            const title = (book.pages[i].content_json?.chapter || '').trim();
+            if (title) chapters.push({ book_id: bid, page_id: row.id, title });
+          });
+          if (chapters.length){
+            const { error: errCh } = await supabase.from('chapters').insert(chapters);
+            if (errCh) throw errCh;
+          }
+
+          Store.set(book); // 保存 db_id
+          alert('已儲存到資料庫 ✅');
+        }catch(e){
+          console.error(e);
+          alert('儲存到資料庫失敗：' + (e?.message || e));
+        }finally{
+          lockUI(false);
+        }
+      }
+
+      async function saveAndBack(){
+        try{ await saveToDatabase(); }catch(_){}
+        if(history.length>1) history.back();
+        else location.href = '/books'; // 替換成你的書單頁 URL
+      }
 
       /* ---------- 版面縮放 ---------- */
       function fit(){
@@ -446,8 +559,25 @@
         scaler.style.transform = `scale(${s})`;
       }
 
+      /* ---------- 小工具 ---------- */
       function clamp(n,a,b){ return Math.max(a, Math.min(b, n)); }
       function isMobile(){ return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || Math.min(window.innerWidth, window.innerHeight) < 768; }
+
+      function lockUI(on, msg){
+        const dis = !!on;
+        ['btnInsertPage','btnDeleteBlank','btnPrev','btnNext','btnSave','btnBack',
+         'btnInsertChapter','btnTOC','btnFontUp','btnFontDown','btnBold','btnItalic','btnUnderline',
+         'btnToggleDir','btnToggleBind','btnToggleView'
+        ].forEach(id=>{
+          const el = document.getElementById(id);
+          if (el) el.disabled = dis;
+        });
+        const saveBtn = document.getElementById('btnSave');
+        if (saveBtn){
+          if (dis){ saveBtn.dataset._txt = saveBtn.textContent; saveBtn.textContent = msg || '儲存中…'; }
+          else if (saveBtn.dataset._txt){ saveBtn.textContent = saveBtn.dataset._txt; delete saveBtn.dataset._txt; }
+        }
+      }
     })();
   </script>
 </body>
