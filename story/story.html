@@ -356,7 +356,7 @@ img {
 
     const { data: p, error: pErr } = await client
       .from('players')
-      .select('player_id, username, email')
+      .select('player_id, username')
       .eq('player_id', user.id)
       .maybeSingle();
     if (pErr) throw pErr;
