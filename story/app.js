@@ -23,11 +23,12 @@
   }
   let book = Store.load() || {
     title: '未命名書籍',
-    direction: 'ltr',               // 'ltr' 橫排；'rtl' 直排
+    direction: 'ltr',               // 'ltr' 橫排；'rtl' 直排/右翻
     binding: 'short',               // 'short' 直放；'long' 橫放（影響紙張旋轉）
     viewMode: 'double',             // 'single' | 'double'
     textStyle: { fs: 1.02, lh: 1.8 },
-    pages: [ newPage(1), newPage(2) ]
+    pages: [ newPage(1), newPage(2) ],
+    cover_url: null                 // 可選：封面圖片（若要）
   };
   function ensureMinPages(){
     while (book.pages.length < 2) {
@@ -48,9 +49,8 @@
 
   let idx = 0;               // 雙頁：左頁 index；單頁：該頁 index
   let isFlipping = false;    // 翻頁鎖
-  let activePageNo = null;   // 你「最近點過 / 正在編輯」的頁碼（插入章節 / 插頁 / 刪頁都依這個）
-
-
+  let activePageNo = null;   // 最近作用頁（插入/刪除/章節聚焦用）
+  let atCover = false;       // 是否位於「封面視圖」
 
   /* ======================
      工具列按鈕
@@ -72,6 +72,8 @@
   titleEl.addEventListener('input', ()=>{
     book.title = titleEl.textContent.trim() || '未命名書籍';
     persist();
+    // 若在封面視圖，標題也要即時更新
+    if (atCover) render();
   });
 
   // 文字樣式（保留選取）
@@ -89,7 +91,7 @@
     b.addEventListener('click',()=>{ setType(getCurPage(), b.dataset.style); });
   });
 
-  // 插入章節（修好：針對「目前頁」）
+  // 插入章節（彈窗+同步）
   $('#btnInsertChapter').onclick = insertChapter;
 
   // 目錄
@@ -146,6 +148,23 @@
 
     idx = clamp(idx, 0, Math.max(0, book.pages.length-1));
 
+    // === 封面視圖 ===
+    if (atCover){
+      leftPaper.innerHTML=''; rightPaper.innerHTML='';
+      const rtl = (book.direction==='rtl');
+      if (isSingle()){
+        // 單頁：只顯示封面
+        renderCover(rightPaper, 'right');
+      }else{
+        // 雙頁：封面 + 第一頁
+        if (!rtl){ renderCover(leftPaper,'left');  renderOne(rightPaper, book.pages[0], 'right'); }
+        else     { renderCover(rightPaper,'right');renderOne(leftPaper , book.pages[0], 'left');  }
+      }
+      buildTOC(); fit(); persist();
+      return;
+    }
+
+    // === 一般內頁 ===
     if (isSingle()){
       leftPaper.innerHTML = '';
       renderOne(rightPaper, book.pages[idx], 'right');
@@ -172,17 +191,19 @@
     if(p.type==='divider-light')return 'tpl-divider-light';
     if(p.type==='divider-dark') return 'tpl-divider-dark';
     if(p.type==='illustration') return 'tpl-illustration';
+    if(p.type==='cover')        return 'tpl-cover';
     return '';
   }
 
   function renderOne(host, page, side){
     host.className = 'paper ' + side + ' ' + templateClass(page);
     host.dataset.pageNo = page.page_no;
+    host.dataset.pid = page.id || '';
 
     const el = document.createElement('div');
     el.className='page';
 
-    // 角標：最近章節
+    // 角落章節籤（跑馬章節）
     const chRun = nearestChapter(page.page_no);
     if (chRun){
       const chip = document.createElement('div');
@@ -250,10 +271,54 @@
   }
 
   /* ======================
-     翻頁（先渲染 → 再演動畫）
+     封面 & 覆蓋層置中工具
+     ====================== */
+  function getVirtualCover(){
+    return { type:'cover', page_no:0, id:'cover', title: book.title || '未命名書籍', image_url: book.cover_url || null };
+  }
+  function renderCover(host, side){
+    host.className = 'paper ' + side + ' cover';
+    host.dataset.pageNo = 0;
+    const el = document.createElement('div'); el.className='page';
+    const badge = document.createElement('div'); badge.className='cover-badge'; badge.textContent='封面';
+    const title = document.createElement('div'); title.className='cover-title'; title.textContent = book.title || '未命名書籍';
+    el.appendChild(badge); el.appendChild(title);
+    host.innerHTML=''; host.appendChild(el);
+  }
+  function centerOverlayFor(pageW){
+    const spreadW = (book.viewMode==='single') ? pageW : pageW*2;
+    flipOverlay.style.width = spreadW + 'px';
+    flipOverlay.style.left = '50%';
+    flipOverlay.style.transform = 'translateX(-50%)';
+  }
+
+  /* ======================
+     翻頁（先渲染 → 再演動畫；支援封面）
      ====================== */
   function step(sign){
     if (isFlipping) return; // 節流
+    const rtl = (book.direction==='rtl');
+
+    // === 封面視圖下的翻頁 ===
+    if (atCover){
+      if (sign>0){ // 從封面翻進內頁
+        if (isSingle()) return openFromCoverSingle();
+        else            return openFromCoverDouble(rtl);
+      }else{
+        return; // 在封面再往回就不動作
+      }
+    }
+
+    // === 內頁往回到封面 ===
+    if (sign<0){
+      const atFirst = (isSingle()? (idx===0) : (idx===0));
+      if (atFirst){
+        if (isSingle()) return closeToCoverSingle();
+        else            return closeToCoverDouble(rtl);
+      }
+    }
+
+    // === 一般內頁翻動 ===
     const delta    = isSingle()? sign*1 : sign*2;
     const maxIndex = Math.max(0, book.pages.length - (isSingle()?1:2));
     const target   = clamp(idx + delta, 0, maxIndex);
@@ -264,104 +329,258 @@
     else            flipDouble(dir, target);
   }
 
-  // 雙頁高級 page-curl
-  function flipDouble(dir, targetIdx){
-  if (isFlipping) return;
-  const rtl   = (book.direction==='rtl');
-  const rectL = leftPaper.getBoundingClientRect();
-  const pageW = rectL.width, pageH = rectL.height;
+  // 封面 → 內頁（雙頁）
+  function openFromCoverDouble(rtl){
+    if (isFlipping) return;
+    const rectL = leftPaper.getBoundingClientRect();
+    const pageW = rectL.width, pageH = rectL.height;
 
-  const L = idx, R = idx+1;
-  let frontPage, backPage, placeLeft;
-  if (!rtl){
-    if (dir==='next'){ frontPage=getPageByIndex(R); backPage=getPageByIndex(R+1)||autoAppendAndGet(R+1); placeLeft=false; }
-    else             { frontPage=getPageByIndex(L); backPage=getPageByIndex(L-1); placeLeft=true;  }
-  }else{
-    if (dir==='next'){ frontPage=getPageByIndex(L); backPage=getPageByIndex(L+1)||autoAppendAndGet(L+1); placeLeft=true;  }
-    else             { frontPage=getPageByIndex(R); backPage=getPageByIndex(R-1); placeLeft=false; }
+    // 覆蓋層
+    centerOverlayFor(pageW);
+    const turn = document.createElement('div');
+    turn.className = 'turn';
+    turn.style.width  = pageW+'px';
+    turn.style.height = pageH+'px';
+
+    let placeLeft, front, back;
+    if (!rtl){
+      placeLeft = true;                         // LTR：封面在左
+      front = snapshotCover('left');           // 翻出去：封面
+      back  = snapshot(book.pages[0], 'right');// 背面是 P1
+    }else{
+      placeLeft = false;                        // RTL：封面在右
+      front = snapshotCover('right');
+      back  = snapshot(book.pages[0], 'left');
+    }
+    positionTurn(turn, pageW, placeLeft);
+    mountFaces(turn, front, back, placeLeft);
+
+    // 先渲染「內頁首攤」
+    isFlipping = true;
+    $('#btnPrev').disabled = $('#btnNext').disabled = true;
+    atCover = false; idx = 0; render();
+
+    // 播動畫
+    flipOverlay.innerHTML=''; flipOverlay.appendChild(turn);
+    void turn.offsetWidth;
+    turn.style.animation = placeLeft ? 'flipLeftPrev .42s ease both'
+                                     : 'flipRightNext .42s ease both';
+    turn.addEventListener('animationend', ()=>{
+      flipOverlay.innerHTML='';
+      isFlipping = false;
+      $('#btnPrev').disabled = $('#btnNext').disabled = false;
+    }, {once:true});
   }
-  if (!backPage) return;
 
-  // 覆蓋層：把「翻出去」的面拍成快照
-  const turn = document.createElement('div');
-  turn.className='turn';
-  turn.style.width  = pageW+'px';
-  turn.style.height = pageH+'px';
-  turn.style.left   = (placeLeft? 0 : pageW) + 'px';
-  turn.style.top    = '0px';
-  turn.style.transformOrigin = placeLeft? 'right center' : 'left center';
+  // 內頁 → 封面（雙頁）
+  function closeToCoverDouble(rtl){
+    if (isFlipping) return;
+    const rectL = leftPaper.getBoundingClientRect();
+    const pageW = rectL.width, pageH = rectL.height;
 
-  const f = document.createElement('div'); f.className='face front';
-  const b = document.createElement('div'); b.className='face back';
-  f.appendChild(snapshot(frontPage, placeLeft? 'left':'right'));
-  b.appendChild(snapshot(backPage , placeLeft? 'right':'left'));
+    centerOverlayFor(pageW);
+    const turn = document.createElement('div');
+    turn.className='turn';
+    turn.style.width  = pageW+'px';
+    turn.style.height = pageH+'px';
 
-  const shade = document.createElement('div'); shade.className='foldShade';
-  shade.style.background = placeLeft
-    ? 'linear-gradient(270deg, rgba(0,0,0,.22), rgba(0,0,0,0) 40%, rgba(0,0,0,0) 60%, rgba(0,0,0,.12))'
-    : 'linear-gradient(90deg,  rgba(0,0,0,.22), rgba(0,0,0,0) 40%, rgba(0,0,0,0) 60%, rgba(0,0,0,.12))';
-  turn.appendChild(f); turn.appendChild(b); turn.appendChild(shade);
+    let placeLeft, front, back;
+    if (!rtl){
+      placeLeft = true;                          // LTR：封面在左，往回翻左頁
+      front = snapshot(book.pages[0], 'left');   // 翻出去：P1
+      back  = snapshotCover('right');            // 背面：封面
+    }else{
+      placeLeft = false;
+      front = snapshot(book.pages[0], 'right');
+      back  = snapshotCover('left');
+    }
+    positionTurn(turn, pageW, placeLeft);
+    mountFaces(turn, front, back, placeLeft);
 
-  // 先渲染目標頁在「底下」，動畫只是在上面跑
-  isFlipping = true;
-  $('#btnPrev').disabled = $('#btnNext').disabled = true;
-  idx = targetIdx;
-  render();
+    // 先渲染封面視圖
+    isFlipping = true;
+    $('#btnPrev').disabled = $('#btnNext').disabled = true;
+    atCover = true; render();
 
-  flipOverlay.innerHTML='';
-  flipOverlay.appendChild(turn);
+    flipOverlay.innerHTML=''; flipOverlay.appendChild(turn);
+    void turn.offsetWidth;
+    // 往回 → 使用與 open 相反的動畫方向
+    turn.style.animation = placeLeft ? 'flipLeftPrev .42s ease both'
+                                     : 'flipRightNext .42s ease both';
+    turn.addEventListener('animationend', ()=>{
+      flipOverlay.innerHTML='';
+      isFlipping = false;
+      $('#btnPrev').disabled = $('#btnNext').disabled = false;
+    }, {once:true});
+  }
 
-  void turn.offsetWidth;
-  turn.style.animation = placeLeft ? 'flipLeftPrev .42s ease both'
-                                   : 'flipRightNext .42s ease both';
+  // 封面 → 內頁（單頁）
+  function openFromCoverSingle(){
+    if (isFlipping) return;
+    const rect  = rightPaper.getBoundingClientRect();
+    const pageW = rect.width, pageH = rect.height;
 
-  turn.addEventListener('animationend', ()=>{
+    centerOverlayFor(pageW);
+    const coverSnap = snapshotCover('right');
+    const coverTurn = document.createElement('div');
+    coverTurn.className='singleTurn';
+    coverTurn.style.width  = pageW+'px';
+    coverTurn.style.height = pageH+'px';
+    coverTurn.style.right  = '0px';
+    coverTurn.style.top    = '0px';
+    coverTurn.style.transformOrigin = 'left center';
+    coverTurn.appendChild(coverSnap);
+
+    isFlipping = true;
+    $('#btnPrev').disabled = $('#btnNext').disabled = true;
+    atCover = false; idx = 0; render();
+
+    flipOverlay.innerHTML=''; flipOverlay.appendChild(coverTurn);
+    void coverTurn.offsetWidth;
+    coverTurn.style.animation = 'singleCurl .32s ease both';
+    coverTurn.addEventListener('animationend', ()=>{
+      flipOverlay.innerHTML='';
+      isFlipping = false;
+      $('#btnPrev').disabled = $('#btnNext').disabled = false;
+    }, {once:true});
+  }
+
+  // 內頁 → 封面（單頁）
+  function closeToCoverSingle(){
+    if (isFlipping) return;
+    const rect  = rightPaper.getBoundingClientRect();
+    const pageW = rect.width, pageH = rect.height;
+
+    centerOverlayFor(pageW);
+    const snap = snapshot(book.pages[0], 'right');
+    const turn = document.createElement('div');
+    turn.className='singleTurn';
+    turn.style.width  = pageW+'px';
+    turn.style.height = pageH+'px';
+    turn.style.right  = '0px';
+    turn.style.top    = '0px';
+    turn.style.transformOrigin = 'left center';
+    turn.appendChild(snap);
+
+    isFlipping = true;
+    $('#btnPrev').disabled = $('#btnNext').disabled = true;
+    atCover = true; render();
+
+    flipOverlay.innerHTML=''; flipOverlay.appendChild(turn);
+    void turn.offsetWidth;
+    turn.style.animation = 'singleCurl .32s ease both';
+    turn.addEventListener('animationend', ()=>{
+      flipOverlay.innerHTML='';
+      isFlipping = false;
+      $('#btnPrev').disabled = $('#btnNext').disabled = false;
+    }, {once:true});
+  }
+
+  // 雙頁內頁翻
+  function flipDouble(dir, targetIdx){
+    if (isFlipping) return;
+    const rtl   = (book.direction==='rtl');
+    const rectL = leftPaper.getBoundingClientRect();
+    const pageW = rectL.width, pageH = rectL.height;
+
+    centerOverlayFor(pageW);
+
+    const L = idx, R = idx+1;
+    let frontPage, backPage, placeLeft;
+    if (!rtl){
+      if (dir==='next'){ frontPage=getPageByIndex(R); backPage=getPageByIndex(R+1)||autoAppendAndGet(R+1); placeLeft=false; }
+      else             { frontPage=getPageByIndex(L); backPage=getPageByIndex(L-1); placeLeft=true;  }
+    }else{
+      if (dir==='next'){ frontPage=getPageByIndex(L); backPage=getPageByIndex(L+1)||autoAppendAndGet(L+1); placeLeft=true;  }
+      else             { frontPage=getPageByIndex(R); backPage=getPageByIndex(R-1); placeLeft=false; }
+    }
+    if (!backPage) return;
+
+    const turn = document.createElement('div');
+    turn.className='turn';
+    turn.style.width  = pageW+'px';
+    turn.style.height = pageH+'px';
+    positionTurn(turn, pageW, placeLeft);
+
+    const f = snapshot(frontPage, placeLeft? 'left':'right');
+    const b = snapshot(backPage , placeLeft? 'right':'left');
+    mountFaces(turn, f, b, placeLeft);
+
+    // 先渲染目標頁在底層
+    isFlipping = true;
+    $('#btnPrev').disabled = $('#btnNext').disabled = true;
+    idx = targetIdx;
+    render();
+
     flipOverlay.innerHTML='';
-    isFlipping = false;
-    $('#btnPrev').disabled = $('#btnNext').disabled = false;
-  }, {once:true});
-}
+    flipOverlay.appendChild(turn);
 
+    void turn.offsetWidth;
+    turn.style.animation = placeLeft ? 'flipLeftPrev .42s ease both'
+                                     : 'flipRightNext .42s ease both';
 
-  // 單頁簡易卷葉
+    turn.addEventListener('animationend', ()=>{
+      flipOverlay.innerHTML='';
+      isFlipping = false;
+      $('#btnPrev').disabled = $('#btnNext').disabled = false;
+    }, {once:true});
+  }
+
+  // 單頁內頁翻
   function flipSingle(dir, targetIdx){
-  if (isFlipping) return;
+    if (isFlipping) return;
 
-  const rect  = rightPaper.getBoundingClientRect();
-  const pageW = rect.width, pageH = rect.height;
+    const rect = rightPaper.getBoundingClientRect();
+    const pageW = rect.width, pageH = rect.height;
 
-  const snap = snapshot(getPageByIndex(idx), 'right'); // 舊頁快照
+    centerOverlayFor(pageW);
+    const snap = snapshot(getPageByIndex(idx), 'right');
 
-  isFlipping = true;
-  $('#btnPrev').disabled = $('#btnNext').disabled = true;
+    isFlipping = true;
+    $('#btnPrev').disabled = $('#btnNext').disabled = true;
 
-  // 先把目標頁渲染到底層
-  idx = targetIdx;
-  render();
+    // 先把目標頁渲染到底層
+    idx = targetIdx;
+    render();
 
-  // 疊上捲頁覆蓋層
-  const cover = document.createElement('div');
-  cover.className='singleTurn';
-  cover.style.width  = pageW+'px';
-  cover.style.height = pageH+'px';
-  cover.style.right  = '0px';
-  cover.style.top    = '0px';
-  cover.style.transformOrigin = 'left center';
-  cover.appendChild(snap);
+    const cover = document.createElement('div');
+    cover.className='singleTurn';
+    cover.style.width  = pageW+'px';
+    cover.style.height = pageH+'px';
+    cover.style.right  = '0px';
+    cover.style.top    = '0px';
+    cover.style.transformOrigin = 'left center';
+    cover.appendChild(snap);
 
-  flipOverlay.innerHTML='';
-  flipOverlay.appendChild(cover);
+    flipOverlay.innerHTML=''; flipOverlay.appendChild(cover);
 
-  void cover.offsetWidth;
-  cover.style.animation = 'singleCurl .32s ease both';
+    void cover.offsetWidth;
+    cover.style.animation = 'singleCurl .32s ease both';
 
-  cover.addEventListener('animationend', ()=>{
-    flipOverlay.innerHTML='';
-    isFlipping = false;
-    $('#btnPrev').disabled = $('#btnNext').disabled = false;
-  }, {once:true});
-}
+    cover.addEventListener('animationend', ()=>{
+      flipOverlay.innerHTML='';
+      isFlipping = false;
+      $('#btnPrev').disabled = $('#btnNext').disabled = false;
+    }, {once:true});
+  }
 
+  // turn 工具
+  function positionTurn(turn, pageW, placeLeft){
+    turn.style.left = (placeLeft? 0 : pageW) + 'px';
+    turn.style.top  = '0px';
+    turn.style.transformOrigin = placeLeft? 'right center' : 'left center';
+  }
+  function mountFaces(turn, frontEl, backEl, placeLeft){
+    const f = document.createElement('div'); f.className='face front';
+    const b = document.createElement('div'); b.className='face back';
+    f.appendChild(frontEl); b.appendChild(backEl);
+
+    const shade = document.createElement('div'); shade.className='foldShade';
+    shade.style.background = placeLeft
+      ? 'linear-gradient(270deg, rgba(0,0,0,.22), rgba(0,0,0,0) 40%, rgba(0,0,0,0) 60%, rgba(0,0,0,.12))'
+      : 'linear-gradient(90deg,  rgba(0,0,0,.22), rgba(0,0,0,0) 40%, rgba(0,0,0,0) 60%, rgba(0,0,0,.12))';
+    turn.appendChild(f); turn.appendChild(b); turn.appendChild(shade);
+  }
 
   // 覆蓋層快照（靜態）
   function snapshot(page, side){
@@ -381,7 +600,18 @@
     }
     host.appendChild(el);
     return host;
-    }
+  }
+  function snapshotCover(side){
+    const p = getVirtualCover();
+    const host = document.createElement('div');
+    host.className = 'paper ' + side + ' cover ' + templateClass(p);
+    const el = document.createElement('div'); el.className='page';
+    const badge = document.createElement('div'); badge.className='cover-badge'; badge.textContent='封面';
+    const title = document.createElement('div'); title.className='cover-title'; title.textContent = book.title || '未命名書籍';
+    el.appendChild(badge); el.appendChild(title);
+    host.appendChild(el);
+    return host;
+  }
 
   /* ======================
      自動換頁（切出去的文字回預設樣式）
@@ -426,6 +656,7 @@
      章節 / 目錄
      ====================== */
   function nearestChapter(pageNo){
+    if (!pageNo) return ''; // 封面或 0
     let best = '';
     for(let x=book.pages.findIndex(p=>p.page_no===pageNo); x>=0; x--){
       const p = book.pages[x];
@@ -453,6 +684,7 @@
       row.onclick = ()=>{
         const targetNo = list[i].no;
         const targetIdx= book.pages.findIndex(p=>p.page_no===targetNo);
+        if (targetIdx<=0){ atCover = false; }
         idx = isSingle()? targetIdx : Math.max(0, targetIdx - (targetIdx%2));
         activePageNo = targetNo;
         render(); $('#tocDialog').close();
@@ -461,15 +693,150 @@
   }
 
   /* ======================
-     操作（修正：針對「目前頁」）
+     插入章節（彈窗 + 角落同步 + 正文大字）
+     ====================== */
+  let chapterUI = { dlg:null, input:null, okBtn:null };
+  function ensureChapterDialog(){
+    if (chapterUI.dlg) return chapterUI;
+    const dlg = document.createElement('dialog');
+    dlg.id = 'chapterDialog';
+    dlg.innerHTML = `
+      <form method="dialog" style="min-width:340px;padding:16px 18px">
+        <div style="font-weight:600;margin-bottom:8px">章節標題</div>
+        <input id="chapterTitleInput" type="text" placeholder="輸入章節名稱…"
+               style="width:100%;padding:8px 10px;box-sizing:border-box" />
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+          <button value="cancel" type="submit">取消</button>
+          <button id="chapterOK" value="ok" type="submit" style="font-weight:600">套用</button>
+        </div>
+      </form>`;
+    document.body.appendChild(dlg);
+    const input = dlg.querySelector('#chapterTitleInput');
+    const okBtn = dlg.querySelector('#chapterOK');
+    chapterUI = { dlg, input, okBtn };
+    return chapterUI;
+  }
+
+  function setCornerChip(pageNo, text){
+    const pageRoot = document.querySelector(`.paper[data-page-no="${pageNo}"] .page`);
+    if (!pageRoot) return;
+    let chip = pageRoot.querySelector('.chapter-chip');
+    if (!text){
+      if (chip) chip.remove();
+      return;
+    }
+    if (!chip){
+      chip = document.createElement('div');
+      chip.className = 'chapter-chip';
+      pageRoot.insertBefore(chip, pageRoot.firstChild);
+    }
+    chip.textContent = text;
+  }
+
+  function setHeadingInBody(pageNo, title){
+    const body = findBodyForPage(pageNo);
+    if (!body) return;
+
+    while (body.firstChild && body.firstChild.nodeType===3 && /^\s*$/.test(body.firstChild.nodeValue)){
+      body.removeChild(body.firstChild);
+    }
+    const isHeadingSpan = (n)=> n && n.nodeType===1 && n.tagName==='SPAN' && n.hasAttribute('data-fs');
+
+    let first = body.firstChild;
+    if (!title){
+      if (isHeadingSpan(first)){
+        first.remove();
+        if (body.firstChild && body.firstChild.nodeType===1 && body.firstChild.tagName==='BR'){
+          body.removeChild(body.firstChild);
+        }
+        persistEditableNow(body);
+      }
+      return;
+    }
+
+    if (isHeadingSpan(first)){
+      first.textContent = title;
+    }else{
+      const span = document.createElement('span');
+      span.setAttribute('data-fs','1.6');
+      span.style.fontSize = '1.6em';
+      span.textContent = title;
+      body.insertBefore(span, body.firstChild);
+    }
+    const heading = body.firstChild;
+    if (!(heading.nextSibling && heading.nextSibling.nodeType===1 && heading.nextSibling.tagName==='BR')){
+      const br = document.createElement('br');
+      if (heading.nextSibling) body.insertBefore(br, heading.nextSibling);
+      else body.appendChild(br);
+    }
+    persistEditableNow(body);
+  }
+
+  function insertChapter(){
+    // 1) 鎖定目標頁（插圖頁就自動在前面插一張文字頁）
+    const cur = getCurPage();
+    let i = book.pages.findIndex(p => p.page_no === cur.page_no);
+    if (i < 0) return;
+
+    let target = book.pages[i];
+    let showIndex = i;
+
+    if (target.type === 'illustration'){
+      const maxNo = Math.max(0, ...book.pages.map(p=>p.page_no||0));
+      const np = newPage(maxNo + 1);  // 乾淨文字頁
+      book.pages.splice(i, 0, np);    // 插在插圖前
+      target = np;
+      showIndex = i;
+    }
+
+    if (!Object.prototype.hasOwnProperty.call(target,'chapter')) target.chapter = '';
+
+    // 2) 讓目標頁出現在畫面上
+    if (isSingle()) idx = showIndex;
+    else idx = Math.max(0, showIndex - (showIndex % 2));
+    atCover = false;
+    activePageNo = target.page_no;
+    persist(); render();
+
+    // 3) 打開彈窗 & 同步輸入到角落章節籤 + 正文大字
+    const { dlg, input } = ensureChapterDialog();
+    input.value = target.chapter || '';
+
+    // 先做一次同步（讓空頁也立刻看得到大字與角落）
+    (function prime(){
+      const t = input.value.trim();
+      target.chapter = t;
+      setCornerChip(target.page_no, t);
+      setHeadingInBody(target.page_no, t);
+      persist();
+    })();
+
+    const onInput = () => {
+      const t = input.value.trim();
+      target.chapter = t;
+      setCornerChip(target.page_no, t);
+      setHeadingInBody(target.page_no, t);
+      persist();
+    };
+    input.removeEventListener('input', input._chapterHandler || (()=>{}));
+    input._chapterHandler = onInput;
+    input.addEventListener('input', onInput);
+
+    dlg.onclose = null;
+    dlg.addEventListener('close', ()=>{}, {once:true});
+    dlg.showModal();
+    setTimeout(()=>{ input.focus(); input.select(); }, 0);
+  }
+
+  /* ======================
+     操作（以「目前頁」為主）
      ====================== */
   function getCurPage(){
-    // 1) 有「你最近點過/正在編輯」→ 用它
+    if (atCover) return book.pages[0]; // 封面視圖時，操作預設第一頁
     if (activePageNo){
       const p = book.pages.find(pp=>pp.page_no===activePageNo);
       if (p) return p;
     }
-    // 2) 否則取畫面右側頁（常用的編輯面），沒有才用左側
     const rightNo = document.querySelector('.paper.right .page-no')?.textContent;
     if (rightNo){
       const p = book.pages.find(pp=>String(pp.page_no)===String(rightNo));
@@ -480,7 +847,6 @@
       const p = book.pages.find(pp=>String(pp.page_no)===String(leftNo));
       if (p) return p;
     }
-    // 3) 退而求其次
     return book.pages[idx];
   }
 
@@ -489,14 +855,14 @@
     const at  = book.pages.findIndex(p=>p.page_no===cur.page_no);
     const maxNo = Math.max(0, ...book.pages.map(p=>p.page_no||0));
     book.pages.splice(at+1, 0, newPage(maxNo+1));
-    activePageNo = cur.page_no + 1;  // 游標移到新頁
-    // 調整 idx 讓新頁可見（雙頁時至少露到右頁）
+    activePageNo = cur.page_no + 1;
     if (isSingle()){
       idx = at+1;
     }else{
       const leftIndex = Math.max(0, (at+1) - ((at+1)%2));
       idx = leftIndex;
     }
+    atCover = false;
     render();
   }
 
@@ -513,7 +879,6 @@
 
     book.pages.splice(i,1);
     ensureMinPages();
-    // 調整 idx 與 active
     activePageNo = book.pages[Math.max(0, i-1)].page_no;
     if (isSingle()){
       idx = Math.max(0, i-1);
@@ -521,68 +886,9 @@
       const leftIndex = Math.max(0, (i-1) - ((i-1)%2));
       idx = leftIndex;
     }
+    atCover = false;
     render();
   }
-function insertChapter(){
-  // 1) 鎖定目標頁（插圖頁就自動在前面插一張文字頁）
-  const cur = getCurPage();
-  let i = book.pages.findIndex(p => p.page_no === cur.page_no);
-  if (i < 0) return;
-
-  let target = book.pages[i];
-  let showIndex = i;
-
-  if (target.type === 'illustration'){
-    const maxNo = Math.max(0, ...book.pages.map(p=>p.page_no||0));
-    const np = newPage(maxNo + 1);  // 乾淨文字頁
-    book.pages.splice(i, 0, np);    // 插在插圖前
-    target = np;
-    showIndex = i;
-  }
-
-  if (!Object.prototype.hasOwnProperty.call(target,'chapter')) target.chapter = '';
-
-  // 2) 讓目標頁出現在畫面上
-  if (isSingle()) idx = showIndex;
-  else idx = Math.max(0, showIndex - (showIndex % 2));
-  activePageNo = target.page_no;
-  persist(); render();
-
-  // 3) 打開彈窗 & 同步輸入到角落章節籤 + 正文大字
-  const { dlg, input } = ensureChapterDialog();
-  input.value = target.chapter || '';
-
-  // 先做一次同步（讓空頁也立刻看得到大字與角落）
-  (function prime(){
-    const t = input.value.trim();
-    target.chapter = t;
-    setCornerChip(target.page_no, t);
-    setHeadingInBody(target.page_no, t);
-    persist();
-  })();
-
-  // 輸入即時同步
-  const onInput = () => {
-    const t = input.value.trim();
-    target.chapter = t;
-    setCornerChip(target.page_no, t);
-    setHeadingInBody(target.page_no, t);
-    persist();
-  };
-  // 避免重複綁定
-  input.removeEventListener('input', input._chapterHandler || (()=>{}));
-  input._chapterHandler = onInput;
-  input.addEventListener('input', onInput);
-
-  // 關閉就收工（Cancel 不回滾，因為我們是「同步輸入」）
-  dlg.onclose = null;
-  dlg.addEventListener('close', ()=>{}, {once:true});
-
-  // 開窗並聚焦
-  dlg.showModal();
-  setTimeout(()=>{ input.focus(); input.select(); }, 0);
-}
-
 
   function setType(p, type){ p.type=type; persist(); render(); }
   function setFont(nextRem){ const MIN=0.7, MAX=1.8; if(!isFinite(nextRem)||nextRem<=0)nextRem=1.02; book.textStyle.fs=Math.max(MIN,Math.min(MAX,nextRem)); persist(); render(); }
@@ -640,7 +946,6 @@ function insertChapter(){
       span.style.fontSize = next + 'em';
     });
 
-    // 還原選取
     try{
       const r2 = document.createRange();
       r2.setStart(firstText, 0);
@@ -649,7 +954,6 @@ function insertChapter(){
       sel.addRange(r2);
     }catch(_){}
 
-    // 保存
     persistEditableNow(editable);
   }
 
@@ -804,93 +1108,6 @@ function insertChapter(){
     }
     return wrap.innerHTML.replace(/\u200B/g,'');
   }
-// 建立 / 取得章名彈窗
-let chapterUI = { dlg:null, input:null, okBtn:null };
-function ensureChapterDialog(){
-  if (chapterUI.dlg) return chapterUI;
-  const dlg = document.createElement('dialog');
-  dlg.id = 'chapterDialog';
-  dlg.innerHTML = `
-    <form method="dialog" style="min-width:340px;padding:16px 18px">
-      <div style="font-weight:600;margin-bottom:8px">章節標題</div>
-      <input id="chapterTitleInput" type="text" placeholder="輸入章節名稱…"
-             style="width:100%;padding:8px 10px;box-sizing:border-box" />
-      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
-        <button value="cancel" type="submit">取消</button>
-        <button id="chapterOK" value="ok" type="submit" style="font-weight:600">套用</button>
-      </div>
-    </form>`;
-  document.body.appendChild(dlg);
-  const input = dlg.querySelector('#chapterTitleInput');
-  const okBtn = dlg.querySelector('#chapterOK');
-  chapterUI = { dlg, input, okBtn };
-  return chapterUI;
-}
-
-// 同步更新某頁角落的章節籤（沒有就幫你生）
-function setCornerChip(pageNo, text){
-  const pageRoot = document.querySelector(`.paper[data-page-no="${pageNo}"] .page`);
-  if (!pageRoot) return;
-  let chip = pageRoot.querySelector('.chapter-chip');
-  if (!text){
-    if (chip) chip.remove();
-    return;
-  }
-  if (!chip){
-    chip = document.createElement('div');
-    chip.className = 'chapter-chip';
-    pageRoot.insertBefore(chip, pageRoot.firstChild);
-  }
-  chip.textContent = text;
-}
-
-// 把章名以「大字 + 換行」放在正文開頭（同步輸入）
-function setHeadingInBody(pageNo, title){
-  const body = findBodyForPage(pageNo);
-  if (!body) return;
-
-  // 去掉開頭多餘空白文字
-  while (body.firstChild && body.firstChild.nodeType===3 && /^\s*$/.test(body.firstChild.nodeValue)){
-    body.removeChild(body.firstChild);
-  }
-
-  const isHeadingSpan = (n)=>
-    n && n.nodeType===1 && n.tagName==='SPAN' && n.hasAttribute('data-fs');
-
-  let first = body.firstChild;
-
-  if (!title){ // 清除標題（若存在）
-    if (isHeadingSpan(first)){
-      first.remove();
-      if (body.firstChild && body.firstChild.nodeType===1 && body.firstChild.tagName==='BR'){
-        body.removeChild(body.firstChild);
-      }
-      persistEditableNow(body);
-    }
-    return;
-  }
-
-  if (isHeadingSpan(first)){
-    first.textContent = title;            // 更新既有大字
-  }else{
-    const span = document.createElement('span'); // 新增大字
-    span.setAttribute('data-fs','1.6');
-    span.style.fontSize = '1.6em';
-    span.textContent = title;
-    body.insertBefore(span, body.firstChild);
-  }
-
-  // 確保後面有一個 <br>
-  const heading = body.firstChild; // 一定是 span
-  if (!(heading.nextSibling && heading.nextSibling.nodeType===1 && heading.nextSibling.tagName==='BR')){
-    const br = document.createElement('br');
-    if (heading.nextSibling) body.insertBefore(br, heading.nextSibling);
-    else body.appendChild(br);
-  }
-
-  // 寫回資料（會跑 sanitize：SPAN+BR 皆白名單、保留 data-fs/字級）
-  persistEditableNow(body);
-}
 
   /* ======================
      其他小工具
