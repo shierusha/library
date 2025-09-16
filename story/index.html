@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <title>電子書編輯器｜整合版</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&family=Noto+Sans+TC:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <!-- 上方導覽 -->
+  <div class="appbar">
+    <div class="brand">書名：<span id="bookTitle" contenteditable="true">未命名書籍</span></div>
+    <div class="tools">
+      <span>頁面數：</span><b id="lblCount">2</b>
+      <button class="btn" id="btnInsertPage">插入頁面</button>
+      <button class="btn danger" id="btnDeleteBlank">刪除空白頁</button>
+      <span style="width:12px"></span>
+      <button class="btn ghost" id="btnPrev">上一頁</button>
+      <button class="btn ghost" id="btnNext">下一頁</button>
+      <button class="btn primary" id="btnSave">儲存</button>
+      <button class="btn" id="btnBack">回書單</button>
+    </div>
+  </div>
+
+  <!-- 左側工具列 -->
+  <div class="side left">
+    <button class="btn ghost" id="btnTOC">目錄</button>
+    <button class="btn ghost" id="btnFontUp">字級＋</button>
+    <button class="btn ghost" id="btnFontDown">字級－</button>
+    <button class="btn ghost" id="btnBold">粗體</button>
+    <button class="btn ghost" id="btnItalic">斜體</button>
+    <button class="btn ghost" id="btnUnderline">底線</button>
+  </div>
+
+  <!-- 右側工具列 -->
+  <div class="side right">
+    <button class="btn ghost" id="btnToggleDir">切換橫/直式</button>
+    <button class="btn ghost" id="btnToggleBind">切換長/短邊</button>
+    <button class="btn ghost" id="btnToggleView">切換單/雙頁</button>
+  </div>
+
+  <!-- 中央舞台 -->
+  <div class="stage">
+    <div class="scaler" id="scaler">
+      <div class="papers" id="papers">
+        <div class="paper left"  id="leftPaper"></div>
+        <div class="paper right" id="rightPaper"></div>
+        <div id="flipOverlay"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 下方 Dock -->
+  <div class="dock" style="bottom: 6%;">
+    <button class="btn" id="btnInsertChapter" style="min-width:128px">插入章節</button>
+  </div>
+  <div class="dock">
+    <button class="btn" data-style="novel">文本頁面</button>
+    <button class="btn" data-style="divider-light">白色中間頁</button>
+    <button class="btn" data-style="divider-dark">黑色中間頁</button>
+    <button class="btn" data-style="illustration">圖片頁</button>
+  </div>
+
+  <!-- 目錄導覽 -->
+  <dialog id="tocDialog">
+    <form method="dialog" style="padding:14px 16px">
+      <h3 style="margin:.2rem 0 1rem">目錄</h3>
+      <div id="tocList" style="max-height:60vh;overflow:auto;border:1px solid #2a3555;border-radius:12px"></div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px"><button>關閉</button></div>
+    </form>
+  </dialog>
+
+  <script defer src="./app.js"></script>
+</body>
+</html>
