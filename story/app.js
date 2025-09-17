@@ -365,7 +365,8 @@ const btnLeft = $('#btnleft');
 
     const pos = getOffsetInOverlay(hostPaper);
     const turn = document.createElement('div');
-    turn.className = 'turn ' + (placeLeft ? 'from-left' : 'from-right');
+    const hardPage = isCover(frontPage);
+    turn.className = 'turn ' + (placeLeft ? 'from-left' : 'from-right') + (hardPage ? ' hard' : '');
     Object.assign(turn.style,{
       width:pos.width+'px', height:pos.height+'px', left:pos.left+'px', top:pos.top+'px',
       transformOrigin: placeLeft? 'right center':'left center'
@@ -376,20 +377,25 @@ const btnLeft = $('#btnleft');
     f.appendChild(snapshot(frontPage, placeLeft?'left':'right'));
     b.appendChild(snapshot(backPage , placeLeft?'right':'left'));
 
-    const shade=document.createElement('div'); shade.className='foldShade';
-    shade.style.background = placeLeft
-      ? 'linear-gradient(270deg, rgba(0,0,0,.22), rgba(0,0,0,0) 40%, rgba(0,0,0,0) 60%, rgba(0,0,0,.12))'
-      : 'linear-gradient(90deg,  rgba(0,0,0,.22), rgba(0,0,0,0) 40%, rgba(0,0,0,0) 60%, rgba(0,0,0,.12))';
-    turn.appendChild(f); turn.appendChild(b); turn.appendChild(shade);
+    const shade = !hardPage ? document.createElement('div') : null;
+    if (shade){
+      shade.className='foldShade';
+      shade.style.background = placeLeft
+        ? 'linear-gradient(270deg, rgba(0,0,0,.22), rgba(0,0,0,0) 40%, rgba(0,0,0,0) 60%, rgba(0,0,0,.12))'
+        : 'linear-gradient(90deg,  rgba(0,0,0,.22), rgba(0,0,0,0) 40%, rgba(0,0,0,0) 60%, rgba(0,0,0,.12))';
+    }
+    turn.appendChild(f); turn.appendChild(b); if (shade) turn.appendChild(shade);
 
     isFlipping=true; disableNav(true);
     idx = targetIdx; render();
 
     flipOverlay.innerHTML=''; flipOverlay.appendChild(turn);
     void turn.offsetWidth;
-    turn.style.animation = placeLeft
-      ? 'flipLeftPrev var(--flip-duration) var(--flip-ease) both'
-      : 'flipRightNext var(--flip-duration) var(--flip-ease) both';
+    const duration = hardPage ? 'var(--hard-flip-duration)' : 'var(--flip-duration)';
+    const anim = placeLeft
+      ? (hardPage ? 'hardFlipLeftPrev' : 'flipLeftPrev')
+      : (hardPage ? 'hardFlipRightNext' : 'flipRightNext');
+    turn.style.animation = anim + ' ' + duration + ' var(--flip-ease) both';
     turn.addEventListener('animationend', ()=>{ flipOverlay.innerHTML=''; isFlipping=false; disableNav(false); }, {once:true});
   }
 
@@ -399,22 +405,27 @@ const btnLeft = $('#btnleft');
     const rtl = (book.direction === 'rtl');
     const fromLeft = rtl ? (dir === 'next') : (dir === 'prev');
     const snapSide = fromLeft ? 'left' : 'right';
-    const snap = snapshot(getPageByIndex(idx), snapSide);
+    const flippingPage = getPageByIndex(idx);
+    const isHard = isCover(flippingPage);
+    const snap = snapshot(flippingPage, snapSide);
     
     isFlipping=true; disableNav(true);
     idx = targetIdx; render();
 
        const cover=document.createElement('div');
     const orientationClass = fromLeft ? 'from-left' : 'from-right';
-    cover.className='singleTurn '+orientationClass;
+    cover.className='singleTurn '+orientationClass + (isHard ? ' hard' : '');
     const origin = fromLeft ? 'right center' : 'left center';
     Object.assign(cover.style,{ width:pos.width+'px', height:pos.height+'px', left:pos.left+'px', top:pos.top+'px', transformOrigin:origin });
     cover.appendChild(snap);
 
     flipOverlay.innerHTML=''; flipOverlay.appendChild(cover);
     void cover.offsetWidth;
-    const singleAnim = fromLeft ? 'singleCurlPrev' : 'singleCurlNext';
-    cover.style.animation = singleAnim + ' var(--single-flip-duration) var(--flip-ease) both';
+    const singleAnim = fromLeft
+      ? (isHard ? 'hardSinglePrev' : 'singleCurlPrev')
+      : (isHard ? 'hardSingleNext' : 'singleCurlNext');
+    const singleDuration = isHard ? 'var(--hard-single-duration)' : 'var(--single-flip-duration)';
+    cover.style.animation = singleAnim + ' ' + singleDuration + ' var(--flip-ease) both';
     cover.addEventListener('animationend', ()=>{ flipOverlay.innerHTML=''; isFlipping=false; disableNav(false); }, {once:true});
   }
 
@@ -1030,6 +1041,7 @@ function getCurPage(){
   function persist(){ Store.save(book) }
   function getPageByIndex(i){ return book.pages[i] }
 })();
+
 
 
 
