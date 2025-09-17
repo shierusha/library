@@ -120,8 +120,10 @@
     if(!target) return;
     e.preventDefault();
     const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+    const pageNo = Number(target.closest('.paper')?.querySelector('.page-no')?.textContent) || null;
     insertPlainTextAtCursor(text);
     persistEditableNow(target);
+    if (pageNo) autoPaginateFrom(pageNo, target);
   });
 
   render(); fit();
@@ -895,6 +897,7 @@ function getCurPage(){
   function persist(){ Store.save(book) }
   function getPageByIndex(i){ return book.pages[i] }
 })();
+
 
 
 
