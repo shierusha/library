@@ -200,6 +200,12 @@
     return '';
   }
 
+  function shouldShowPageMetadata(page){
+    if (!page || isCover(page)) return false;
+    const type = page.type;
+    return type!=='divider-light' && type!=='divider-dark' && type!=='illustration';
+  }
+
   function renderOne(host, page, side){
     if(!host || !page) return;
     host.className = 'paper ' + side + ' ' + templateClass(page);
@@ -232,37 +238,39 @@
       return;
     }
 
-    // 角落章節籤（顯示：最近章名；雙擊：直接編輯該章起始頁的章名）
-    const chTitle = nearestChapter(page.page_no);
-    if (chTitle){
-      const chip = document.createElement('div');
-      chip.className='chapter-chip';
-      chip.textContent = chTitle;
-      chip.title = '雙擊可編輯章節名稱';
-            chip.addEventListener('dblclick', ()=>{
-        const originIdx = getChapterOriginIndex(page.page_no);
-        if (originIdx<0) return;
-        const origin = book.pages[originIdx];
-        const cur = getChapterTitleMeta(origin) || '';
-        const next = prompt('章節名稱：', cur);
-        if (next===null) return;
-        const title = (next||'').trim();
-        if (title){
-          applyHeadingToPage(origin, title);
-          setChapterTitleMeta(origin, title);
-        }else{
-          setChapterTitleMeta(origin, null);
-        }
-        persist(); render();
-      });
-      el.appendChild(chip);
-    }
+   if (shouldShowPageMetadata(page)){
+      // 角落章節籤（顯示：最近章名；雙擊：直接編輯該章起始頁的章名）
+      const chTitle = nearestChapter(page.page_no);
+      if (chTitle){
+        const chip = document.createElement('div');
+        chip.className='chapter-chip';
+        chip.textContent = chTitle;
+        chip.title = '雙擊可編輯章節名稱';
+        chip.addEventListener('dblclick', ()=>{
+          const originIdx = getChapterOriginIndex(page.page_no);
+          if (originIdx<0) return;
+          const origin = book.pages[originIdx];
+          const cur = getChapterTitleMeta(origin) || '';
+          const next = prompt('章節名稱：', cur);
+          if (next===null) return;
+          const title = (next||'').trim();
+          if (title){
+            applyHeadingToPage(origin, title);
+            setChapterTitleMeta(origin, title);
+          }else{
+            setChapterTitleMeta(origin, null);
+          }
+          persist(); render();
+        });
+        el.appendChild(chip);
+      }
 
-    // 頁碼
-    const no = document.createElement('div');
-    no.className='page-no';
-    no.textContent = page.page_no || '';
-    el.appendChild(no);
+      // 頁碼
+      const no = document.createElement('div');
+      no.className='page-no';
+      no.textContent = page.page_no || '';
+      el.appendChild(no);
+    }
 
     // 點擊設為 active
     host.addEventListener('mousedown', ()=>{ setActivePage(page); }, {passive:true});
@@ -417,9 +425,19 @@
       host.appendChild(el); return host;
     }
 
-    const ch = nearestChapter(page.page_no);
-    if (ch){ const chip=document.createElement('div'); chip.className='chapter-chip'; chip.textContent=ch; el.appendChild(chip); }
-    const no=document.createElement('div'); no.className='page-no'; no.textContent=page.page_no||''; el.appendChild(no);
+    if (shouldShowPageMetadata(page)){
+      const ch = nearestChapter(page.page_no);
+      if (ch){
+        const chip=document.createElement('div');
+        chip.className='chapter-chip';
+        chip.textContent=ch;
+        el.appendChild(chip);
+      }
+      const no=document.createElement('div');
+      no.className='page-no';
+      no.textContent=page.page_no||'';
+      el.appendChild(no);
+    };
 
     if (page.type==='illustration'){
       el.innerHTML += page.image_url ? `<img src="${esc(page.image_url)}" alt="">` : '';
@@ -996,6 +1014,7 @@ function getCurPage(){
   function persist(){ Store.save(book) }
   function getPageByIndex(i){ return book.pages[i] }
 })();
+
 
 
 
