@@ -95,8 +95,8 @@ const btnLeft = $('#btnleft');
   $('#btnBack')?.addEventListener('click', ()=> alert('示範：自行導回書單 URL'));
 
   $('#btnToggleView')?.addEventListener('click', ()=>{ book.viewMode = (book.viewMode==='single'?'double':'single'); render(); });
-  $('#btnToggleDir') ?.addEventListener('click', ()=>{ book.direction = (book.direction==='rtl'?'ltr':'rtl'); render(); });
-  $('#btnToggleBind')?.addEventListener('click', ()=>{ book.binding   = (book.binding==='long'?'short':'long'); render(); });
+  $('#btnToggleDir')?.addEventListener('click', ()=>{book.direction = (book.direction==='rtl'?'ltr':'rtl'); render(); });
+  $('#btnToggleBind')?.addEventListener('click', ()=>{ book.binding  = (book.binding==='long'?'short':'long'); render(); });
 
   // 文字工具（保留選取）
   const keepSel=btn=>btn?.addEventListener('mousedown',e=>e.preventDefault());
@@ -105,7 +105,7 @@ const btnLeft = $('#btnleft');
   $('#btnItalic')   ?.addEventListener('click', ()=> document.execCommand('italic',false,null));
   $('#btnUnderline')?.addEventListener('click', ()=> document.execCommand('underline',false,null));
   $('#btnFontUp')   ?.addEventListener('click', ()=> scaleSelection(1.15));
-  $('#btnFontDown') ?.addEventListener('click', ()=> scaleSelection(0.87));
+  $('#btnFontDown')?.addEventListener('click', ()=> scaleSelection(0.87));
 
   // Dock：切模板
   $all('[data-style]').forEach(b=>{
@@ -364,7 +364,7 @@ const btnLeft = $('#btnleft');
     if (!hostPaper) return;
 
     const pos = getOffsetInOverlay(hostPaper);
-    const turn = document.createElement('div');␊
+    const turn = document.createElement('div');
     turn.className = 'turn ' + (placeLeft ? 'from-left' : 'from-right');
     Object.assign(turn.style,{
       width:pos.width+'px', height:pos.height+'px', left:pos.left+'px', top:pos.top+'px',
@@ -1030,6 +1030,7 @@ function getCurPage(){
   function persist(){ Store.save(book) }
   function getPageByIndex(i){ return book.pages[i] }
 })();
+
 
 
 
