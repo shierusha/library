@@ -32,8 +32,6 @@
     pages:[ newCover(), newPage(), newPage() ]
   };
 
-  initializeChapterMetadata();
-
   function ensureCover(){
     if (!book.pages.length || book.pages[0].type!=='cover-front'){
       book.pages.unshift(newCover());
@@ -51,6 +49,7 @@
   }
   const isCover = (p)=> p && p.type==='cover-front';
 
+  initializeChapterMetadata();
   /* ======================
      DOM & 狀態
      ====================== */
@@ -997,6 +996,7 @@ function getCurPage(){
   function persist(){ Store.save(book) }
   function getPageByIndex(i){ return book.pages[i] }
 })();
+
 
 
 
