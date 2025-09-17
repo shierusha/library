@@ -541,15 +541,33 @@
     });
 
     // 點章節
-    $all('.toc-row[data-no]', box).forEach(row=>{
-      row.addEventListener('click', ()=>{
+   $all('.toc-row[data-no]', box).forEach(row=>{
+      const navigateToEntry = ()=>{
         const targetNo = parseInt(row.getAttribute('data-no'),10);
         const targetIdx= book.pages.findIndex(p=>p.page_no===targetNo);
-        if (targetIdx<0) return;
+        if (targetIdx<0) return null;
+        const page = book.pages[targetIdx];
         const effSingle = effectiveSingleAt(targetIdx);
         idx = effSingle ? targetIdx : Math.max(0, targetIdx - (targetIdx%2));
-        setActivePage(book.pages[targetIdx]);
+        setActivePage(page);
         render(); $('#tocDialog')?.close();
+        return page;
+      };
+      row.addEventListener('click', ()=>{ navigateToEntry(); });
+      row.addEventListener('dblclick', ()=>{
+        const page = navigateToEntry();
+        if (!page) return;
+        const currentTitle = getHeadingFromPage(page) || '';
+        const next = prompt('章節名稱：', currentTitle);
+        if (next===null) return;
+        const title = next.trim();
+        if (title){
+          applyHeadingToPage(page, title);
+        }else{
+          removeHeadingFromPage(page);
+        }
+        persist();
+        render();
       });
     });
   }
@@ -907,6 +925,7 @@ function getCurPage(){
   function persist(){ Store.save(book) }
   function getPageByIndex(i){ return book.pages[i] }
 })();
+
 
 
 
