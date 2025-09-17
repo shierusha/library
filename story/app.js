@@ -56,41 +56,11 @@
   const $=(s,r=document)=>r.querySelector(s);
   const $all=(s,r=document)=>Array.from((r||document).querySelectorAll(s));
     const scaler=$('#scaler'), papersWrap=$('#papers'), leftPaper=$('#leftPaper'), rightPaper=$('#rightPaper'), flipOverlay=$('#flipOverlay');
-  const reduceMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
-
-  const FLIP_PROFILES = {
-    double: {
-      soft: { offset:0.3, depth:0.04, lift:0.026, skew:34, clip:22, fold:0.65, sheen:0.55, frontDim:0.42, backBoost:0.28 },
-      hard: { offset:0.2, depth:0.026, lift:0.018, skew:22, clip:16, fold:0.32, sheen:0.32, frontDim:0.32, backBoost:0.22 }
-    },
-    single: {
-      soft: { offset:0.36, depth:0.05, lift:0.032, skew:38, clip:26, fold:0.7, sheen:0.6, frontDim:0.46, backBoost:0.32 },
-      hard: { offset:0.24, depth:0.032, lift:0.022, skew:26, clip:18, fold:0.38, sheen:0.36, frontDim:0.36, backBoost:0.26 }
-    }
-  };
+   const reduceMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
 
   let idx=0;                 // 左頁 index（單頁=當前 index）
   let isFlipping=false;      // 動畫節流
   let activePageId=null;     // 目前操作頁（避免重編號時游標亂跳）
-
-  function parseDuration(raw, fallback){
-    const trimmed = (raw||'').trim();
-    if (!trimmed) return fallback;
-    if (trimmed.endsWith('ms')) return parseFloat(trimmed);
-    if (trimmed.endsWith('s'))  return parseFloat(trimmed)*1000;
-    const num = parseFloat(trimmed);
-    return Number.isFinite(num) ? num*1000 : fallback;
-  }
-
-  function getFlipDurations(){
-    const cs = getComputedStyle(document.documentElement);
-    return {
-      softDouble: parseDuration(cs.getPropertyValue('--flip-duration'), 680),
-      hardDouble: parseDuration(cs.getPropertyValue('--hard-flip-duration'), 820),
-      softSingle: parseDuration(cs.getPropertyValue('--single-flip-duration'), 580),
-      hardSingle: parseDuration(cs.getPropertyValue('--hard-single-duration'), 720)
-    };
-  }
 
   /* ======================
      導覽列
@@ -380,138 +350,53 @@ const btnLeft = $('#btnleft');
     return { left: pr.left-or.left, top: pr.top-or.top, width: pr.width, height: pr.height };
   }
 
-  function animateFlipFX({ mode, fromLeft, hard, rect, frontNode, backNode }){
+ function animateFlip({ mode, fromLeft, hard, rect, frontNode, backNode, borderRadius }){
     return new Promise(resolve => {
       if (!flipOverlay){ resolve(); return; }
       flipOverlay.innerHTML='';
       if (reduceMotionQuery && reduceMotionQuery.matches){ resolve(); return; }
 
-      const orientationClass = fromLeft ? 'from-left' : 'from-right';
-      const hardnessClass = hard ? 'hard' : 'soft';
-      const host = document.createElement('div');
-      host.className = `flipFxHost ${mode} ${hardnessClass} ${orientationClass}`;
-      Object.assign(host.style, {
+      const sheet = document.createElement('div');
+      sheet.className = `flip-sheet ${mode} ${fromLeft ? 'from-left' : 'from-right'} ${hard ? 'hard' : 'soft'}`;
+      Object.assign(sheet.style, {
         width: rect.width + 'px',
         height: rect.height + 'px',
         left: rect.left + 'px',
-        top: rect.top + 'px',
-        perspective: Math.max(rect.width, rect.height) * 3.4 + 'px'
+        top: rect.top + 'px'
       });
+      if (borderRadius){ sheet.style.borderRadius = borderRadius; }
 
-      const sheet = document.createElement('div');
-      sheet.className = 'flipFx-sheet';
-      sheet.style.transformOrigin = fromLeft ? 'right center' : 'left center';
-
-      const front = document.createElement('div');
-      front.className = 'fx-face fx-front';
-      front.style.clipPath = 'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)';
-      front.style.setProperty('--front-sheen', '0');
-
-      const back = document.createElement('div');
-      back.className = 'fx-face fx-back';
-      back.style.clipPath = 'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)';
-      back.style.setProperty('--back-glow', '0');
+      const frontFace = document.createElement('div');
+      frontFace.className = 'flip-face front';
+      const backFace = document.createElement('div');
+      backFace.className = 'flip-face back';
 
       const frontContent = frontNode ? frontNode.cloneNode(true) : document.createElement('div');
-      const backContent  = backNode  ? backNode.cloneNode(true)  : (frontNode ? frontNode.cloneNode(true) : document.createElement('div'));
+      const backContent  = backNode  ? backNode.cloneNode(true)  : document.createElement('div');
+      frontContent.style.width = '100%';
+      frontContent.style.height = '100%';
+      backContent.style.width = '100%';
+      backContent.style.height = '100%';
 
-      front.appendChild(frontContent);
-      back.appendChild(backContent);
+      frontFace.appendChild(frontContent);
+      backFace.appendChild(backContent);
 
-      sheet.append(front, back);
+      sheet.append(frontFace, backFace);
+      flipOverlay.appendChild(sheet);
 
-      const fold = document.createElement('div');
-      fold.className = 'fx-fold';
-      const sheen = document.createElement('div');
-      sheen.className = 'fx-sheen';
-
-      host.append(sheet, fold, sheen);
-
-      let rim=null;
-      if (hard){
-        rim = document.createElement('div');
-        rim.className = 'fx-rim';
-        host.appendChild(rim);
-      }
-
-      flipOverlay.appendChild(host);
-
-      const durations = getFlipDurations();
-      const duration = hard
-        ? (mode === 'single' ? durations.hardSingle : durations.hardDouble)
-        : (mode === 'single' ? durations.softSingle : durations.softDouble);
-
-      const profile = FLIP_PROFILES[mode][hard ? 'hard' : 'soft'];
-      const start = performance.now();
-      const sign = fromLeft ? 1 : -1;
-
-      const rimTranslate = Math.max(3, rect.width * 0.014);
-
-      function easeInOutCubic(t){
-        return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-      }
-
-      function finish(){
+      const cleanup = () => {
+        sheet.removeEventListener('animationend', cleanup);
+        sheet.removeEventListener('animationcancel', cleanup);
         flipOverlay.innerHTML='';
         resolve();
-      }
+      };
 
-      function frame(now){
-        const elapsed = now - start;
-        const raw = elapsed / duration;
-        const t = raw >= 1 ? 1 : raw <= 0 ? 0 : raw;
-        const eased = easeInOutCubic(t);
-        const angle = eased * 180;
-        const rad = angle * Math.PI / 180;
-        const sin = Math.sin(rad);
+      sheet.addEventListener('animationend', cleanup);
+      sheet.addEventListener('animationcancel', cleanup);
 
-        const offset = sin * rect.width * profile.offset;
-        const depth = sin * rect.width * profile.depth;
-        const lift = sin * rect.height * profile.lift;
-        const skew = sin * profile.skew;
-        const clip = sin * profile.clip;
-        const foldOpacity = Math.pow(sin, 0.85) * profile.fold;
-        const sheenOpacity = Math.pow(sin, 1.08) * profile.sheen;
-        const frontBrightness = Math.max(0.35, 1 - sin * profile.frontDim);
-        const backBrightness  = Math.min(1.25, 0.78 + sin * profile.backBoost);
-        const contrastShiftFront = 1 - sin * 0.12;
-        const contrastShiftBack  = 1 + sin * 0.08;
-
-        host.style.filter = `drop-shadow(0 ${18 + sin*26}px ${42 + sin*58}px rgba(15,23,42,${0.26 + sin*0.22}))`;
-
-        sheet.style.transform = `translateZ(${depth}px) translateY(${-lift}px) translateX(${sign * -offset}px) rotateY(${sign * angle}deg) skewY(${sign * skew}deg)`;
-
-        const clipValue = Math.min(profile.clip, clip);
-        if (fromLeft){
-          front.style.clipPath = `polygon(${clipValue}% 0%, 100% 0%, 100% 100%, ${clipValue}% 100%)`;
-          back.style.clipPath  = `polygon(0% 0%, ${100 - clipValue}% 0%, ${100 - clipValue}% 100%, 0% 100%)`;
-        }else{
-          front.style.clipPath = `polygon(0% 0%, ${100 - clipValue}% 0%, ${100 - clipValue}% 100%, 0% 100%)`;
-          back.style.clipPath  = `polygon(${clipValue}% 0%, 100% 0%, 100% 100%, ${clipValue}% 100%)`;
-        }
-
-        fold.style.opacity = foldOpacity;
-        fold.style.transform = `translateX(${sign * -offset * 0.38}px) skewY(${sign * skew * 0.32}deg) scaleX(${1 + sin * 0.18})`;
-
-        sheen.style.opacity = sheenOpacity;
-        sheen.style.transform = `translateX(${sign * -offset * 0.7}px) rotate(${sign * -4.6}deg)`;
-
-        front.style.filter = `brightness(${frontBrightness}) contrast(${contrastShiftFront})`;
-        back.style.filter  = `brightness(${backBrightness}) contrast(${contrastShiftBack})`;
-
-        front.style.setProperty('--front-sheen', sheenOpacity.toFixed(3));
-        back.style.setProperty('--back-glow', (Math.pow(sin, 0.9) * 0.5).toFixed(3));
-
-        if (rim){
-          const rimAngle = sign > 0 ? -90 : 90;
-          rim.style.transform = `rotateY(${rimAngle}deg) translateZ(${rimTranslate}px) scaleY(${1 - sin * 0.22})`;
-        }
-
-        if (t < 1){ requestAnimationFrame(frame); }
-        else { finish(); }
-      }
-
-      requestAnimationFrame(frame);
+      requestAnimationFrame(() => {
+        sheet.classList.add('animate');
+      });
     });
   }
 
@@ -530,7 +415,8 @@ const btnLeft = $('#btnleft');
     if (!hostPaper || !frontPage) return;
 
     const pos = getOffsetInOverlay(hostPaper);
-    const hardPage = isCover(frontPage);
+const hardPage = isCover(frontPage);
+    const borderRadius = hostPaper ? getComputedStyle(hostPaper).borderRadius : '';
     const frontSnap = snapshot(frontPage, placeLeft ? 'left' : 'right');
     const backSnap  = snapshot(backPage , placeLeft ? 'right' : 'left');
 
@@ -542,13 +428,14 @@ const btnLeft = $('#btnleft');
       return;
     }
 
-    animateFlipFX({
+    animateFlip({
       mode:'double',
       fromLeft: placeLeft,
       hard: hardPage,
       rect: pos,
       frontNode: frontSnap,
-      backNode: backSnap
+      backNode: backSnap,
+      borderRadius
     }).then(()=>{ isFlipping=false; disableNav(false); });
   }
 
@@ -563,6 +450,7 @@ const btnLeft = $('#btnleft');
     const targetPage = getPageByIndex(targetIdx) || newPage();
     const frontSnap = snapshot(flippingPage, snapSide);
     const backSnap  = snapshot(targetPage, fromLeft ? 'right' : 'left');
+    const borderRadius = rightPaper ? getComputedStyle(rightPaper).borderRadius : '';
 
     isFlipping=true; disableNav(true);
     idx = targetIdx; render();
@@ -572,13 +460,14 @@ const btnLeft = $('#btnleft');
       return;
     }
 
-    animateFlipFX({
+    animateFlip({
       mode:'single',
       fromLeft,
       hard: isHard,
       rect: pos,
       frontNode: frontSnap,
-      backNode: backSnap
+      backNode: backSnap,
+      borderRadius
     }).then(()=>{ isFlipping=false; disableNav(false); });
   }
 
@@ -1194,6 +1083,7 @@ function getCurPage(){
   function persist(){ Store.save(book) }
   function getPageByIndex(i){ return book.pages[i] }
 })();
+
 
 
 
