@@ -38,7 +38,7 @@ body{
 .btn.primary{background:#6f82ff;border-color:#6f82ff}
 .btn.danger{background:#2a0f18;border-color:#6b1b2e;color:#ffb3c2}
 .btn.ghost{background:#ffffff18;border-color:#ffffff33}
-.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn:disabled{opacity:.5;cursor:default}
 
 /* 工具列 & Dock */
 .side{
@@ -126,4 +126,5 @@ body{
   box-shadow:0 8px 18px rgba(0,0,0,.18);
 }
 @keyframes singleCurl { 0%{ transform:rotateY(0deg) } 100%{ transform:rotateY(-160deg) } }
+
 
