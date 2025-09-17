@@ -199,10 +199,10 @@
           <div style="font-size:1.6em;font-weight:700;line-height:1.2">${esc(book.title||'未命名書籍')}</div>
           <div style="margin-top:10px;opacity:.65">～ 封面 ～</div>
         </div>`;
-    host.innerHTML=''; host.appendChild(el);␊
+    host.innerHTML=''; host.appendChild(el);
       host.addEventListener('mousedown', ()=>{ setActivePage(page); }, {passive:true});
-      return;␊
-    }␊
+      return;
+    }
 
     // 角落章節籤（顯示：最近章名；雙擊：直接編輯該章起始頁的章名）
     const chTitle = nearestChapter(page.page_no);
@@ -854,4 +854,5 @@ function getCurPage(){
   function persist(){ Store.save(book) }
   function getPageByIndex(i){ return book.pages[i] }
 })();
+
 
