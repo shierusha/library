@@ -147,9 +147,10 @@
     papersWrap?.classList.toggle('landscape', book.binding==='long');
     scaler?.classList.toggle('vertical', book.direction==='rtl');
 
-    // 顯示內容頁數（不含封面）
+        // 顯示內容頁數（不含封面）
     const count = book.pages.reduce((acc,p)=> acc + (isCover(p)?0:1), 0);
-    $('#lblCount')?.textContent = String(count);
+    const lblCount = $('#lblCount');
+    if (lblCount) lblCount.textContent = String(count);
     document.documentElement.style.setProperty('--fs', book.textStyle.fs+'rem');
     document.documentElement.style.setProperty('--lh', book.textStyle.lh);
 
@@ -834,3 +835,4 @@
   function persist(){ Store.save(book) }
   function getPageByIndex(i){ return book.pages[i] }
 })();
+
