@@ -524,12 +524,12 @@ function getChapterOriginIndex(pageNo){
         first.textContent = title;
       }else{
         const span=document.createElement('span');
-        span.setAttribute('data-fs','1.6'); span.style.fontSize='1.6em'; span.textContent=title;
+        span.setAttribute('data-fs','1.4'); span.style.fontSize='1.4em'; span.textContent=title;
         tmp.insertBefore(span, first);
       }
     }else{
       const span=document.createElement('span');
-      span.setAttribute('data-fs','1.6'); span.style.fontSize='1.6em'; span.textContent=title;
+      span.setAttribute('data-fs','1.4'); span.style.fontSize='1.4em'; span.textContent=title;
       tmp.insertBefore(span, first||null);
     }
     // 確保下一個是 <br>
@@ -996,6 +996,7 @@ function getCurPage(){
   function persist(){ Store.save(book) }
   function getPageByIndex(i){ return book.pages[i] }
 })();
+
 
 
 
