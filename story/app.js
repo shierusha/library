@@ -23,7 +23,7 @@
   }
   function newCover(){ return { id:'cover_front', page_no:0, type:'cover-front', content_text:'', content_html:'', image_url:null }; }
 
-  let book = Store.load() || {
+ let book = Store.load() || {
     title:'未命名書籍',
     direction:'ltr',       // 'ltr' 橫排；'rtl' 直排
     binding:'short',       // 'short' 直放；'long' 橫放
@@ -31,6 +31,8 @@
     textStyle:{ fs:1.02, lh:1.8 },
     pages:[ newCover(), newPage(), newPage() ]
   };
+
+  initializeChapterMetadata();
 
   function ensureCover(){
     if (!book.pages.length || book.pages[0].type!=='cover-front'){
@@ -40,7 +42,12 @@
   function ensureMinPages(){
     // 至少兩張內容頁（不含封面）
     const contents = book.pages.filter(p=>p.type!=='cover-front');
-    while(contents.length<2){ book.pages.push(newPage()); contents.push(1); }
+ while(contents.length<2){
+      const extra = newPage();
+      book.pages.push(extra);
+      setChapterTitleMeta(extra, null);
+      contents.push(1);
+    }
   }
   const isCover = (p)=> p && p.type==='cover-front';
 
@@ -142,8 +149,8 @@
     }
   }
 
-  function render(){
-    ensureCover(); ensureMinPages(); renumberPages();
+   function render(){
+    ensureCover(); ensureMinPages(); renumberPages(); syncChapterMetadata();
 
     const effSingle = effectiveSingleAt(idx);
     document.body.classList.toggle('single', effSingle);
@@ -158,8 +165,14 @@
     document.documentElement.style.setProperty('--lh', book.textStyle.lh);
 
     // 雙頁尾端自動補白
-    if (!effSingle && !book.pages[idx+1]){ book.pages.push(newPage()); renumberPages(); }
-
+    if (!effSingle && !book.pages[idx+1]){
+      const extra = newPage();
+      book.pages.push(extra);
+      setChapterTitleMeta(extra, null);
+      renumberPages();
+      syncChapterMetadata();
+    }
+                     
     const maxIndex = Math.max(0, book.pages.length - (effSingle?1:2));
     idx = clamp(idx, 0, maxIndex);
 
@@ -227,17 +240,19 @@
       chip.className='chapter-chip';
       chip.textContent = chTitle;
       chip.title = '雙擊可編輯章節名稱';
-      chip.addEventListener('dblclick', ()=>{
+            chip.addEventListener('dblclick', ()=>{
         const originIdx = getChapterOriginIndex(page.page_no);
         if (originIdx<0) return;
         const origin = book.pages[originIdx];
-        const cur = getHeadingFromPage(origin) || '';
+        const cur = getChapterTitleMeta(origin) || '';
         const next = prompt('章節名稱：', cur);
         if (next===null) return;
-        if ((next||'').trim()){
-          applyHeadingToPage(origin, (next||'').trim());
+        const title = (next||'').trim();
+        if (title){
+          applyHeadingToPage(origin, title);
+          setChapterTitleMeta(origin, title);
         }else{
-          removeHeadingFromPage(origin);
+          setChapterTitleMeta(origin, null);
         }
         persist(); render();
       });
@@ -295,8 +310,11 @@
 
     // 雙頁往後翻且逼近尾端 → 先補一頁（防呆）
     const effSingleNow = isEffectiveSingleNow();
-    if (!effSingleNow && sign>0 && (idx + 2 >= book.pages.length)){
-      book.pages.push(newPage()); renumberPages();
+       if (!effSingleNow && sign>0 && (idx + 2 >= book.pages.length)){
+      const extra = newPage();
+      book.pages.push(extra); renumberPages();
+      setChapterTitleMeta(extra, null);
+      syncChapterMetadata();
     }
 
     const effSingle = isEffectiveSingleNow();
@@ -413,9 +431,48 @@
     return host;
   }
 
-  /* ======================
+   /* ======================
      章節：偵測 / 編輯 / 目錄
      ====================== */
+  function initializeChapterMetadata(){
+    if (book.chapters && typeof book.chapters === 'object'){
+      syncChapterMetadata();
+      return;
+    }
+    book.chapters = {};
+    book.pages.forEach(page=>{
+      if (!page || !page.id) return;
+      if (isCover(page)){ book.chapters[page.id] = null; return; }
+      const inferred = getHeadingFromPage(page);
+      book.chapters[page.id] = inferred ? { title: inferred } : null;
+    });
+  }
+
+  function syncChapterMetadata(){
+    if (!book.chapters || typeof book.chapters !== 'object') book.chapters = {};
+    const ids = new Set(book.pages.map(p=>p.id));
+    Object.keys(book.chapters).forEach(id=>{ if (!ids.has(id)) delete book.chapters[id]; });
+    book.pages.forEach(page=>{
+      if (!page || !page.id) return;
+      if (!(page.id in book.chapters)) book.chapters[page.id] = null;
+    });
+  }
+
+  function getChapterTitleMeta(page){
+    if (!page) return '';
+    if (!book.chapters || typeof book.chapters !== 'object') return '';
+    const entry = book.chapters[page.id];
+    if (entry && typeof entry === 'object' && entry.title) return entry.title;
+    return '';
+  }
+
+  function setChapterTitleMeta(page, title){
+    if (!page) return;
+    if (!book.chapters || typeof book.chapters !== 'object') book.chapters = {};
+    if (title && title.trim()) book.chapters[page.id] = { title: title.trim() };
+    else book.chapters[page.id] = null;
+  }
+
   // 章名規則：正文第一個節點若是 <span data-fs>=1.2 或 style.fontSize>=1.2em，就視為章名；其後需有 <br>
   function getHeadingFromHTML(html){
     if (!html) return '';
@@ -431,22 +488,24 @@
   }
   function getHeadingFromPage(p){ return getHeadingFromHTML(p.content_html||''); }
 
-  function getChapterOriginIndex(pageNo){
+function getChapterOriginIndex(pageNo){
+    syncChapterMetadata();
     let i=book.pages.findIndex(p=>p.page_no===pageNo);
     if (i<0) return -1;
     for(let x=i; x>=0; x--){
       const p=book.pages[x];
-      if (p.page_no>0 && getHeadingFromPage(p)) return x;
+      if (p.page_no>0 && getChapterTitleMeta(p)) return x;
     }
     return -1;
   }
   function nearestChapter(pageNo){
+    syncChapterMetadata();
     let i=book.pages.findIndex(p=>p.page_no===pageNo);
     if (i<0) return '';
     for(let x=i; x>=0; x--){
       const p=book.pages[x];
       if (p.page_no>0){
-        const h=getHeadingFromPage(p);
+        const h=getChapterTitleMeta(p);
         if (h) return h;
       }
     }
@@ -501,8 +560,10 @@
     page.content_text = tmp.textContent || '';
   }
 
-  function buildTOC(){
+    function buildTOC(){
     const box=$('#tocList'); if(!box) return;
+
+    syncChapterMetadata();
 
     const rows=[];
     // 封面列
@@ -518,7 +579,7 @@
     for (let i=0;i<book.pages.length;i++){
       const p=book.pages[i];
       if (p.page_no<=0) continue;
-      const ch=getHeadingFromPage(p);
+      const ch=getChapterTitleMeta(p);
       if (!ch) continue;
       rows.push(`
       <div class="toc-row" data-no="${p.page_no}"
@@ -557,14 +618,15 @@
       row.addEventListener('dblclick', ()=>{
         const page = navigateToEntry();
         if (!page) return;
-        const currentTitle = getHeadingFromPage(page) || '';
+                const currentTitle = getChapterTitleMeta(page) || '';
         const next = prompt('章節名稱：', currentTitle);
         if (next===null) return;
         const title = next.trim();
         if (title){
           applyHeadingToPage(page, title);
+          setChapterTitleMeta(page, title);
         }else{
-          removeHeadingFromPage(page);
+          setChapterTitleMeta(page, null);
         }
         persist();
         render();
@@ -602,7 +664,14 @@
     // 下一可寫文本頁（跳過插圖/封面；不足補頁）
     let j=i+1;
     while(j<book.pages.length && (book.pages[j].type==='illustration' || isCover(book.pages[j]))) j++;
-    if (j>=book.pages.length){ book.pages.push(newPage()); j=book.pages.length-1; renumberPages(); }
+    if (j>=book.pages.length){
+      const extra = newPage();
+      book.pages.push(extra);
+      setChapterTitleMeta(extra, null);
+      j=book.pages.length-1;
+      renumberPages();
+      syncChapterMetadata();
+    }
     const remain = fullText.slice(fit).trimStart();
     const before = book.pages[j].content_text || '';
     book.pages[j].content_text = remain + (before?('\n'+before):'');
@@ -657,9 +726,10 @@ function getCurPage(){
 
     const cur = getCurPage();
     const at  = book.pages.indexOf(cur);
-    const page = newPage();
+        const page = newPage();
     book.pages.splice(at+1, 0, page);
     applyHeadingToPage(page, title);
+    setChapterTitleMeta(page, title);
     renumberPages();
 
     if (effectiveSingleAt(at+1)) idx = at+1;
@@ -673,7 +743,9 @@ function getCurPage(){
   function insertAfter(){
     const cur = getCurPage();
     const at  = book.pages.indexOf(cur);
-    book.pages.splice(at+1, 0, newPage());
+        const page = newPage();
+    book.pages.splice(at+1, 0, page);
+    setChapterTitleMeta(page, null);
     renumberPages();
     // 讓新頁可見
     if (effectiveSingleAt(at+1)) idx = at+1;
@@ -925,6 +997,7 @@ function getCurPage(){
   function persist(){ Store.save(book) }
   function getPageByIndex(i){ return book.pages[i] }
 })();
+
 
 
 
