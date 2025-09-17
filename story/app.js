@@ -377,7 +377,7 @@ const btnLeft = $('#btnleft');
     b.appendChild(snapshot(backPage , placeLeft?'right':'left'));
 
     const shade=document.createElement('div'); shade.className='foldShade';
-    shade.style.background = placeLeft␊
+    shade.style.background = placeLeft
       ? 'linear-gradient(270deg, rgba(0,0,0,.25), rgba(0,0,0,0) 30%, rgba(0,0,0,0) 70%, rgba(0,0,0,.12))'
       : 'linear-gradient(90deg,  rgba(0,0,0,.25), rgba(0,0,0,0) 30%, rgba(0,0,0,0) 70%, rgba(0,0,0,.12))';
     turn.appendChild(f); turn.appendChild(b); turn.appendChild(shade);
@@ -1030,6 +1030,7 @@ function getCurPage(){
   function persist(){ Store.save(book) }
   function getPageByIndex(i){ return book.pages[i] }
 })();
+
 
 
 
