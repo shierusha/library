@@ -78,8 +78,16 @@
   /* ======================
      工具列按鈕
      ====================== */
- $('#btnPrev')?.addEventListener('click', ()=> step(-1));
-  $('#btnNext')?.addEventListener('click', ()=> step(+1));
+const btnLeft = $('#btnleft');
+  const btnRight = $('#btnright');
+  btnLeft?.addEventListener('click', ()=>{
+    const sign = book.direction==='rtl' ? -1 : +1;
+    step(sign);
+  });
+  btnRight?.addEventListener('click', ()=>{
+    const sign = book.direction==='rtl' ? +1 : -1;
+    step(sign);
+  });
   $('#btnInsertChapter')?.addEventListener('click', insertChapter);
   $('#btnInsertPage')?.addEventListener('click', insertAfter);
   $('#btnDeleteBlank')?.addEventListener('click', deleteBlank);
@@ -402,7 +410,7 @@
     cover.addEventListener('animationend', ()=>{ flipOverlay.innerHTML=''; isFlipping=false; disableNav(false); }, {once:true});
   }
 
-  function disableNav(v){ const a=$('#btnPrev'), b=$('#btnNext'); if(a)a.disabled=v; if(b)b.disabled=v; }
+  function disableNav(v){ const a=$('#btnleft'), b=$('#btnright'); if(a)a.disabled=v; if(b)b.disabled=v; }
 
   // 覆蓋層快照
   function snapshot(page, side){
@@ -1014,6 +1022,7 @@ function getCurPage(){
   function persist(){ Store.save(book) }
   function getPageByIndex(i){ return book.pages[i] }
 })();
+
 
 
 
