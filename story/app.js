@@ -81,11 +81,11 @@
 const btnLeft = $('#btnleft');
   const btnRight = $('#btnright');
   btnLeft?.addEventListener('click', ()=>{
-    const sign = book.direction==='rtl' ? -1 : +1;
+    const sign = book.direction==='rtl' ? +1 : -1;
     step(sign);
   });
   btnRight?.addEventListener('click', ()=>{
-    const sign = book.direction==='rtl' ? +1 : -1;
+    const sign = book.direction==='rtl' ? -1 : +1;
     step(sign);
   });
   $('#btnInsertChapter')?.addEventListener('click', insertChapter);
@@ -1022,6 +1022,7 @@ function getCurPage(){
   function persist(){ Store.save(book) }
   function getPageByIndex(i){ return book.pages[i] }
 })();
+
 
 
 
