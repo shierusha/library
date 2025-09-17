@@ -589,7 +589,17 @@
     const before = book.pages[j].content_text || '';
     book.pages[j].content_text = remain + (before?('\n'+before):'');
     book.pages[j].content_html = '';
-    persist(); render();
+
+    const nextPageNo = book.pages[j].page_no;
+    persist();
+    render();
+
+    if (remain){
+      const nextBody = findBodyForPage(nextPageNo);
+      const queueNext = () => autoPaginateFrom(nextPageNo, nextBody || undefined);
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(queueNext);
+      else setTimeout(queueNext, 16);
+    }
   }
 
   /* ======================
@@ -897,6 +907,7 @@ function getCurPage(){
   function persist(){ Store.save(book) }
   function getPageByIndex(i){ return book.pages[i] }
 })();
+
 
 
 
