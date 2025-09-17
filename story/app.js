@@ -72,8 +72,9 @@
   /* ======================
      工具列按鈕
      ====================== */
-  $('#btnPrev')?.addEventListener('click', ()=> step(-1));
+ $('#btnPrev')?.addEventListener('click', ()=> step(-1));
   $('#btnNext')?.addEventListener('click', ()=> step(+1));
+  $('#btnInsertChapter')?.addEventListener('click', insertChapter);
   $('#btnInsertPage')?.addEventListener('click', insertAfter);
   $('#btnDeleteBlank')?.addEventListener('click', deleteBlank);
   $('#btnSave')?.addEventListener('click', ()=> alert('示範：已存 LocalStorage；未連 DB'));
@@ -618,6 +619,27 @@ function getCurPage(){
     updateDockButtonsState();
   }
 
+  function insertChapter(){
+    const raw = prompt('章節名稱：', '');
+    if (raw===null) return;
+    const title = raw.trim();
+    if (!title) return;
+
+    const cur = getCurPage();
+    const at  = book.pages.indexOf(cur);
+    const page = newPage();
+    book.pages.splice(at+1, 0, page);
+    applyHeadingToPage(page, title);
+    renumberPages();
+
+    if (effectiveSingleAt(at+1)) idx = at+1;
+    else idx = Math.max(0, (at+1) - ((at+1)%2));
+
+    setActivePage(page);
+    persist();
+    render();
+  }
+
   function insertAfter(){
     const cur = getCurPage();
     const at  = book.pages.indexOf(cur);
@@ -873,6 +895,7 @@ function getCurPage(){
   function persist(){ Store.save(book) }
   function getPageByIndex(i){ return book.pages[i] }
 })();
+
 
 
 
