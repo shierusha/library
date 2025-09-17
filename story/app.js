@@ -364,7 +364,7 @@ const btnLeft = $('#btnleft');
     if (!hostPaper) return;
 
     const pos = getOffsetInOverlay(hostPaper);
-   const turn = document.createElement('div');␊
+   const turn = document.createElement('div');
     turn.className = 'turn ' + (placeLeft ? 'turn-left' : 'turn-right');
     Object.assign(turn.style,{
       width:pos.width+'px', height:pos.height+'px', left:pos.left+'px', top:pos.top+'px',
@@ -1030,6 +1030,7 @@ function getCurPage(){
   function persist(){ Store.save(book) }
   function getPageByIndex(i){ return book.pages[i] }
 })();
+
 
 
 
