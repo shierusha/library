@@ -13,22 +13,40 @@ body{
 
 /* 上方導覽 */
 .appbar{
-  position:sticky; top:0; z-index:100;
-  display:flex; justify-content:space-between; align-items:center; gap:10px;
-  padding:10px 14px; background:rgba(15,27,51,.85); border-bottom:1px solid #223057;
+  position:sticky; 
+  top:0; 
+  z-index:100;
+  display:flex; 
+  justify-content:space-between; 
+  align-items:center; 
+  gap:10px;
+  padding:10px 14px; 
+  background:rgba(15,27,51,.85); 
+  border-bottom:1px solid #223057;
 }
 .brand{display:flex;gap:.6rem;align-items:center;font-weight:700}
 #bookTitle{outline:none}
 #bookTitle[contenteditable="true"]{border-bottom:1px dashed #8aa1ff}
 .tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.btn{background:#16244a;border:1px solid #3a4a78;color:#fff;padding:.45rem .8rem;border-radius:10px;cursor:pointer}
+.btn{
+  background:#16244a;
+  border:1px solid #3a4a78;
+  color:#fff;
+  padding:5px 10px;
+  border-radius:10px;
+  cursor:pointer}
 .btn.primary{background:#6f82ff;border-color:#6f82ff}
 .btn.danger{background:#2a0f18;border-color:#6b1b2e;color:#ffb3c2}
 .btn.ghost{background:#ffffff18;border-color:#ffffff33}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 
 /* 工具列 & Dock */
-.side{position:fixed;top:90px;display:flex;flex-direction:column;gap:8px;z-index:90}
+.side{
+  position:fixed;
+  top:5%;
+  display:flex;
+  gap:8px;
+  z-index:90}
 .side.left{left:10px}
 .side.right{right:10px}
 .dock{position:fixed;left:0;right:0;bottom: 1%;display:flex;gap:10px;justify-content:center;z-index:90}
@@ -108,3 +126,4 @@ body{
   box-shadow:0 8px 18px rgba(0,0,0,.18);
 }
 @keyframes singleCurl { 0%{ transform:rotateY(0deg) } 100%{ transform:rotateY(-160deg) } }
+
