@@ -194,12 +194,25 @@
     el.className='page';
 
     if (isCover(page)){
-      el.innerHTML = `
-        <div style="display:grid;place-items:center;height:100%;text-align:center;padding:24px">
-          <div style="font-size:1.6em;font-weight:700;line-height:1.2">${esc(book.title||'未命名書籍')}</div>
-          <div style="margin-top:10px;opacity:.65">～ 封面 ～</div>
-        </div>`;
-    host.innerHTML=''; host.appendChild(el);
+     if (page.image_url){
+        el.style.padding = '0';
+        el.innerHTML = `<img src="${esc(page.image_url)}" alt="" style="width:100%;height:100%;object-fit:cover;display:block">`;
+      }else{
+        el.innerHTML = `
+          <div style="display:grid;place-items:center;height:100%;text-align:center;padding:24px">
+            <div style="font-size:1.6em;font-weight:700;line-height:1.2">${esc(book.title||'未命名書籍')}</div>
+            <div style="margin-top:10px;opacity:.65">～ 封面 ～</div>
+          </div>`;
+      }
+      host.innerHTML=''; host.appendChild(el);
+      host.ondblclick = ()=>{
+        const url = prompt('封面圖片網址：', page.image_url||'');
+        if (url===null) return;
+        const next = url.trim();
+        page.image_url = next ? next : null;
+        persist();
+        render();
+      };
       host.addEventListener('mousedown', ()=>{ setActivePage(page); }, {passive:true});
       return;
     }
@@ -370,11 +383,17 @@
     const el=document.createElement('div'); el.className='page';
 
     if (isCover(page)){
-      el.innerHTML = `
-        <div style="display:grid;place-items:center;height:100%;text-align:center;padding:24px">
-          <div style="font-size:1.6em;font-weight:700;line-height:1.2">${esc(book.title||'未命名書籍')}</div>
-          <div style="margin-top:10px;opacity:.65">～ 封面 ～</div>
-        </div>`;
+     if (page.image_url){
+        el.style.padding='0';
+        el.innerHTML = `<img src="${esc(page.image_url)}" alt="" style="width:100%;height:100%;object-fit:cover;display:block">`;
+      }else{
+        el.innerHTML = `
+          <div style="display:grid;place-items:center;height:100%;text-align:center;padding:24px">
+            <div style="font-size:1.6em;font-weight:700;line-height:1.2">${esc(book.title||'未命名書籍')}</div>
+            <div style="margin-top:10px;opacity:.65">～ 封面 ～</div>
+          </div>`;
+      }
+      
       host.appendChild(el); return host;
     }
 
@@ -854,5 +873,6 @@ function getCurPage(){
   function persist(){ Store.save(book) }
   function getPageByIndex(i){ return book.pages[i] }
 })();
+
 
 
