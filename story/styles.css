@@ -2,6 +2,8 @@
   --mm:3.7795275591px; --paper-w-mm:148; --paper-h-mm:210;
   --pad:6%; --ink:#111827; --muted:#6b7280;
   --fs:1.02rem; --lh:1.8;
+  --flip-duration:.68s; --single-flip-duration:.58s;
+  --flip-ease:cubic-bezier(.33,1,.68,1);
 }
 *{box-sizing:border-box}
 html,body{height:100%}
@@ -112,19 +114,103 @@ body{
 .tpl-illustration img{ width:100%; height:100%; object-fit:cover; display:block }
 
 /* 翻頁覆蓋層：雙頁＝高級；單頁＝簡易卷葉 */
-#flipOverlay{ position:absolute; inset:0; pointer-events:none; z-index:20 }
-.turn{ position:absolute; width:0;height:0; transform-style:preserve-3d; backface-visibility:hidden; }
-.turn .face{ position:absolute; inset:0; backface-visibility:hidden; overflow:hidden; background:#fff }
-.turn .back{ transform: rotateY(180deg) }
-.foldShade{ position:absolute; inset:0; pointer-events:none; opacity:.22 }
-@keyframes flipRightNext { from{ transform:rotateY(0deg) } to{ transform:rotateY(-180deg) } }
-@keyframes flipLeftPrev  { from{ transform:rotateY(0deg) } to{ transform:rotateY(180deg) } }
+#flipOverlay{ position:absolute; inset:0; pointer-events:none; z-index:20; perspective:1800px; }
+.turn{ position:absolute; width:0;height:0; transform-style:preserve-3d; backface-visibility:hidden; border-radius:10px; overflow:visible; filter:drop-shadow(0 22px 45px rgba(15,23,42,.28)); will-change:transform,filter,opacity; }
+.turn .face{ position:absolute; inset:0; backface-visibility:hidden; overflow:hidden; background:#fff; border-radius:inherit; box-shadow:inset 0 0 0 1px rgba(15,23,42,.08); }
+.turn .face::after{ content:""; position:absolute; inset:0; pointer-events:none; border-radius:inherit; opacity:0; mix-blend-mode:screen; }
+.turn .back{ transform: rotateY(180deg); }
+.turn.from-right .front::after{ background:linear-gradient(90deg, rgba(255,255,255,.65) 0%, rgba(255,255,255,0) 48%, rgba(15,23,42,.22) 88%); animation:frontSheenRight var(--flip-duration) var(--flip-ease) both; }
+.turn.from-left  .front::after{ background:linear-gradient(270deg, rgba(255,255,255,.65) 0%, rgba(255,255,255,0) 48%, rgba(15,23,42,.22) 88%); animation:frontSheenLeft  var(--flip-duration) var(--flip-ease) both; }
+.turn .back::after{ background:radial-gradient(circle at 20% 20%, rgba(255,255,255,.35), transparent 55%); animation:backGlow var(--flip-duration) var(--flip-ease) both; mix-blend-mode:overlay; }
+.foldShade{ position:absolute; inset:0; pointer-events:none; opacity:0; mix-blend-mode:multiply; border-radius:inherit; }
+.turn.from-right .foldShade{ animation:foldShadeRight var(--flip-duration) var(--flip-ease) both; }
+.turn.from-left  .foldShade{ animation:foldShadeLeft  var(--flip-duration) var(--flip-ease) both; }
+@keyframes flipRightNext {
+  0%{ transform:rotateY(0deg) rotateX(0deg) translateZ(0); }
+  45%{ transform:rotateY(-98deg) rotateX(1.5deg) translateZ(6px); }
+  100%{ transform:rotateY(-180deg) rotateX(0deg) translateZ(0); }
+}
+@keyframes flipLeftPrev  {
+  0%{ transform:rotateY(0deg) rotateX(0deg) translateZ(0); }
+  45%{ transform:rotateY(98deg) rotateX(1.5deg) translateZ(6px); }
+  100%{ transform:rotateY(180deg) rotateX(0deg) translateZ(0); }
+}
+@keyframes foldShadeRight {
+  0%{ opacity:0; transform:translateX(0); }
+  30%{ opacity:.55; transform:translateX(-6%); }
+  60%{ opacity:.28; transform:translateX(-10%); }
+  100%{ opacity:0; transform:translateX(-14%); }
+}
+@keyframes foldShadeLeft {
+  0%{ opacity:0; transform:translateX(0); }
+  30%{ opacity:.55; transform:translateX(6%); }
+  60%{ opacity:.28; transform:translateX(10%); }
+  100%{ opacity:0; transform:translateX(14%); }
+}
+@keyframes frontSheenRight {
+  0%{ opacity:0; transform:translateX(-18%); }
+  40%{ opacity:.45; transform:translateX(-6%); }
+  70%{ opacity:.18; transform:translateX(4%); }
+  100%{ opacity:0; transform:translateX(12%); }
+}
+@keyframes frontSheenLeft {
+  0%{ opacity:0; transform:translateX(18%); }
+  40%{ opacity:.45; transform:translateX(6%); }
+  70%{ opacity:.18; transform:translateX(-4%); }
+  100%{ opacity:0; transform:translateX(-12%); }
+}
+@keyframes backGlow {
+  0%{ opacity:0.05; transform:translateX(0); }
+  50%{ opacity:.25; transform:translateX(4%); }
+  100%{ opacity:0; transform:translateX(8%); }
+}
 
-/* 單頁簡易卷葉（不閃、不抖） */
+/* 單頁高級卷葉 */
 .singleTurn{
   position:absolute; width:0;height:0; backface-visibility:hidden; overflow:hidden; background:#fff;
-  box-shadow:0 8px 18px rgba(0,0,0,.18);
+  box-shadow:0 14px 40px rgba(15,23,42,.28);
+  border-radius:10px; transform-style:preserve-3d; will-change:transform,filter,opacity;
 }
-@keyframes singleCurl { 0%{ transform:rotateY(0deg) } 100%{ transform:rotateY(-160deg) } }
+.singleTurn::after{
+  content:""; position:absolute; inset:0; pointer-events:none; border-radius:inherit; opacity:0; mix-blend-mode:screen;
+}
+.singleTurn.from-right::after{ background:linear-gradient(100deg, rgba(255,255,255,.6) 0%, rgba(255,255,255,0) 45%, rgba(15,23,42,.22) 85%); animation:singleHighlightRight var(--single-flip-duration) var(--flip-ease) both; }
+.singleTurn.from-left::after{ background:linear-gradient(260deg, rgba(255,255,255,.6) 0%, rgba(255,255,255,0) 45%, rgba(15,23,42,.22) 85%); animation:singleHighlightLeft var(--single-flip-duration) var(--flip-ease) both; }
+@keyframes singleCurlNext {
+  0%{ transform:rotateY(0deg) rotateX(0deg) translateZ(0); }
+  45%{ transform:rotateY(-118deg) rotateX(1.4deg) translateZ(6px); }
+  100%{ transform:rotateY(-170deg) rotateX(0deg) translateZ(0); }
+}
+@keyframes singleCurlPrev {
+  0%{ transform:rotateY(0deg) rotateX(0deg) translateZ(0); }
+  45%{ transform:rotateY(118deg) rotateX(1.4deg) translateZ(6px); }
+  100%{ transform:rotateY(170deg) rotateX(0deg) translateZ(0); }
+}
+@keyframes singleHighlightRight {
+  0%{ opacity:0; transform:translateX(-14%); }
+  35%{ opacity:.48; transform:translateX(-4%); }
+  65%{ opacity:.18; transform:translateX(6%); }
+  100%{ opacity:0; transform:translateX(12%); }
+}
+@keyframes singleHighlightLeft {
+  0%{ opacity:0; transform:translateX(14%); }
+  35%{ opacity:.48; transform:translateX(4%); }
+  65%{ opacity:.18; transform:translateX(-6%); }
+  100%{ opacity:0; transform:translateX(-12%); }
+}
+
+@media (prefers-reduced-motion: reduce){
+  .turn,
+  .singleTurn{
+    animation-duration:.001ms !important;
+    animation-iteration-count:1 !important;
+    transition-duration:.001ms !important;
+    filter:none !important;
+  }
+  .turn .face::after,
+  .singleTurn::after,
+  .foldShade{ animation:none !important; opacity:0 !important; }
+}
+
 
 
