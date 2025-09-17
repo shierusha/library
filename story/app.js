@@ -717,24 +717,24 @@ function getCurPage(){
     updateDockButtonsState();
   }
 
-  function insertChapter(){
+    function insertChapter(){
     const raw = prompt('章節名稱：', '');
     if (raw===null) return;
     const title = raw.trim();
     if (!title) return;
 
     const cur = getCurPage();
-    const at  = book.pages.indexOf(cur);
-        const page = newPage();
-    book.pages.splice(at+1, 0, page);
-    applyHeadingToPage(page, title);
-    setChapterTitleMeta(page, title);
-    renumberPages();
+    if (!cur || isCover(cur)) return;
 
-    if (effectiveSingleAt(at+1)) idx = at+1;
-    else idx = Math.max(0, (at+1) - ((at+1)%2));
+    applyHeadingToPage(cur, title);
+    setChapterTitleMeta(cur, title);
 
-    setActivePage(page);
+    const body = cur.page_no ? findBodyForPage(cur.page_no) : null;
+    if (body){
+      body.innerHTML = cur.content_html || '';
+    }
+
+    setActivePage(cur);
     persist();
     render();
   }
@@ -996,6 +996,7 @@ function getCurPage(){
   function persist(){ Store.save(book) }
   function getPageByIndex(i){ return book.pages[i] }
 })();
+
 
 
 
