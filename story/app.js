@@ -2,10 +2,10 @@
   /* ======================
      儲存：LocalStorage
      ====================== */
-  var Store = {
-    KEY: 'ebook_integrated_v1',
-    load: function(){ try{ return JSON.parse(localStorage.getItem(this.KEY)); }catch(e){ return null; } },
-    save: function(data){ localStorage.setItem(this.KEY, JSON.stringify(data)); }
+  const Store = {
+    KEY:'ebook_integrated_v1',
+    load(){ try{ return JSON.parse(localStorage.getItem(this.KEY)) }catch{ return null } },
+    save(data){ localStorage.setItem(this.KEY, JSON.stringify(data)) }
   };
 
   /* ======================
@@ -13,25 +13,23 @@
      ====================== */
   function newPage(){
     return {
-      id: 'local_'+Math.random().toString(36).slice(2,9),
-      page_no: 0,                 // 內容頁在 render 會重編 1..N；封面固定 0
-      type: 'novel',              // 'novel' | 'illustration' | 'divider-light' | 'divider-dark' | 'cover-front'
-      content_text: '',
-      content_html: '',
-      image_url: null
+      id:'local_'+Math.random().toString(36).slice(2,9),
+      page_no:0,                // 內容頁會在 render 時重編 1..N；封面固定 0
+      type:'novel',             // 'novel' | 'illustration' | 'divider-light' | 'divider-dark' | 'cover-front'
+      content_text:'',
+      content_html:'',
+      image_url:null
     };
   }
-  function newCover(){ // 封面
-    return { id:'cover_front', page_no:0, type:'cover-front', content_text:'', content_html:'', image_url:null };
-  }
+  function newCover(){ return { id:'cover_front', page_no:0, type:'cover-front', content_text:'', content_html:'', image_url:null }; }
 
-  var book = Store.load() || {
-    title: '未命名書籍',
-    direction: 'ltr',       // 'ltr' 橫排；'rtl' 直排
-    binding: 'short',       // 'short' 直放；'long' 橫放
-    viewMode: 'double',     // 'single' | 'double'
-    textStyle: { fs: 1.02, lh: 1.8 },
-    pages: [ newCover(), newPage(), newPage() ]
+  let book = Store.load() || {
+    title:'未命名書籍',
+    direction:'ltr',       // 'ltr' 橫排；'rtl' 直排
+    binding:'short',       // 'short' 直放；'long' 橫放
+    viewMode:'double',     // 'single' | 'double'
+    textStyle:{ fs:1.02, lh:1.8 },
+    pages:[ newCover(), newPage(), newPage() ]
   };
 
   function ensureCover(){
@@ -41,109 +39,72 @@
   }
   function ensureMinPages(){
     // 至少兩張內容頁（不含封面）
-    var contents = book.pages.filter(function(p){ return p.type!=='cover-front'; });
-    while (contents.length < 2){
-      book.pages.push(newPage());
-      contents.push(1);
-    }
+    const contents = book.pages.filter(p=>p.type!=='cover-front');
+    while(contents.length<2){ book.pages.push(newPage()); contents.push(1); }
   }
+  const isCover = (p)=> p && p.type==='cover-front';
 
   /* ======================
-     DOM & 小工具
+     DOM & 狀態
      ====================== */
-  function $(sel, root){ return (root||document).querySelector(sel); }
-  function $all(sel, root){ return Array.prototype.slice.call((root||document).querySelectorAll(sel)); }
-  function closest(el, sel){
-    while(el && el.nodeType===1){ if (el.matches(sel)) return el; el = el.parentElement; }
-    return null;
-  }
-  function esc(s){ return String(s||'').replace(/[&<>"']/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
-  function clamp(n,a,b){ return Math.max(a, Math.min(b, n)); }
-  function persist(){ Store.save(book); }
-  function getPageByIndex(i){ return book.pages[i]; }
-  function isCover(p){ return p && p.type==='cover-front'; }
+  const $=(s,r=document)=>r.querySelector(s);
+  const $all=(s,r=document)=>Array.from((r||document).querySelectorAll(s));
+  const scaler=$('#scaler'), papersWrap=$('#papers'), leftPaper=$('#leftPaper'), rightPaper=$('#rightPaper'), flipOverlay=$('#flipOverlay');
 
-  var scaler      = $('#scaler');
-  var papersWrap  = $('#papers');
-  var leftPaper   = $('#leftPaper');
-  var rightPaper  = $('#rightPaper');
-  var flipOverlay = $('#flipOverlay');
-
-  var idx = 0;                 // 左頁索引（單頁=當前索引）
-  var isFlipping = false;
-  var activePageId = null;     // ★ 用 id 追蹤目前頁（不再用 page_no）
+  let idx=0;                 // 左頁 index（單頁=當前 index）
+  let isFlipping=false;      // 動畫節流
+  let activePageId=null;     // 目前操作頁（避免重編號時游標亂跳）
 
   /* ======================
-     導覽列 & 按鈕
+     導覽列
      ====================== */
-  var titleEl = $('#bookTitle');
+  const titleEl = $('#bookTitle');
   if (titleEl){
     titleEl.textContent = book.title;
-    titleEl.addEventListener('input', function(){
+    titleEl.addEventListener('input', ()=>{
       book.title = (titleEl.textContent||'').trim() || '未命名書籍';
       persist(); render();
     });
     // 雙擊書名 → 跳封面
-    titleEl.addEventListener('dblclick', function(){ idx = 0; render(); });
+    titleEl.addEventListener('dblclick', ()=>{ idx=0; render(); });
   }
 
-  var btnPrev = $('#btnPrev'), btnNext = $('#btnNext');
-  if (btnPrev) btnPrev.onclick = function(){ step(-1); };
-  if (btnNext) btnNext.onclick = function(){ step( 1); };
+  /* ======================
+     工具列按鈕
+     ====================== */
+  $('#btnPrev')?.addEventListener('click', ()=> step(-1));
+  $('#btnNext')?.addEventListener('click', ()=> step(+1));
+  $('#btnInsertPage')?.addEventListener('click', insertAfter);
+  $('#btnDeleteBlank')?.addEventListener('click', deleteBlank);
+  $('#btnSave')?.addEventListener('click', ()=> alert('示範：已存 LocalStorage；未連 DB'));
+  $('#btnBack')?.addEventListener('click', ()=> alert('示範：自行導回書單 URL'));
 
-  var btnInsertPage = $('#btnInsertPage');
-  if (btnInsertPage) btnInsertPage.onclick = insertAfter;
+  $('#btnToggleView')?.addEventListener('click', ()=>{ book.viewMode = (book.viewMode==='single'?'double':'single'); render(); });
+  $('#btnToggleDir') ?.addEventListener('click', ()=>{ book.direction = (book.direction==='rtl'?'ltr':'rtl'); render(); });
+  $('#btnToggleBind')?.addEventListener('click', ()=>{ book.binding   = (book.binding==='long'?'short':'long'); render(); });
 
-  var btnDeleteBlank = $('#btnDeleteBlank');
-  if (btnDeleteBlank) btnDeleteBlank.onclick = deleteBlank;
+  // 文字工具（保留選取）
+  const keepSel=btn=>btn?.addEventListener('mousedown',e=>e.preventDefault());
+  ['#btnFontUp','#btnFontDown','#btnBold','#btnItalic','#btnUnderline'].forEach(s=>keepSel($(s)));
+  $('#btnBold')     ?.addEventListener('click', ()=> document.execCommand('bold',false,null));
+  $('#btnItalic')   ?.addEventListener('click', ()=> document.execCommand('italic',false,null));
+  $('#btnUnderline')?.addEventListener('click', ()=> document.execCommand('underline',false,null));
+  $('#btnFontUp')   ?.addEventListener('click', ()=> scaleSelection(1.15));
+  $('#btnFontDown') ?.addEventListener('click', ()=> scaleSelection(0.87));
 
-  var btnSave = $('#btnSave');
-  if (btnSave) btnSave.onclick = function(){ alert('示範：已存到 LocalStorage（尚未連 DB）'); };
-
-  var btnBack = $('#btnBack');
-  if (btnBack) btnBack.onclick = function(){ alert('示範：自行導回書單 URL'); };
-
-  var btnToggleView = $('#btnToggleView');
-  if (btnToggleView) btnToggleView.onclick = function(){ book.viewMode = (book.viewMode==='single'?'double':'single'); render(); };
-
-  var btnToggleDir = $('#btnToggleDir');
-  if (btnToggleDir) btnToggleDir.onclick  = function(){ book.direction = (book.direction==='rtl'?'ltr':'rtl'); render(); };
-
-  var btnToggleBind = $('#btnToggleBind');
-  if (btnToggleBind) btnToggleBind.onclick = function(){ book.binding   = (book.binding==='long'?'short':'long'); render(); };
-
-  function keepSel(btn){ if(!btn) return; btn.addEventListener('mousedown', function(e){ e.preventDefault(); }); }
-  var btnBold=$('#btnBold'), btnItalic=$('#btnItalic'), btnUnderline=$('#btnUnderline'), btnFontUp=$('#btnFontUp'), btnFontDown=$('#btnFontDown');
-  [btnBold,btnItalic,btnUnderline,btnFontUp,btnFontDown].forEach(keepSel);
-  if (btnBold)      btnBold.onclick      = function(){ document.execCommand('bold',false,null); };
-  if (btnItalic)    btnItalic.onclick    = function(){ document.execCommand('italic',false,null); };
-  if (btnUnderline) btnUnderline.onclick = function(){ document.execCommand('underline',false,null); };
-  if (btnFontUp)    btnFontUp.onclick    = function(){ scaleSelection(1.15); };
-  if (btnFontDown)  btnFontDown.onclick  = function(){ scaleSelection(0.87); };
-
-  // Dock 切模板
-  $all('[data-style]').forEach(function(b){
-    b.addEventListener('click', function(){ setType(getCurPage(), b.getAttribute('data-style')); });
+  // Dock：切模板
+  $all('[data-style]').forEach(b=>{
+    b.addEventListener('click',()=>{ setType(getCurPage(), b.dataset.style); });
   });
-
-  // 插入章節（沿用前版，這裡主題是頁碼）
-  var btnInsertChapter = $('#btnInsertChapter');
-  if (btnInsertChapter) btnInsertChapter.onclick = insertChapter;
 
   // 目錄
-  var btnTOC = $('#btnTOC');
-  if (btnTOC) btnTOC.onclick = openTOC;
+  $('#btnTOC')?.addEventListener('click', ()=>{ buildTOC(); $('#tocDialog').showModal(); });
 
-  // 鍵盤翻頁
-  window.addEventListener('resize', fit);
-  document.addEventListener('keydown', function(e){
-    if (e.key==='ArrowLeft')  { if(btnPrev) btnPrev.click(); }
-    if (e.key==='ArrowRight') { if(btnNext) btnNext.click(); }
-  });
+  // ❌ 移除方向鍵翻頁：不再綁 ArrowLeft/ArrowRight
 
-  // Tab 縮排 / 反縮排（僅正文/章節）
-  document.addEventListener('keydown', function(e){
-    var target = closest(e.target, '.body-text, .chapter-block');
+  // Tab 縮排 / 反縮排（僅正文/章節中作用）
+  document.addEventListener('keydown', (e)=>{
+    const target = e.target?.closest?.('.body-text');
     if(!target) return;
     if(e.key === 'Tab'){
       e.preventDefault();
@@ -152,85 +113,67 @@
     }
   });
 
-  // 貼上 → 純文字
-  document.addEventListener('paste', function(e){
-    var target = closest(e.target, '.body-text, .chapter-block');
+  // 貼上只留純文字
+  document.addEventListener('paste', (e)=>{
+    const target = e.target?.closest?.('.body-text');
     if(!target) return;
     e.preventDefault();
-    var text = (e.clipboardData && e.clipboardData.getData('text/plain')) || (window.clipboardData && window.clipboardData.getData('Text')) || '';
+    const text = (e.clipboardData || window.clipboardData).getData('text/plain');
     insertPlainTextAtCursor(text);
     persistEditableNow(target);
   });
 
-  /* ======================
-     章節 / TOC
-     ====================== */
-  function nearestChapter(pageNo){
-    var start = -1;
-    for (var i=0;i<book.pages.length;i++){ if (book.pages[i].page_no===pageNo){ start=i; break; } }
-    var best = '';
-    for (var x=start; x>=0; x--){
-      var p = book.pages[x];
-      if (Object.prototype.hasOwnProperty.call(p,'chapter') && (p.chapter||'').trim()){
-        best = (p.chapter||'').trim(); break;
-      }
-    }
-    return best;
-  }
-  function buildTOC(){
-    var box = $('#tocList'); if(!box) return;
-    var rows = [];
-    rows.push('<div class="toc-row toc-cover" style="display:flex;justify-content:space-between;padding:10px 12px;border-bottom:1px dashed #2a3555;cursor:pointer"><div>封面</div><div>'+esc(book.title||'未命名書籍')+'</div></div>');
-    for (var i=0;i<book.pages.length;i++){
-      var p = book.pages[i];
-      if (p.page_no>0 && Object.prototype.hasOwnProperty.call(p,'chapter')){
-        var ch = (p.chapter||'').trim();
-        if (ch){
-          rows.push('<div class="toc-row" data-no="'+p.page_no+'" style="display:flex;justify-content:space-between;padding:10px 12px;border-bottom:1px dashed #2a3555;cursor:pointer"><div>P'+p.page_no+'</div><div>'+esc(ch)+'</div></div>');
-        }
-      }
-    }
-    if (!rows.length){
-      box.innerHTML='<div style="padding:12px;color:#9aa3b2">尚無章節</div>';
-      return;
-    }
-    box.innerHTML = rows.join('');
-
-    var coverRow = $('.toc-cover', box);
-    if (coverRow) coverRow.onclick = function(){ idx = 0; render(); closeTOC(); };
-
-    $all('.toc-row[data-no]', box).forEach(function(row){
-      row.onclick = function(){
-        var targetNo = parseInt(row.getAttribute('data-no'),10);
-        var targetIdx=-1;
-        for (var i=0;i<book.pages.length;i++){ if (book.pages[i].page_no===targetNo){ targetIdx=i; break; } }
-        if (targetIdx<0) return;
-        var effSingle = effectiveSingleAt(targetIdx);
-        idx = effSingle ? targetIdx : Math.max(0, targetIdx - (targetIdx%2));
-        activePageId = book.pages[targetIdx].id;
-        render(); closeTOC();
-      };
-    });
-  }
-  function openTOC(){ buildTOC(); var dlg=$('#tocDialog'); if(!dlg) return; try{ dlg.showModal(); }catch(_){ dlg.setAttribute('open',''); } }
-  function closeTOC(){ var dlg=$('#tocDialog'); if(!dlg) return; try{ dlg.close(); }catch(_){ dlg.removeAttribute('open'); } }
+  render(); fit();
+  window.addEventListener('resize', fit);
 
   /* ======================
-     渲染（★重編頁碼）
+     渲染（頁碼每次 1..N 重編；封面固定單頁）
      ====================== */
-  function userWantsSingle(){ return book.viewMode==='single'; }
-  function effectiveSingleAt(i){
-    var L = book.pages[i], R = book.pages[i+1];
-    return isCover(L) || isCover(R) ? true : userWantsSingle();
-  }
+  const userWantsSingle = ()=> (book.viewMode==='single');
+  function effectiveSingleAt(i){ const L=book.pages[i], R=book.pages[i+1]; return isCover(L)||isCover(R) ? true : userWantsSingle(); }
   function renumberPages(){
-    // 封面固定 0；其餘依目前順序 1..N
-    var n=1;
-    for (var i=0;i<book.pages.length;i++){
-      if (isCover(book.pages[i])) { book.pages[i].page_no = 0; }
-      else { book.pages[i].page_no = n++; }
+    let n=1;
+    for (let i=0;i<book.pages.length;i++){
+      if (isCover(book.pages[i])) book.pages[i].page_no = 0;
+      else book.pages[i].page_no = n++;
     }
   }
+
+  function render(){
+    ensureCover(); ensureMinPages(); renumberPages();
+
+    const effSingle = effectiveSingleAt(idx);
+    document.body.classList.toggle('single', effSingle);
+    papersWrap?.classList.toggle('landscape', book.binding==='long');
+    scaler?.classList.toggle('vertical', book.direction==='rtl');
+
+    // 顯示內容頁數（不含封面）
+    const count = book.pages.reduce((acc,p)=> acc + (isCover(p)?0:1), 0);
+    $('#lblCount')?.textContent = String(count);
+    document.documentElement.style.setProperty('--fs', book.textStyle.fs+'rem');
+    document.documentElement.style.setProperty('--lh', book.textStyle.lh);
+
+    // 雙頁尾端自動補白
+    if (!effSingle && !book.pages[idx+1]){ book.pages.push(newPage()); renumberPages(); }
+
+    const maxIndex = Math.max(0, book.pages.length - (effSingle?1:2));
+    idx = clamp(idx, 0, maxIndex);
+
+    leftPaper.innerHTML=''; rightPaper.innerHTML='';
+    if (effSingle){
+      renderOne(rightPaper, book.pages[idx], 'right');
+    }else{
+      const rtl=(book.direction==='rtl');
+      const pL=book.pages[idx], pR=book.pages[idx+1] || newPage();
+      if (!rtl){ renderOne(leftPaper,pL,'left'); renderOne(rightPaper,pR,'right'); }
+      else     { renderOne(leftPaper,pR,'left'); renderOne(rightPaper,pL,'right'); }
+    }
+
+    buildTOC();
+    fit();
+    persist();
+  }
+
   function templateClass(p){
     if(!p) return '';
     if(p.type==='divider-light')return 'tpl-divider-light';
@@ -240,110 +183,81 @@
     return '';
   }
 
-  function render(){
-    ensureCover(); ensureMinPages();
-    renumberPages(); // ★ 每次渲染都重編 1..N
-
-    var effSingle = effectiveSingleAt(idx);
-    document.body.classList.toggle('single', effSingle);
-    if (papersWrap) papersWrap.classList.toggle('landscape', book.binding==='long');
-    if (scaler) scaler.classList.toggle('vertical', book.direction==='rtl');
-
-    // 只算內容頁數
-    var count=0; for (var i=0;i<book.pages.length;i++){ if (!isCover(book.pages[i])) count++; }
-    var lblCount = $('#lblCount'); if (lblCount) lblCount.textContent = String(count);
-
-    document.documentElement.style.setProperty('--fs', book.textStyle.fs+'rem');
-    document.documentElement.style.setProperty('--lh', book.textStyle.lh);
-
-    var maxIndex = Math.max(0, book.pages.length - (effSingle?1:2));
-    idx = clamp(idx, 0, maxIndex);
-
-    if (!leftPaper || !rightPaper) return;
-    leftPaper.innerHTML=''; rightPaper.innerHTML='';
-
-    if (effSingle){
-      renderOne(rightPaper, book.pages[idx], 'right');
-    }else{
-      var rtl = (book.direction==='rtl');
-      var pL = book.pages[idx];
-      var pR = book.pages[idx+1] || autoAppendAndGet(idx+1);
-      if (!rtl){ renderOne(leftPaper , pL,'left'); renderOne(rightPaper,pR,'right'); }
-      else     { renderOne(leftPaper , pR,'left'); renderOne(rightPaper,pL,'right'); }
-    }
-    buildTOC();
-    fit();
-    persist();
-  }
-
   function renderOne(host, page, side){
     if(!host || !page) return;
     host.className = 'paper ' + side + ' ' + templateClass(page);
     host.setAttribute('data-page-no', String(page.page_no||0));
 
-    var el = document.createElement('div'); el.className='page';
+    const el = document.createElement('div');
+    el.className='page';
 
     if (isCover(page)){
-      el.innerHTML = '<div style="display:grid;place-items:center;height:100%;text-align:center;padding:24px">'+
-                     '<div style="font-size:1.6em;font-weight:700;line-height:1.2">'+esc(book.title||'未命名書籍')+'</div>'+
-                     '<div style="margin-top:10px;opacity:.65">～ 封面 ～</div></div>';
+      el.innerHTML = `
+        <div style="display:grid;place-items:center;height:100%;text-align:center;padding:24px">
+          <div style="font-size:1.6em;font-weight:700;line-height:1.2">${esc(book.title||'未命名書籍')}</div>
+          <div style="margin-top:10px;opacity:.65">～ 封面 ～</div>
+        </div>`;
       host.innerHTML=''; host.appendChild(el);
-      host.addEventListener('mousedown', function(){ activePageId = page.id; });
+      host.addEventListener('mousedown', ()=>{ activePageId = page.id; }, {passive:true});
       return;
     }
 
-    // 角標：最近章名
-    var chRun = nearestChapter(page.page_no);
-    if (chRun){
-      var chip = document.createElement('div');
-      chip.className='chapter-chip'; chip.textContent=chRun;
+    // 角落章節籤（顯示：最近章名；雙擊：直接編輯該章起始頁的章名）
+    const chTitle = nearestChapter(page.page_no);
+    if (chTitle){
+      const chip = document.createElement('div');
+      chip.className='chapter-chip';
+      chip.textContent = chTitle;
+      chip.title = '雙擊可編輯章節名稱';
+      chip.addEventListener('dblclick', ()=>{
+        const originIdx = getChapterOriginIndex(page.page_no);
+        if (originIdx<0) return;
+        const origin = book.pages[originIdx];
+        const cur = getHeadingFromPage(origin) || '';
+        const next = prompt('章節名稱：', cur);
+        if (next===null) return;
+        if ((next||'').trim()){
+          applyHeadingToPage(origin, (next||'').trim());
+        }else{
+          removeHeadingFromPage(origin);
+        }
+        persist(); render();
+      });
       el.appendChild(chip);
     }
 
     // 頁碼
-    var no = document.createElement('div');
-    no.className='page-no'; no.textContent = page.page_no || '';
+    const no = document.createElement('div');
+    no.className='page-no';
+    no.textContent = page.page_no || '';
     el.appendChild(no);
 
-    host.addEventListener('mousedown', function(){ activePageId = page.id; });
+    // 點擊設為 active
+    host.addEventListener('mousedown', ()=>{ activePageId = page.id; }, {passive:true});
 
     if (page.type==='illustration'){
       el.innerHTML += page.image_url
-        ? '<img src="'+esc(page.image_url)+'" alt="">'
-        : '<div class="ph" style="color:#6b7280;display:grid;place-items:center;height:100%">（雙擊貼上圖片網址）</div>';
-      host.ondblclick = function(){
-        var url = prompt('圖片網址：', page.image_url||'') || '';
-        url = url.trim();
+        ? `<img src="${esc(page.image_url)}" alt="">`
+        : `<div class="ph" style="color:#6b7280;display:grid;place-items:center;height:100%">（雙擊貼上圖片網址）</div>`;
+      host.ondblclick = ()=>{
+        const url = prompt('圖片網址：', page.image_url||'')?.trim()||'';
         page.image_url = url || null; persist(); render();
       };
     }else{
-      // 章節標題（只有插過才有）
-      if (Object.prototype.hasOwnProperty.call(page,'chapter')){
-        var chbox = document.createElement('div');
-        chbox.className='chapter-block';
-        chbox.setAttribute('contenteditable','true');
-        chbox.setAttribute('data-ph','章節名稱…');
-        chbox.textContent = page.chapter || '';
-        chbox.addEventListener('focus', function(){ activePageId = page.id; });
-        chbox.addEventListener('input', function(){ page.chapter = (chbox.textContent||'').trim(); persist(); });
-        el.appendChild(chbox);
-      }
+      // 正文（章名＝第一行大字 <span data-fs> + <br>）
+      const body = document.createElement('div');
+      body.className='body-text'; body.contentEditable='true';
+      body.dataset.ph = (page.type==='novel' ? '正文…' : '置中文字…');
+      if (page.content_html) body.innerHTML = page.content_html;
+      else body.textContent = page.content_text || '';
 
-      // 正文
-      var body = document.createElement('div');
-      body.className='body-text'; body.setAttribute('contenteditable','true');
-      body.setAttribute('data-ph', (page.type==='novel' ? '正文…' : '置中文字…'));
-      if (page.content_html){ body.innerHTML = page.content_html; }
-      else { body.textContent = page.content_text || ''; }
-
-      var tmr=null;
-      body.addEventListener('focus', function(){ activePageId = page.id; });
-      body.addEventListener('input', function(){
+      let tmr=null;
+      body.addEventListener('focus', ()=>{ activePageId = page.id; });
+      body.addEventListener('input', ()=>{
         page.content_html = sanitizeEditableHTML(body);
         page.content_text = body.textContent || '';
         persist();
-        if (tmr) clearTimeout(tmr);
-        tmr = setTimeout(function(){ autoPaginateFrom(page.page_no, body); }, 40);
+        clearTimeout(tmr); tmr=setTimeout(()=>autoPaginateFrom(page.page_no, body), 40);
       });
 
       el.appendChild(body);
@@ -354,457 +268,569 @@
   }
 
   /* ======================
-     翻頁（可翻到封面）
+     翻頁：先渲染目標在底，再疊動畫（看到底下真內容）
      ====================== */
-  function userSingleNow(){ return effectiveSingleAt(idx); }
+  function isEffectiveSingleNow(){ return effectiveSingleAt(idx); }
+
   function step(sign){
     if (isFlipping) return;
-    var effSingle = userSingleNow();
-    var delta    = effSingle ? sign*1 : sign*2;
-    var maxIndex = Math.max(0, book.pages.length - (effSingle?1:2));
-    var target   = clamp(idx + delta, 0, maxIndex);
-    if (target === idx) return;
-    var dir = (sign>0)? 'next' : 'prev';
+
+    // 雙頁往後翻且逼近尾端 → 先補一頁（防呆）
+    const effSingleNow = isEffectiveSingleNow();
+    if (!effSingleNow && sign>0 && (idx + 2 >= book.pages.length)){
+      book.pages.push(newPage()); renumberPages();
+    }
+
+    const effSingle = isEffectiveSingleNow();
+    const delta    = effSingle? sign*1 : sign*2;
+    const maxIndex = Math.max(0, book.pages.length - (effSingle?1:2));
+    const target   = clamp(idx + delta, 0, maxIndex);
+    if (target===idx) return;
+
+    const dir = (sign>0)? 'next' : 'prev';
     if (effSingle) flipSingle(dir, target);
     else           flipDouble(dir, target);
   }
+
   function getOffsetInOverlay(hostPaper){
-    var pr = hostPaper.getBoundingClientRect();
-    var or = flipOverlay.getBoundingClientRect();
-    return { left: pr.left - or.left, top: pr.top - or.top, width: pr.width, height: pr.height };
+    const pr = hostPaper.getBoundingClientRect();
+    const or = flipOverlay.getBoundingClientRect();
+    return { left: pr.left-or.left, top: pr.top-or.top, width: pr.width, height: pr.height };
   }
+
   function flipDouble(dir, targetIdx){
     if (isFlipping) return;
-    var rtl = (book.direction==='rtl');
-    var L = idx, R = idx+1;
-    var frontPage, backPage, placeLeft, hostPaper;
+    const rtl=(book.direction==='rtl');
+    const L=idx, R=idx+1;
+    let frontPage, backPage, placeLeft, hostPaper;
     if (!rtl){
-      if (dir==='next'){ frontPage=getPageByIndex(R); backPage=getPageByIndex(R+1)||autoAppendAndGet(R+1); placeLeft=false; hostPaper=rightPaper; }
-      else             { frontPage=getPageByIndex(L); backPage=getPageByIndex(L-1);                         placeLeft=true;  hostPaper=leftPaper;  }
+      if (dir==='next'){ frontPage=getPageByIndex(R); backPage=getPageByIndex(R+1)||newPage(); placeLeft=false; hostPaper=rightPaper; }
+      else             { frontPage=getPageByIndex(L); backPage=getPageByIndex(L-1);           placeLeft=true;  hostPaper=leftPaper; }
     }else{
-      if (dir==='next'){ frontPage=getPageByIndex(L); backPage=getPageByIndex(L+1)||autoAppendAndGet(L+1); placeLeft=true;  hostPaper=leftPaper;  }
-      else             { frontPage=getPageByIndex(R); backPage=getPageByIndex(R-1);                         placeLeft=false; hostPaper=rightPaper; }
+      if (dir==='next'){ frontPage=getPageByIndex(L); backPage=getPageByIndex(L+1)||newPage(); placeLeft=true;  hostPaper=leftPaper; }
+      else             { frontPage=getPageByIndex(R); backPage=getPageByIndex(R-1);           placeLeft=false; hostPaper=rightPaper; }
     }
-    if (!backPage || !hostPaper) return;
+    if (!hostPaper) return;
 
-    var pos = getOffsetInOverlay(hostPaper);
-    var turn = document.createElement('div');
+    const pos = getOffsetInOverlay(hostPaper);
+    const turn = document.createElement('div');
     turn.className='turn';
-    turn.style.width  = pos.width+'px';
-    turn.style.height = pos.height+'px';
-    turn.style.left   = pos.left+'px';
-    turn.style.top    = pos.top+'px';
-    turn.style.transformOrigin = placeLeft? 'right center' : 'left center';
+    Object.assign(turn.style,{
+      width:pos.width+'px', height:pos.height+'px', left:pos.left+'px', top:pos.top+'px',
+      transformOrigin: placeLeft? 'right center':'left center'
+    });
 
-    var f = document.createElement('div'); f.className='face front';
-    var b = document.createElement('div'); b.className='face back';
-    f.appendChild(snapshot(frontPage, placeLeft? 'left':'right'));
-    b.appendChild(snapshot(backPage , placeLeft? 'right':'left'));
+    const f = document.createElement('div'); f.className='face front';
+    const b = document.createElement('div'); b.className='face back';
+    f.appendChild(snapshot(frontPage, placeLeft?'left':'right'));
+    b.appendChild(snapshot(backPage , placeLeft?'right':'left'));
 
-    var shade = document.createElement('div'); shade.className='foldShade';
+    const shade=document.createElement('div'); shade.className='foldShade';
     shade.style.background = placeLeft
       ? 'linear-gradient(270deg, rgba(0,0,0,.22), rgba(0,0,0,0) 40%, rgba(0,0,0,0) 60%, rgba(0,0,0,.12))'
       : 'linear-gradient(90deg,  rgba(0,0,0,.22), rgba(0,0,0,0) 40%, rgba(0,0,0,0) 60%, rgba(0,0,0,.12))';
     turn.appendChild(f); turn.appendChild(b); turn.appendChild(shade);
 
-    isFlipping = true; if (btnPrev) btnPrev.disabled = true; if (btnNext) btnNext.disabled = true;
+    isFlipping=true; disableNav(true);
     idx = targetIdx; render();
+
     flipOverlay.innerHTML=''; flipOverlay.appendChild(turn);
     void turn.offsetWidth;
     turn.style.animation = placeLeft ? 'flipLeftPrev .42s ease both' : 'flipRightNext .42s ease both';
-    turn.addEventListener('animationend', function(){
-      flipOverlay.innerHTML=''; isFlipping = false;
-      if (btnPrev) btnPrev.disabled = false; if (btnNext) btnNext.disabled = false;
-    }, {once:true});
+    turn.addEventListener('animationend', ()=>{ flipOverlay.innerHTML=''; isFlipping=false; disableNav(false); }, {once:true});
   }
+
   function flipSingle(dir, targetIdx){
     if (isFlipping) return;
-    var pos = getOffsetInOverlay(rightPaper);
-    var snap = snapshot(getPageByIndex(idx), 'right');
-    isFlipping = true; if (btnPrev) btnPrev.disabled = true; if (btnNext) btnNext.disabled = true;
+    const pos = getOffsetInOverlay(rightPaper);
+    const snap = snapshot(getPageByIndex(idx), 'right');
+
+    isFlipping=true; disableNav(true);
     idx = targetIdx; render();
-    var cover = document.createElement('div');
+
+    const cover=document.createElement('div');
     cover.className='singleTurn';
-    cover.style.width  = pos.width+'px';
-    cover.style.height = pos.height+'px';
-    cover.style.left   = pos.left+'px';
-    cover.style.top    = pos.top+'px';
-    cover.style.transformOrigin = 'left center';
+    Object.assign(cover.style,{ width:pos.width+'px', height:pos.height+'px', left:pos.left+'px', top:pos.top+'px', transformOrigin:'left center' });
     cover.appendChild(snap);
+
     flipOverlay.innerHTML=''; flipOverlay.appendChild(cover);
     void cover.offsetWidth;
-    cover.style.animation = 'singleCurl .32s ease both';
-    cover.addEventListener('animationend', function(){
-      flipOverlay.innerHTML=''; isFlipping = false;
-      if (btnPrev) btnPrev.disabled = false; if (btnNext) btnNext.disabled = false;
-    }, {once:true});
+    cover.style.animation='singleCurl .32s ease both';
+    cover.addEventListener('animationend', ()=>{ flipOverlay.innerHTML=''; isFlipping=false; disableNav(false); }, {once:true});
   }
+
+  function disableNav(v){ const a=$('#btnPrev'), b=$('#btnNext'); if(a)a.disabled=v; if(b)b.disabled=v; }
+
+  // 覆蓋層快照
   function snapshot(page, side){
-    var host = document.createElement('div');
-    host.className = 'paper ' + side + ' ' + templateClass(page);
-    var el = document.createElement('div'); el.className='page';
+    const host=document.createElement('div');
+    host.className='paper '+side+' '+templateClass(page);
+    const el=document.createElement('div'); el.className='page';
+
     if (isCover(page)){
-      el.innerHTML = '<div style="display:grid;place-items:center;height:100%;text-align:center;padding:24px">'+
-                     '<div style="font-size:1.6em;font-weight:700;line-height:1.2">'+esc(book.title||'未命名書籍')+'</div>'+
-                     '<div style="margin-top:10px;opacity:.65">～ 封面 ～</div></div>';
+      el.innerHTML = `
+        <div style="display:grid;place-items:center;height:100%;text-align:center;padding:24px">
+          <div style="font-size:1.6em;font-weight:700;line-height:1.2">${esc(book.title||'未命名書籍')}</div>
+          <div style="margin-top:10px;opacity:.65">～ 封面 ～</div>
+        </div>`;
       host.appendChild(el); return host;
     }
-    var ch = nearestChapter(page.page_no);
-    if (ch){ var chip=document.createElement('div'); chip.className='chapter-chip'; chip.textContent=ch; el.appendChild(chip); }
-    var no = document.createElement('div'); no.className='page-no'; no.textContent = page.page_no||''; el.appendChild(no);
+
+    const ch = nearestChapter(page.page_no);
+    if (ch){ const chip=document.createElement('div'); chip.className='chapter-chip'; chip.textContent=ch; el.appendChild(chip); }
+    const no=document.createElement('div'); no.className='page-no'; no.textContent=page.page_no||''; el.appendChild(no);
+
     if (page.type==='illustration'){
-      el.innerHTML += page.image_url ? '<img src="'+esc(page.image_url)+'" alt="">' : '';
+      el.innerHTML += page.image_url ? `<img src="${esc(page.image_url)}" alt="">` : '';
     }else{
-      if (Object.prototype.hasOwnProperty.call(page,'chapter')){
-        var c = document.createElement('div'); c.className='chapter-block'; c.textContent = page.chapter||''; el.appendChild(c);
-      }
-      var b = document.createElement('div'); b.className='body-text'; b.textContent = page.content_text||''; el.appendChild(b);
+      const b=document.createElement('div'); b.className='body-text'; b.textContent = page.content_text||''; el.appendChild(b);
     }
     host.appendChild(el);
     return host;
   }
 
   /* ======================
-     自動換頁 / 插入 / 刪除
+     章節：偵測 / 編輯 / 目錄
+     ====================== */
+  // 章名規則：正文第一個節點若是 <span data-fs>=1.2 或 style.fontSize>=1.2em，就視為章名；其後需有 <br>
+  function getHeadingFromHTML(html){
+    if (!html) return '';
+    const wrap=document.createElement('div'); wrap.innerHTML=html;
+    let n=wrap.firstChild;
+    while(n && n.nodeType===3 && !n.nodeValue.trim()){ n=n.nextSibling; } // 去開頭空白
+    if (n && n.nodeType===1 && n.tagName==='SPAN'){
+      const ds=parseFloat(n.getAttribute('data-fs'));
+      const fs=parseFloat((n.style.fontSize||'').replace('em',''));
+      if ((isFinite(ds) && ds>=1.2) || (isFinite(fs) && fs>=1.2)) return (n.textContent||'').trim();
+    }
+    return '';
+  }
+  function getHeadingFromPage(p){ return getHeadingFromHTML(p.content_html||''); }
+
+  function getChapterOriginIndex(pageNo){
+    let i=book.pages.findIndex(p=>p.page_no===pageNo);
+    if (i<0) return -1;
+    for(let x=i; x>=0; x--){
+      const p=book.pages[x];
+      if (p.page_no>0 && getHeadingFromPage(p)) return x;
+    }
+    return -1;
+  }
+  function nearestChapter(pageNo){
+    let i=book.pages.findIndex(p=>p.page_no===pageNo);
+    if (i<0) return '';
+    for(let x=i; x>=0; x--){
+      const p=book.pages[x];
+      if (p.page_no>0){
+        const h=getHeadingFromPage(p);
+        if (h) return h;
+      }
+    }
+    return '';
+  }
+
+  function applyHeadingToPage(page, title){
+    const tmp=document.createElement('div');
+    tmp.innerHTML = page.content_html || '';
+    // 去開頭空白
+    let first=tmp.firstChild;
+    while(first && first.nodeType===3 && !first.nodeValue.trim()){ const t=first; first=first.nextSibling; tmp.removeChild(t); }
+    if (first && first.nodeType===1 && first.tagName==='SPAN'){
+      const ds=parseFloat(first.getAttribute('data-fs'));
+      const fs=parseFloat((first.style.fontSize||'').replace('em',''));
+      if ((isFinite(ds)&&ds>=1.2) || (isFinite(fs)&&fs>=1.2)){
+        first.textContent = title;
+      }else{
+        const span=document.createElement('span');
+        span.setAttribute('data-fs','1.6'); span.style.fontSize='1.6em'; span.textContent=title;
+        tmp.insertBefore(span, first);
+      }
+    }else{
+      const span=document.createElement('span');
+      span.setAttribute('data-fs','1.6'); span.style.fontSize='1.6em'; span.textContent=title;
+      tmp.insertBefore(span, first||null);
+    }
+    // 確保下一個是 <br>
+    if (!(spanOrFirst(tmp.firstChild).nextSibling && spanOrFirst(tmp.firstChild).nextSibling.tagName==='BR')){
+      const br=document.createElement('br');
+      tmp.insertBefore(br, spanOrFirst(tmp.firstChild).nextSibling || null);
+    }
+    page.content_html = sanitizeEditableHTML(tmp);
+    page.content_text = tmp.textContent || '';
+  }
+  function spanOrFirst(n){ return (n && n.tagName==='SPAN') ? n : n; }
+  function removeHeadingFromPage(page){
+    const tmp=document.createElement('div'); tmp.innerHTML=page.content_html||'';
+    let first=tmp.firstChild;
+    while(first && first.nodeType===3 && !first.nodeValue.trim()){ const t=first; first=first.nextSibling; tmp.removeChild(t); }
+    if (first && first.nodeType===1 && first.tagName==='SPAN'){
+      const ds=parseFloat(first.getAttribute('data-fs'));
+      const fs=parseFloat((first.style.fontSize||'').replace('em',''));
+      if ((isFinite(ds)&&ds>=1.2) || (isFinite(fs)&&fs>=1.2)){
+        // 刪掉 span 與緊接的 <br>
+        const rm=first; const next=rm.nextSibling;
+        tmp.removeChild(rm);
+        if (next && next.nodeType===1 && next.tagName==='BR') tmp.removeChild(next);
+      }
+    }
+    page.content_html = sanitizeEditableHTML(tmp);
+    page.content_text = tmp.textContent || '';
+  }
+
+  function buildTOC(){
+    const box=$('#tocList'); if(!box) return;
+
+    const rows=[];
+    // 封面列
+    rows.push(`
+      <div class="toc-row" data-cover="1"
+           style="display:flex;gap:10px;align-items:baseline;padding:10px 12px;border-bottom:1px dashed #2a3555;cursor:pointer">
+        <div style="white-space:nowrap;max-width:70%;overflow:hidden;text-overflow:ellipsis">封面</div>
+        <div style="flex:1;border-bottom:1px dotted #2a3555;transform:translateY(-2px)"></div>
+        <div style="color:#9aa3b2">—</div>
+      </div>`);
+
+    // 逐頁找「本頁第一行大字」作為章節起點
+    for (let i=0;i<book.pages.length;i++){
+      const p=book.pages[i];
+      if (p.page_no<=0) continue;
+      const ch=getHeadingFromPage(p);
+      if (!ch) continue;
+      rows.push(`
+      <div class="toc-row" data-no="${p.page_no}"
+           style="display:flex;gap:10px;align-items:baseline;padding:10px 12px;border-bottom:1px dashed #2a3555;cursor:pointer">
+        <div style="white-space:nowrap;max-width:70%;overflow:hidden;text-overflow:ellipsis">${esc(ch)}</div>
+        <div style="flex:1;border-bottom:1px dotted #2a3555;transform:translateY(-2px)"></div>
+        <div style="color:#9aa3b2">P${p.page_no}</div>
+      </div>`);
+    }
+
+    if (rows.length===1){
+      box.innerHTML='<div style="padding:12px;color:#9aa3b2">尚無章節</div>';
+      return;
+    }
+    box.innerHTML = rows.join('');
+
+    // 點封面
+    box.querySelector('[data-cover]')?.addEventListener('click', ()=>{
+      idx=0; render(); $('#tocDialog')?.close();
+    });
+
+    // 點章節
+    $all('.toc-row[data-no]', box).forEach(row=>{
+      row.addEventListener('click', ()=>{
+        const targetNo = parseInt(row.getAttribute('data-no'),10);
+        const targetIdx= book.pages.findIndex(p=>p.page_no===targetNo);
+        if (targetIdx<0) return;
+        const effSingle = effectiveSingleAt(targetIdx);
+        idx = effSingle ? targetIdx : Math.max(0, targetIdx - (targetIdx%2));
+        activePageId = book.pages[targetIdx].id;
+        render(); $('#tocDialog')?.close();
+      });
+    });
+  }
+
+  /* ======================
+     自動換頁（切出去的文字回預設樣式）
      ====================== */
   function autoPaginateFrom(pageNo, bodyEl){
-    var i=-1; for (var k=0;k<book.pages.length;k++){ if (book.pages[k].page_no===pageNo){ i=k; break; } }
+    const i = book.pages.findIndex(p=>p.page_no===pageNo);
     if (i<0) return;
-    var body = bodyEl || findBodyForPage(pageNo);
+    const body = bodyEl || findBodyForPage(pageNo);
     if (!body) return;
     if (body.scrollHeight <= body.clientHeight) return;
 
-    var originalHTML = body.innerHTML;
-    var fullText = body.textContent || '';
-    var lo=0, hi=fullText.length, fit=fullText.length;
+    const originalHTML = body.innerHTML;
+    const fullText = body.textContent || '';
+    let lo=0, hi=fullText.length, fit=fullText.length;
     while(lo<=hi){
-      var mid=(lo+hi>>1);
+      const mid=(lo+hi>>1);
       body.textContent = fullText.slice(0,mid);
       if (body.scrollHeight <= body.clientHeight){ fit=mid; lo=mid+1; } else hi=mid-1;
     }
     body.innerHTML = originalHTML;
     if (fit >= fullText.length) return;
 
+    // 第一頁保留樣式
     truncateEditableToChars(body, fit);
-    var p = book.pages[i];
+    const p = book.pages[i];
     p.content_html = sanitizeEditableHTML(body);
     p.content_text = body.textContent || '';
 
-    var j=i+1;
+    // 下一可寫文本頁（跳過插圖/封面；不足補頁）
+    let j=i+1;
     while(j<book.pages.length && (book.pages[j].type==='illustration' || isCover(book.pages[j]))) j++;
-    if (j>=book.pages.length){ book.pages.push(newPage()); j=book.pages.length-1; }
-    var remain = fullText.slice(fit).replace(/^\s+/,'');
-    var before = book.pages[j].content_text || '';
+    if (j>=book.pages.length){ book.pages.push(newPage()); j=book.pages.length-1; renumberPages(); }
+    const remain = fullText.slice(fit).trimStart();
+    const before = book.pages[j].content_text || '';
     book.pages[j].content_text = remain + (before?('\n'+before):'');
     book.pages[j].content_html = '';
     persist(); render();
   }
 
+  /* ======================
+     操作
+     ====================== */
   function getCurPage(){
-    // 1) 以 id 追蹤（不受重編號影響）
     if (activePageId){
-      for (var i=0;i<book.pages.length;i++){ if (book.pages[i].id===activePageId) return book.pages[i]; }
+      const p = book.pages.find(pp=>pp.id===activePageId);
+      if (p) return p;
     }
-    // 2) 讀畫面右/左頁的頁碼以回推
-    var rightNoEl = $('.paper.right .page-no');
-    if (rightNoEl){
-      var n = parseInt(rightNoEl.textContent||'0',10);
-      for (var j=0;j<book.pages.length;j++){ if (book.pages[j].page_no===n) return book.pages[j]; }
-    }
-    var leftNoEl = $('.paper.left .page-no');
-    if (leftNoEl){
-      var n2 = parseInt(leftNoEl.textContent||'0',10);
-      for (var k=0;k<book.pages.length;k++){ if (book.pages[k].page_no===n2) return book.pages[k]; }
+    const rightNo = document.querySelector('.paper.right .page-no')?.textContent;
+    if (rightNo){
+      const p = book.pages.find(pp=>String(pp.page_no)===String(rightNo));
+      if (p) return p;
     }
     return book.pages[idx];
   }
 
   function insertAfter(){
-    var cur = getCurPage();
-    var atIdx = -1;
-    for (var i=0;i<book.pages.length;i++){ if (book.pages[i]===cur){ atIdx=i; break; } }
-    if (atIdx<0) atIdx=0;
-
-    var np = newPage();
-    if (cur.type==='cover-front'){
-      book.pages.splice(1, 0, np);
-      activePageId = np.id;
-      idx = 0;
-    }else{
-      book.pages.splice(atIdx+1, 0, np);
-      activePageId = np.id;
-      var effSingle = effectiveSingleAt(atIdx+1);
-      idx = effSingle ? (atIdx+1) : Math.max(0, (atIdx+1) - ((atIdx+1)%2));
-    }
-    render(); // 這裡會重編 1..N，所以頁碼不會亂跳
-  }
-
-  function deleteBlank(){
-    var cur = getCurPage();
-    if (cur.type==='cover-front'){ alert('封面不可刪除'); return; }
-    var i=-1; for (var k=0;k<book.pages.length;k++){ if (book.pages[k]===cur){ i=k; break; } }
-    if (i<0) return;
-
-    var p = book.pages[i];
-    var hasText = ((p.content_text||'').trim().length>0);
-    var hasCh   = (Object.prototype.hasOwnProperty.call(p,'chapter') && (p.chapter||'').trim().length>0);
-    var hasImg  = !!p.image_url;
-    if (hasText||hasCh||hasImg){ alert('此頁有內容或圖片，無法刪除'); return; }
-
-    // 設定刪除後的焦點 id
-    var nextFocus = book.pages[Math.max(0, i-1)];
-    activePageId = nextFocus ? nextFocus.id : null;
-
-    book.pages.splice(i,1);
-    ensureMinPages();
-
-    var prevIdx = Math.max(0, i-1);
-    var effSingle = effectiveSingleAt(prevIdx);
-    idx = effSingle ? prevIdx : Math.max(0, prevIdx - (prevIdx%2));
-    render(); // 重編 1..N
-  }
-
-  function insertChapter(){
-    var p = getCurPage();
-    if (p.type==='cover-front'){
-      if (book.pages[1] && book.pages[1].type!=='illustration'){ p = book.pages[1]; }
-      else { var np=newPage(); book.pages.splice(1,0,np); p=np; }
-      idx = 0; render();
-    }
-    if (!Object.prototype.hasOwnProperty.call(p,'chapter')) p.chapter = '';
-    var title = prompt('章節名稱：', p.chapter||'') || '';
-    title = title.trim();
-    p.chapter = title;
-
-    var body = findBodyForPage(p.page_no);
-    if (body){
-      while (body.firstChild && body.firstChild.nodeType===3 && /^\s*$/.test(body.firstChild.nodeValue)){ body.removeChild(body.firstChild); }
-      var first = body.firstChild;
-      var isHead = first && first.nodeType===1 && first.tagName==='SPAN' && first.getAttribute('data-fs');
-      if (title){
-        if (!isHead){
-          var span = document.createElement('span'); span.setAttribute('data-fs','1.6'); span.style.fontSize='1.6em'; span.textContent=title;
-          body.insertBefore(span, body.firstChild);
-          var br = document.createElement('br'); if (span.nextSibling) body.insertBefore(br, span.nextSibling); else body.appendChild(br);
-        }else{
-          first.textContent = title;
-          if (!(first.nextSibling && first.nextSibling.nodeType===1 && first.nextSibling.tagName==='BR')){
-            var br2 = document.createElement('br'); if (first.nextSibling) body.insertBefore(br2, first.nextSibling); else body.appendChild(br2);
-          }
-        }
-      }else if (isHead){
-        first.parentNode.removeChild(first);
-        if (body.firstChild && body.firstChild.nodeType===1 && body.firstChild.tagName==='BR'){ body.removeChild(body.firstChild); }
-      }
-      persistEditableNow(body);
-    }
-    activePageId = p.id;
+    const cur = getCurPage();
+    const at  = book.pages.indexOf(cur);
+    book.pages.splice(at+1, 0, newPage());
+    renumberPages();
+    // 讓新頁可見
+    if (effectiveSingleAt(at+1)) idx = at+1;
+    else idx = Math.max(0, (at+1) - ((at+1)%2));
+    activePageId = book.pages[at+1].id;
     render();
   }
 
-  function setType(p, type){ if(!p) return; p.type=type; persist(); render(); }
-  function setFont(nextRem){
-    var MIN=0.7, MAX=1.8;
-    if(!isFinite(nextRem)||nextRem<=0)nextRem=1.02;
-    book.textStyle.fs=Math.max(MIN,Math.min(MAX,nextRem));
-    persist(); render();
-  }
-  function autoAppendAndGet(i){
-    var np = newPage();
-    book.pages[i]=np; return np;
+  function deleteBlank(){
+    const cur = getCurPage();
+    const i   = book.pages.indexOf(cur);
+    if (i<=0) return; // 不刪封面
+    const p = book.pages[i];
+    const hasText=(p.content_text||'').trim().length>0;
+    const hasImg = !!p.image_url;
+    if (hasText||hasImg) return alert('此頁有內容或圖片，無法刪除');
+    book.pages.splice(i,1); ensureMinPages(); renumberPages();
+    const back = Math.max(0, i-1);
+    idx = effectiveSingleAt(back) ? back : Math.max(0, back - (back%2));
+    activePageId = book.pages[idx]?.id || null;
+    render();
   }
 
+  function setType(p, type){ p.type=type; persist(); render(); }
+  function setFont(nextRem){ const MIN=0.7, MAX=1.8; if(!isFinite(nextRem)||nextRem<=0)nextRem=1.02; book.textStyle.fs=Math.max(MIN,Math.min(MAX,nextRem)); persist(); render(); }
+
   /* ======================
-     文字縮放 / 貼上 / 保存
+     編輯輔助
      ====================== */
   function getActiveEditable(){
-    var sel = window.getSelection();
+    const sel = window.getSelection();
     if(!sel || sel.rangeCount===0) return null;
-    var range = sel.getRangeAt(0);
-    var node = (range.commonAncestorContainer.nodeType===1)
+    const range = sel.getRangeAt(0);
+    const node = (range.commonAncestorContainer.nodeType===1)
       ? range.commonAncestorContainer
       : range.commonAncestorContainer.parentElement;
-    return closest(node, '.body-text, .chapter-block');
+    return node?.closest?.('.body-text') || null;
   }
   function scaleSelection(mult){
-    var sel = window.getSelection();
+    const sel = window.getSelection();
     if(!sel || sel.rangeCount===0){ setFont(book.textStyle.fs * mult); return; }
-    var range = sel.getRangeAt(0);
-    var editable = getActiveEditable();
+    const range = sel.getRangeAt(0);
+    const editable = getActiveEditable();
     if (!editable || !editable.contains(range.commonAncestorContainer)) return;
 
     splitTextBoundaries(range);
 
-    var walker = document.createTreeWalker(editable, NodeFilter.SHOW_TEXT, null, false);
-    var texts=[];
-    while(walker.nextNode()){
-      var n = walker.currentNode;
-      if(!n.nodeValue || !n.nodeValue.trim()) continue;
-      var r = document.createRange(); r.selectNodeContents(n);
-      if (range.compareBoundaryPoints(Range.END_TO_START, r)>=0)  continue;
-      if (range.compareBoundaryPoints(Range.START_TO_END, r)<=0)  continue;
-      texts.push(n);
-    }
+    const walker = document.createTreeWalker(editable, NodeFilter.SHOW_TEXT, {
+      acceptNode(n){
+        if(!n.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+        const r = document.createRange(); r.selectNodeContents(n);
+        if (range.compareBoundaryPoints(Range.END_TO_START, r)>=0)  return NodeFilter.FILTER_REJECT;
+        if (range.compareBoundaryPoints(Range.START_TO_END, r)<=0)  return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    });
+    const texts=[]; while(walker.nextNode()) texts.push(walker.currentNode);
     if (!texts.length) return;
 
-    var firstText = texts[0];
-    var lastText  = texts[texts.length-1];
+    const firstText = texts[0];
+    const lastText  = texts[texts.length-1];
 
-    for (var i=0;i<texts.length;i++){
-      var text = texts[i];
-      var span = text.parentElement;
-      if(!(span && span.tagName==='SPAN' && span.getAttribute('data-fs')!=null)){
+    texts.forEach(text=>{
+      let span = text.parentElement;
+      if(!(span && span.tagName==='SPAN' && span.hasAttribute('data-fs'))){
         span = document.createElement('span');
         text.parentNode.insertBefore(span, text);
         span.appendChild(text);
         span.setAttribute('data-fs','1');
         span.style.fontSize='1em';
       }
-      var cur  = parseFloat(span.getAttribute('data-fs')) || 1;
-      var next = cur * mult; next = Math.max(0.6, Math.min(3, next));
+      const cur  = parseFloat(span.getAttribute('data-fs')) || 1;
+      let next   = cur * mult; next = Math.max(0.6, Math.min(3, next)); // 範圍
       span.setAttribute('data-fs', String(parseFloat(next.toFixed(3))));
       span.style.fontSize = next + 'em';
-    }
+    });
 
+    // 還原選取
     try{
-      var r2 = document.createRange();
+      const r2 = document.createRange();
       r2.setStart(firstText, 0);
       r2.setEnd(lastText, lastText.nodeValue.length);
-      sel.removeAllRanges();
-      sel.addRange(r2);
+      sel.removeAllRanges(); sel.addRange(r2);
     }catch(_){}
+
     persistEditableNow(editable);
   }
   function splitTextBoundaries(range){
-    if(range.startContainer && range.startContainer.nodeType===3){
-      var t=range.startContainer;
+    if(range.startContainer.nodeType===3){
+      const t=range.startContainer;
       if(range.startOffset>0 && range.startOffset<t.nodeValue.length){
-        var after = t.splitText(range.startOffset);
+        const after = t.splitText(range.startOffset);
         range.setStart(after, 0);
       }
     }
-    if(range.endContainer && range.endContainer.nodeType===3){
-      var t2=range.endContainer;
-      if(range.endOffset>0 && range.endOffset<t2.nodeValue.length){
-        t2.splitText(range.endOffset);
+    if(range.endContainer.nodeType===3){
+      const t=range.endContainer;
+      if(range.endOffset>0 && range.endOffset<t.nodeValue.length){
+        t.splitText(range.endOffset);
       }
     }
   }
+  function indentAtSelection(target){
+    insertPlainTextAtCursor('\t');
+    persistEditableNow(target);
+  }
+  function outdentAtSelection(target){
+    const sel = window.getSelection();
+    if(!sel || sel.rangeCount===0) return;
+    const r = sel.getRangeAt(0);
+    if (r.collapsed){
+      const node = r.startContainer;
+      if (node.nodeType===3){
+        const txt = node.nodeValue;
+        const off = r.startOffset;
+        const pre = txt.slice(Math.max(0,off-2), off);
+        let remove = 0;
+        if (pre.endsWith('\t')) remove = 1;
+        else if (/\s{1,2}$/.test(pre)) remove = pre.match(/\s+$/)[0].length;
+        if (remove>0){
+          node.nodeValue = txt.slice(0, off-remove) + txt.slice(off);
+          r.setStart(node, off-remove); r.collapse(true);
+          sel.removeAllRanges(); sel.addRange(r);
+        }
+      }
+    }
+    persistEditableNow(target);
+  }
   function insertPlainTextAtCursor(text){
-    var sel = window.getSelection(); if(!sel || sel.rangeCount===0) return;
-    var range = sel.getRangeAt(0);
+    const sel = window.getSelection(); if(!sel || sel.rangeCount===0) return;
+    const range = sel.getRangeAt(0);
     range.deleteContents();
-    var node = document.createTextNode(text);
+    const node = document.createTextNode(text);
     range.insertNode(node);
     range.setStartAfter(node); range.setEndAfter(node);
     sel.removeAllRanges(); sel.addRange(range);
   }
   function persistEditableNow(target){
-    var paper = closest(target, '.paper');
-    var noEl  = paper ? $('.page-no', paper) : null;
-    var pageNo = noEl ? Number(noEl.textContent||'0') : 0;
-    var p=null;
-    for (var i=0;i<book.pages.length;i++){ if (book.pages[i].page_no===pageNo){ p=book.pages[i]; break; } }
+    const pageNo = Number(target.closest('.paper')?.querySelector('.page-no')?.textContent) || null;
+    if (!pageNo) return;
+    const p = book.pages.find(pp=>pp.page_no===pageNo);
     if(!p) return;
     activePageId = p.id;
-    if (target.classList.contains('body-text')){
-      p.content_html = sanitizeEditableHTML(target);
-      p.content_text = target.textContent || '';
-    }else if(target.classList.contains('chapter-block')){
-      p.chapter = (target.textContent||'').trim();
-    }
+    p.content_html = sanitizeEditableHTML(target);
+    p.content_text = target.textContent || '';
     persist();
   }
 
   /* ======================
-     DOM 截斷 / 查找 / 白名單
+     DOM 截斷（保留樣式）
      ====================== */
   function truncateEditableToChars(root, keep){
-    var remain = keep;
-    var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
-    var nodes=[]; while(walker.nextNode()) nodes.push(walker.currentNode);
-    var toRemove = [];
-    for (var k=0;k<nodes.length;k++){
-      var t = nodes[k];
-      var len = t.nodeValue.length;
+    let remain = keep;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+    const toRemove = [];
+    while(walker.nextNode()){
+      const t = walker.currentNode;
+      const len = t.nodeValue.length;
       if (remain>=len){ remain -= len; continue; }
       t.nodeValue = t.nodeValue.slice(0, remain);
-      remain = 0; collectSiblingsToRemove(t); break;
+      remain = 0;
+      collectSiblingsToRemove(t);
+      break;
     }
     function collectSiblingsToRemove(node){
-      var n = node;
-      while(n){ if (n.nextSibling){ markAll(n.nextSibling); } n = n.parentNode; if (n===root) break; }
+      let n = node;
+      while(n){
+        if (n.nextSibling){ markAll(n.nextSibling); }
+        n = n.parentNode;
+        if (n===root) break;
+      }
     }
-    function markAll(n){ toRemove.push(n); var c=n.firstChild; while(c){ markAll(c); c=c.nextSibling; } }
-    toRemove.forEach(function(n){ if (n.parentNode) n.parentNode.removeChild(n); });
+    function markAll(n){
+      toRemove.push(n);
+      let c = n.firstChild;
+      while(c){ markAll(c); c = c.nextSibling; }
+    }
+    toRemove.forEach(n=> n.parentNode && n.parentNode.removeChild(n));
   }
+
+  /* ======================
+     找到畫面上的正文元素
+     ====================== */
   function findBodyForPage(pageNo){
-    var leftNoEl  = $('.paper.left  .page-no');
-    var rightNoEl = $('.paper.right .page-no');
-    if (leftNoEl  && String(pageNo)===String(leftNoEl.textContent||''))  return $('.paper.left  .body-text:last-of-type');
-    if (rightNoEl && String(pageNo)===String(rightNoEl.textContent||'')) return $('.paper.right .body-text:last-of-type');
+    const leftNo  = document.querySelector('.paper.left  .page-no')?.textContent;
+    const rightNo = document.querySelector('.paper.right .page-no')?.textContent;
+    if (String(pageNo)===leftNo)  return document.querySelector('.paper.left  .body-text:last-of-type');
+    if (String(pageNo)===rightNo) return document.querySelector('.paper.right .body-text:last-of-type');
     return null;
   }
+
+  /* ======================
+     精簡 HTML 白名單
+     ====================== */
   function sanitizeEditableHTML(rootEl){
-    var allowed = {B:1,I:1,U:1,SPAN:1,BR:1};
-    var wrap = document.createElement('div');
+    const allowed = new Set(['B','I','U','SPAN','BR']);
+    const wrap = document.createElement('div');
     wrap.appendChild(rootEl.cloneNode(true));
-    $all('[contenteditable]', wrap).forEach(function(n){ n.removeAttribute('contenteditable'); });
-    $all('[data-ph]', wrap).forEach(function(n){ n.removeAttribute('data-ph'); });
-    $all('*', wrap).forEach(function(node){
-      if (!allowed[node.tagName]){
-        var parent=node.parentNode;
+    wrap.querySelectorAll('[contenteditable]').forEach(n=>n.removeAttribute('contenteditable'));
+    wrap.querySelectorAll('[data-ph]').forEach(n=>n.removeAttribute('data-ph'));
+    const all = wrap.querySelectorAll('*');
+    for (const node of Array.from(all)){
+      if (!allowed.has(node.tagName)){
+        const parent=node.parentNode;
         while(node.firstChild) parent.insertBefore(node.firstChild, node);
-        if (parent && node.parentNode===parent) parent.removeChild(node);
-        return;
+        parent.removeChild(node);
+        continue;
       }
       if (node.tagName==='SPAN'){
-        var ds = parseFloat(node.getAttribute('data-fs'));
-        var fs = node.style.fontSize || (isFinite(ds)? (ds+'em') : '');
-        Array.prototype.slice.call(node.attributes).forEach(function(a){
+        const ds = parseFloat(node.getAttribute('data-fs'));
+        const fs = node.style.fontSize || (isFinite(ds)? (ds+'em') : '');
+        [...node.attributes].forEach(a=>{
           if(a.name!=='data-fs' && a.name!=='style') node.removeAttribute(a.name);
         });
         if (isFinite(ds)) node.setAttribute('data-fs', String(ds));
         else node.removeAttribute('data-fs');
         node.style.cssText = fs ? ('font-size:'+fs) : '';
         if (!node.getAttribute('data-fs') && !node.getAttribute('style')){
-          var p=node.parentNode; if (p){ while(node.firstChild) p.insertBefore(node.firstChild,node); p.removeChild(node); }
+          const p=node.parentNode; while(node.firstChild) p.insertBefore(node.firstChild,node); p.removeChild(node);
         }
       }else{
-        Array.prototype.slice.call(node.attributes).forEach(function(a){ node.removeAttribute(a.name); });
+        [...node.attributes].forEach(a=>node.removeAttribute(a.name));
       }
-    });
+    }
+    // 回傳純內容（只保留允許的標籤）
     return wrap.innerHTML.replace(/\u200B/g,'');
   }
 
   /* ======================
-     RWD 縮放
+     其它小工具
      ====================== */
   function fit(){
-    var root = getComputedStyle(document.documentElement);
-    var mm  = parseFloat(root.getPropertyValue('--mm')) || 3.7795;
-    var Wmm = parseFloat(root.getPropertyValue('--paper-w-mm')) || 148;
-    var Hmm = parseFloat(root.getPropertyValue('--paper-h-mm')) || 210;
-
-    var paperW = (book.binding==='long' ? Hmm*mm : Wmm*mm);
-    var paperH = (book.binding==='long' ? Wmm*mm : Hmm*mm);
-
-    var needW  = effectiveSingleAt(idx)? paperW : paperW*2;
-    var needH  = paperH;
-
-    var stage = $('.stage'); if(!stage || !scaler) return;
-    var cs = getComputedStyle(stage);
-    var stageW = stage.clientWidth  - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-    var stageH = stage.clientHeight - parseFloat(cs.paddingTop)  - parseFloat(cs.paddingBottom);
-
-    var s = Math.min(1, stageW / needW, stageH / needH);
-    scaler.style.transform = 'scale('+s+')';
+    const mm   = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--mm'));
+    const Wmm  = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--paper-w-mm'));
+    const Hmm  = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--paper-h-mm'));
+    const paperW = (book.binding==='long' ? Hmm*mm : Wmm*mm);
+    const stageW = document.querySelector('.stage').clientWidth - 30;
+    const needW  = effectiveSingleAt(idx)? paperW : paperW*2;
+    const s = Math.min(1, stageW / needW);
+    scaler.style.transform = `scale(${s})`;
   }
-
-  /* ======================
-     啟動
-     ====================== */
-  ensureCover();
-  render();
-  fit();
+  function esc(s){return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+  function clamp(n,a,b){ return Math.max(a, Math.min(b, n)) }
+  function persist(){ Store.save(book) }
+  function getPageByIndex(i){ return book.pages[i] }
 })();
