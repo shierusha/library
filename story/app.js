@@ -55,8 +55,7 @@
      ====================== */
   const $=(s,r=document)=>r.querySelector(s);
   const $all=(s,r=document)=>Array.from((r||document).querySelectorAll(s));
-    const scaler=$('#scaler'), papersWrap=$('#papers'), leftPaper=$('#leftPaper'), rightPaper=$('#rightPaper'), flipOverlay=$('#flipOverlay');
-   const reduceMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const scaler=$('#scaler'), papersWrap=$('#papers'), leftPaper=$('#leftPaper'), rightPaper=$('#rightPaper'), flipOverlay=$('#flipOverlay');
 
   let idx=0;                 // 左頁 index（單頁=當前 index）
   let isFlipping=false;      // 動畫節流
@@ -96,8 +95,8 @@ const btnLeft = $('#btnleft');
   $('#btnBack')?.addEventListener('click', ()=> alert('示範：自行導回書單 URL'));
 
   $('#btnToggleView')?.addEventListener('click', ()=>{ book.viewMode = (book.viewMode==='single'?'double':'single'); render(); });
-  $('#btnToggleDir')?.addEventListener('click', ()=>{book.direction = (book.direction==='rtl'?'ltr':'rtl'); render(); });
-  $('#btnToggleBind')?.addEventListener('click', ()=>{ book.binding  = (book.binding==='long'?'short':'long'); render(); });
+  $('#btnToggleDir') ?.addEventListener('click', ()=>{ book.direction = (book.direction==='rtl'?'ltr':'rtl'); render(); });
+  $('#btnToggleBind')?.addEventListener('click', ()=>{ book.binding   = (book.binding==='long'?'short':'long'); render(); });
 
   // 文字工具（保留選取）
   const keepSel=btn=>btn?.addEventListener('mousedown',e=>e.preventDefault());
@@ -106,7 +105,7 @@ const btnLeft = $('#btnleft');
   $('#btnItalic')   ?.addEventListener('click', ()=> document.execCommand('italic',false,null));
   $('#btnUnderline')?.addEventListener('click', ()=> document.execCommand('underline',false,null));
   $('#btnFontUp')   ?.addEventListener('click', ()=> scaleSelection(1.15));
-  $('#btnFontDown')?.addEventListener('click', ()=> scaleSelection(0.87));
+  $('#btnFontDown') ?.addEventListener('click', ()=> scaleSelection(0.87));
 
   // Dock：切模板
   $all('[data-style]').forEach(b=>{
@@ -344,60 +343,10 @@ const btnLeft = $('#btnleft');
     else           flipDouble(dir, target);
   }
 
- function getOffsetInOverlay(hostPaper){
+  function getOffsetInOverlay(hostPaper){
     const pr = hostPaper.getBoundingClientRect();
     const or = flipOverlay.getBoundingClientRect();
     return { left: pr.left-or.left, top: pr.top-or.top, width: pr.width, height: pr.height };
-  }
-
- function animateFlip({ mode, fromLeft, hard, rect, frontNode, backNode, borderRadius }){
-    return new Promise(resolve => {
-      if (!flipOverlay){ resolve(); return; }
-      flipOverlay.innerHTML='';
-      if (reduceMotionQuery && reduceMotionQuery.matches){ resolve(); return; }
-
-      const sheet = document.createElement('div');
-      sheet.className = `flip-sheet ${mode} ${fromLeft ? 'from-left' : 'from-right'} ${hard ? 'hard' : 'soft'}`;
-      Object.assign(sheet.style, {
-        width: rect.width + 'px',
-        height: rect.height + 'px',
-        left: rect.left + 'px',
-        top: rect.top + 'px'
-      });
-      if (borderRadius){ sheet.style.borderRadius = borderRadius; }
-
-      const frontFace = document.createElement('div');
-      frontFace.className = 'flip-face front';
-      const backFace = document.createElement('div');
-      backFace.className = 'flip-face back';
-
-      const frontContent = frontNode ? frontNode.cloneNode(true) : document.createElement('div');
-      const backContent  = backNode  ? backNode.cloneNode(true)  : document.createElement('div');
-      frontContent.style.width = '100%';
-      frontContent.style.height = '100%';
-      backContent.style.width = '100%';
-      backContent.style.height = '100%';
-
-      frontFace.appendChild(frontContent);
-      backFace.appendChild(backContent);
-
-      sheet.append(frontFace, backFace);
-      flipOverlay.appendChild(sheet);
-
-      const cleanup = () => {
-        sheet.removeEventListener('animationend', cleanup);
-        sheet.removeEventListener('animationcancel', cleanup);
-        flipOverlay.innerHTML='';
-        resolve();
-      };
-
-      sheet.addEventListener('animationend', cleanup);
-      sheet.addEventListener('animationcancel', cleanup);
-
-      requestAnimationFrame(() => {
-        sheet.classList.add('animate');
-      });
-    });
   }
 
   function flipDouble(dir, targetIdx){
@@ -407,68 +356,58 @@ const btnLeft = $('#btnleft');
     let frontPage, backPage, placeLeft, hostPaper;
     if (!rtl){
       if (dir==='next'){ frontPage=getPageByIndex(R); backPage=getPageByIndex(R+1)||newPage(); placeLeft=false; hostPaper=rightPaper; }
-      else             { frontPage=getPageByIndex(L); backPage=getPageByIndex(L-1)||newPage(); placeLeft=true;  hostPaper=leftPaper; }
+      else             { frontPage=getPageByIndex(L); backPage=getPageByIndex(L-1);           placeLeft=true;  hostPaper=leftPaper; }
     }else{
       if (dir==='next'){ frontPage=getPageByIndex(L); backPage=getPageByIndex(L+1)||newPage(); placeLeft=true;  hostPaper=leftPaper; }
-      else             { frontPage=getPageByIndex(R); backPage=getPageByIndex(R-1)||newPage(); placeLeft=false; hostPaper=rightPaper; }
+      else             { frontPage=getPageByIndex(R); backPage=getPageByIndex(R-1);           placeLeft=false; hostPaper=rightPaper; }
     }
-    if (!hostPaper || !frontPage) return;
+    if (!hostPaper) return;
 
     const pos = getOffsetInOverlay(hostPaper);
-const hardPage = isCover(frontPage);
-    const borderRadius = hostPaper ? getComputedStyle(hostPaper).borderRadius : '';
-    const frontSnap = snapshot(frontPage, placeLeft ? 'left' : 'right');
-    const backSnap  = snapshot(backPage , placeLeft ? 'right' : 'left');
+    const turn = document.createElement('div');
+    turn.className='turn';
+    Object.assign(turn.style,{
+      width:pos.width+'px', height:pos.height+'px', left:pos.left+'px', top:pos.top+'px',
+      transformOrigin: placeLeft? 'right center':'left center'
+    });
+
+    const f = document.createElement('div'); f.className='face front';
+    const b = document.createElement('div'); b.className='face back';
+    f.appendChild(snapshot(frontPage, placeLeft?'left':'right'));
+    b.appendChild(snapshot(backPage , placeLeft?'right':'left'));
+
+    const shade=document.createElement('div'); shade.className='foldShade';
+    shade.style.background = placeLeft
+      ? 'linear-gradient(270deg, rgba(0,0,0,.22), rgba(0,0,0,0) 40%, rgba(0,0,0,0) 60%, rgba(0,0,0,.12))'
+      : 'linear-gradient(90deg,  rgba(0,0,0,.22), rgba(0,0,0,0) 40%, rgba(0,0,0,0) 60%, rgba(0,0,0,.12))';
+    turn.appendChild(f); turn.appendChild(b); turn.appendChild(shade);
 
     isFlipping=true; disableNav(true);
     idx = targetIdx; render();
 
-    if (!(pos.width>0 && pos.height>0)){
-      isFlipping=false; disableNav(false); flipOverlay.innerHTML='';
-      return;
-    }
-
-    animateFlip({
-      mode:'double',
-      fromLeft: placeLeft,
-      hard: hardPage,
-      rect: pos,
-      frontNode: frontSnap,
-      backNode: backSnap,
-      borderRadius
-    }).then(()=>{ isFlipping=false; disableNav(false); });
+    flipOverlay.innerHTML=''; flipOverlay.appendChild(turn);
+    void turn.offsetWidth;
+    turn.style.animation = placeLeft ? 'flipLeftPrev .42s ease both' : 'flipRightNext .42s ease both';
+    turn.addEventListener('animationend', ()=>{ flipOverlay.innerHTML=''; isFlipping=false; disableNav(false); }, {once:true});
   }
 
   function flipSingle(dir, targetIdx){
     if (isFlipping) return;
     const pos = getOffsetInOverlay(rightPaper);
-    const rtl = (book.direction === 'rtl');
-    const fromLeft = rtl ? (dir === 'next') : (dir === 'prev');
-    const snapSide = fromLeft ? 'left' : 'right';
-    const flippingPage = getPageByIndex(idx);
-    const isHard = isCover(flippingPage);
-    const targetPage = getPageByIndex(targetIdx) || newPage();
-    const frontSnap = snapshot(flippingPage, snapSide);
-    const backSnap  = snapshot(targetPage, fromLeft ? 'right' : 'left');
-    const borderRadius = rightPaper ? getComputedStyle(rightPaper).borderRadius : '';
+    const snap = snapshot(getPageByIndex(idx), 'right');
 
     isFlipping=true; disableNav(true);
     idx = targetIdx; render();
 
-    if (!(pos.width>0 && pos.height>0)){
-      isFlipping=false; disableNav(false); flipOverlay.innerHTML='';
-      return;
-    }
+    const cover=document.createElement('div');
+    cover.className='singleTurn';
+    Object.assign(cover.style,{ width:pos.width+'px', height:pos.height+'px', left:pos.left+'px', top:pos.top+'px', transformOrigin:'left center' });
+    cover.appendChild(snap);
 
-    animateFlip({
-      mode:'single',
-      fromLeft,
-      hard: isHard,
-      rect: pos,
-      frontNode: frontSnap,
-      backNode: backSnap,
-      borderRadius
-    }).then(()=>{ isFlipping=false; disableNav(false); });
+    flipOverlay.innerHTML=''; flipOverlay.appendChild(cover);
+    void cover.offsetWidth;
+    cover.style.animation='singleCurl .32s ease both';
+    cover.addEventListener('animationend', ()=>{ flipOverlay.innerHTML=''; isFlipping=false; disableNav(false); }, {once:true});
   }
 
   function disableNav(v){ const a=$('#btnleft'), b=$('#btnright'); if(a)a.disabled=v; if(b)b.disabled=v; }
@@ -1083,12 +1022,6 @@ function getCurPage(){
   function persist(){ Store.save(book) }
   function getPageByIndex(i){ return book.pages[i] }
 })();
-
-
-
-
-
-
 
 
 
