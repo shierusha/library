@@ -168,10 +168,11 @@
       const pL=book.pages[idx], pR=book.pages[idx+1] || newPage();
       if (!rtl){ renderOne(leftPaper,pL,'left'); renderOne(rightPaper,pR,'right'); }
       else     { renderOne(leftPaper,pR,'left'); renderOne(rightPaper,pL,'right'); }
-    }
+   }
 
     buildTOC();
     fit();
+    updateDockButtonsState();
     persist();
   }
 
@@ -198,10 +199,10 @@
           <div style="font-size:1.6em;font-weight:700;line-height:1.2">${esc(book.title||'未命名書籍')}</div>
           <div style="margin-top:10px;opacity:.65">～ 封面 ～</div>
         </div>`;
-      host.innerHTML=''; host.appendChild(el);
-      host.addEventListener('mousedown', ()=>{ activePageId = page.id; }, {passive:true});
-      return;
-    }
+    host.innerHTML=''; host.appendChild(el);␊
+      host.addEventListener('mousedown', ()=>{ setActivePage(page); }, {passive:true});
+      return;␊
+    }␊
 
     // 角落章節籤（顯示：最近章名；雙擊：直接編輯該章起始頁的章名）
     const chTitle = nearestChapter(page.page_no);
@@ -234,7 +235,7 @@
     el.appendChild(no);
 
     // 點擊設為 active
-    host.addEventListener('mousedown', ()=>{ activePageId = page.id; }, {passive:true});
+    host.addEventListener('mousedown', ()=>{ setActivePage(page); }, {passive:true});
 
     if (page.type==='illustration'){
       el.innerHTML += page.image_url
@@ -253,7 +254,7 @@
       else body.textContent = page.content_text || '';
 
       let tmr=null;
-      body.addEventListener('focus', ()=>{ activePageId = page.id; });
+      body.addEventListener('focus', ()=>{ setActivePage(page); });
       body.addEventListener('input', ()=>{
         page.content_html = sanitizeEditableHTML(body);
         page.content_text = body.textContent || '';
@@ -525,7 +526,7 @@
         if (targetIdx<0) return;
         const effSingle = effectiveSingleAt(targetIdx);
         idx = effSingle ? targetIdx : Math.max(0, targetIdx - (targetIdx%2));
-        activePageId = book.pages[targetIdx].id;
+        setActivePage(book.pages[targetIdx]);
         render(); $('#tocDialog')?.close();
       });
     });
@@ -572,7 +573,7 @@
   /* ======================
      操作
      ====================== */
-  function getCurPage(){
+function getCurPage(){
     if (activePageId){
       const p = book.pages.find(pp=>pp.id===activePageId);
       if (p) return p;
@@ -585,6 +586,19 @@
     return book.pages[idx];
   }
 
+  function updateDockButtonsState(){
+    const cur = getCurPage();
+    const disabled = !cur || isCover(cur);
+    $all('[data-style]').forEach(btn=>{
+      btn.disabled = disabled;
+    });
+  }
+
+  function setActivePage(page){
+    activePageId = page?.id || null;
+    updateDockButtonsState();
+  }
+
   function insertAfter(){
     const cur = getCurPage();
     const at  = book.pages.indexOf(cur);
@@ -593,7 +607,7 @@
     // 讓新頁可見
     if (effectiveSingleAt(at+1)) idx = at+1;
     else idx = Math.max(0, (at+1) - ((at+1)%2));
-    activePageId = book.pages[at+1].id;
+    setActivePage(book.pages[at+1]);
     render();
   }
 
@@ -608,11 +622,16 @@
     book.pages.splice(i,1); ensureMinPages(); renumberPages();
     const back = Math.max(0, i-1);
     idx = effectiveSingleAt(back) ? back : Math.max(0, back - (back%2));
-    activePageId = book.pages[idx]?.id || null;
+    setActivePage(book.pages[idx] || null);
     render();
   }
 
-  function setType(p, type){ p.type=type; persist(); render(); }
+  function setType(p, type){
+    if (!p || isCover(p)) return;
+    p.type=type;
+    persist();
+    render();
+  }
   function setFont(nextRem){ const MIN=0.7, MAX=1.8; if(!isFinite(nextRem)||nextRem<=0)nextRem=1.02; book.textStyle.fs=Math.max(MIN,Math.min(MAX,nextRem)); persist(); render(); }
 
   /* ======================
@@ -731,7 +750,7 @@
     if (!pageNo) return;
     const p = book.pages.find(pp=>pp.page_no===pageNo);
     if(!p) return;
-    activePageId = p.id;
+    setActivePage(p);
     p.content_html = sanitizeEditableHTML(target);
     p.content_text = target.textContent || '';
     persist();
