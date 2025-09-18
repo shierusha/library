@@ -364,8 +364,8 @@ const btnLeft = $('#btnleft');
     if (!hostPaper) return;
 
     const pos = getOffsetInOverlay(hostPaper);
-   const turn = document.createElement('div');
-    turn.className = 'turn ' + (placeLeft ? 'turn-left' : 'turn-right');
+    const turn = document.createElement('div');
+    turn.className='turn';
     Object.assign(turn.style,{
       width:pos.width+'px', height:pos.height+'px', left:pos.left+'px', top:pos.top+'px',
       transformOrigin: placeLeft? 'right center':'left center'
@@ -378,8 +378,8 @@ const btnLeft = $('#btnleft');
 
     const shade=document.createElement('div'); shade.className='foldShade';
     shade.style.background = placeLeft
-      ? 'linear-gradient(270deg, rgba(0,0,0,.25), rgba(0,0,0,0) 30%, rgba(0,0,0,0) 70%, rgba(0,0,0,.12))'
-      : 'linear-gradient(90deg,  rgba(0,0,0,.25), rgba(0,0,0,0) 30%, rgba(0,0,0,0) 70%, rgba(0,0,0,.12))';
+      ? 'linear-gradient(270deg, rgba(0,0,0,.22), rgba(0,0,0,0) 40%, rgba(0,0,0,0) 60%, rgba(0,0,0,.12))'
+      : 'linear-gradient(90deg,  rgba(0,0,0,.22), rgba(0,0,0,0) 40%, rgba(0,0,0,0) 60%, rgba(0,0,0,.12))';
     turn.appendChild(f); turn.appendChild(b); turn.appendChild(shade);
 
     isFlipping=true; disableNav(true);
@@ -387,7 +387,7 @@ const btnLeft = $('#btnleft');
 
     flipOverlay.innerHTML=''; flipOverlay.appendChild(turn);
     void turn.offsetWidth;
-turn.style.animation = placeLeft ? 'flipLeftPrev .6s ease-in-out both' : 'flipRightNext .6s ease-in-out both';
+    turn.style.animation = placeLeft ? 'flipLeftPrev .42s ease both' : 'flipRightNext .42s ease both';
     turn.addEventListener('animationend', ()=>{ flipOverlay.innerHTML=''; isFlipping=false; disableNav(false); }, {once:true});
   }
 
@@ -399,22 +399,14 @@ turn.style.animation = placeLeft ? 'flipLeftPrev .6s ease-in-out both' : 'flipRi
     isFlipping=true; disableNav(true);
     idx = targetIdx; render();
 
-const cover=document.createElement('div');
-    cover.className='singleTurn ' + (dir==='next' ? 'turn-right' : 'turn-left');
-    Object.assign(cover.style,{
-      width:pos.width+'px',
-      height:pos.height+'px',
-      left:pos.left+'px',
-      top:pos.top+'px',
-      transformOrigin: dir==='next' ? 'left center' : 'right center'
-    });
+    const cover=document.createElement('div');
+    cover.className='singleTurn';
+    Object.assign(cover.style,{ width:pos.width+'px', height:pos.height+'px', left:pos.left+'px', top:pos.top+'px', transformOrigin:'left center' });
     cover.appendChild(snap);
 
     flipOverlay.innerHTML=''; flipOverlay.appendChild(cover);
     void cover.offsetWidth;
-cover.style.animation = (dir==='next'
-      ? 'singleCurl .6s ease-in-out both'
-      : 'singleCurlReverse .6s ease-in-out both');
+    cover.style.animation='singleCurl .32s ease both';
     cover.addEventListener('animationend', ()=>{ flipOverlay.innerHTML=''; isFlipping=false; disableNav(false); }, {once:true});
   }
 
@@ -1030,10 +1022,6 @@ function getCurPage(){
   function persist(){ Store.save(book) }
   function getPageByIndex(i){ return book.pages[i] }
 })();
-
-
-
-
 
 
 
