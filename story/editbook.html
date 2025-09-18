@@ -2,8 +2,10 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="utf-8" />
-  <title>謝爾夏｜電子書編輯器</title>
+  <title>謝爾夏｜電子書編輯器（BookFlip 版）</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- 字體 & 你的主樣式 -->
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&family=Noto+Sans+TC:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./styles.css">
 </head>
@@ -12,7 +14,7 @@
   <div class="appbar">
     <div class="brand">書名:<span id="bookTitle" contenteditable="true">未命名書籍</span></div>
     <div class="tools">
-      <div>  
+      <div>
         <span>頁面數：</span><b id="lblCount">7</b>
         <span style="width:5px"></span>
       </div>
@@ -24,40 +26,34 @@
   </div>
 
   <!-- 左側工具列 -->
-<div class="side left">
+  <div class="side left">
     <button class="btn ghost" id="btnTOC">目錄</button>
     <button class="btn ghost" id="btnFontUp">A+</button>
     <button class="btn ghost" id="btnFontDown">A-</button>
     <button class="btn ghost" id="btnBold"><b>B</b></button>
     <button class="btn ghost" id="btnItalic"><i>I</i></button>
-    <button class="btn ghost" id="btnUnderline"><u>U<!--</u--></u></button>
+    <button class="btn ghost" id="btnUnderline"><u>U</u></button>
   </div>
 
-<!--
-<button class="btn ghost" id="btnPrev">上一頁</button>
-<button class="btn ghost" id="btnNext">下一頁</button>
--->
-<div class="side left" style="top:20%;">
+  <!-- 翻頁左右鍵（保留） -->
+  <div class="side left" style="top:20%;">
     <button class="btn ghost" id="btnleft"><</button>
-</div>
-<div class="side right" style="top:20%;">
+  </div>
+  <div class="side right" style="top:20%;">
     <button class="btn ghost" id="btnright">></button>
-</div>
+  </div>
+
   <!-- 右側工具列 -->
- <div class="side right">
+  <div class="side right">
     <button class="btn ghost" id="btnToggleDir">文字方向</button>
     <button class="btn ghost" id="btnToggleBind">長/短邊</button>
     <button class="btn ghost" id="btnToggleView">單/雙頁</button>
   </div>
 
-  <!-- 中央舞台 -->
+  <!-- 中央舞台（交給 BookFlip） -->
   <div class="stage">
     <div class="scaler" id="scaler">
-      <div class="papers" id="papers">
-        <div class="paper left"  id="leftPaper"></div>
-        <div class="paper right" id="rightPaper"></div>
-        <div id="flipOverlay"></div>
-      </div>
+      <div class="book" id="bookCanvas"></div>
     </div>
   </div>
 
@@ -83,24 +79,306 @@
     </form>
   </dialog>
 
-<!-- Supabase JS v2 CDN -->
+  <!-- Supabase（保持） -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
-  // ======= 1) 換成你的專案參數 =======
-  const SUPABASE_URL = "https://ogzpfrkwnqqaitytncla.supabase.co";
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nenBmcmt3bnFxYWl0eXRuY2xhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxODQzNzEsImV4cCI6MjA3MDc2MDM3MX0.Ls83xOXcKIW7FUcavr8_sOs37I18VGFWYNW3sNFRS24";
-  const BOOK_ID = "f695e2ac-b3b2-4714-ab93-925cdab47487"; // 指定要顯示的書
-</script>
+    const SUPABASE_URL = "https://ogzpfrkwnqqaitytncla.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nenBmcmt3bnFxYWl0eXRuY2xhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxODQzNzEsImV4cCI6MjA3MDc2MDM3MX0.Ls83xOXcKIW7FUcavr8_sOs37I18VGFWYNW3sNFRS24";
+    const BOOK_ID = "f695e2ac-b3b2-4714-ab93-925cdab47487";
+  </script>
+
+  <!-- 你的主程式（保持原樣路徑） -->
   <script defer src="./app.js"></script>
+
+  <!-- ===== BookFlip 插件：嵌入版（必要 CSS 會自動注入） ===== -->
+  <script>
+  /*! BookFlip v1.0.0 (embedded) */
+  (function (global) {
+    const STYLE_ID = 'bookflip-core-style-v1';
+    function injectCoreCSS() {
+      if (document.getElementById(STYLE_ID)) return;
+      const style = document.createElement('style');
+      style.id = STYLE_ID;
+      style.textContent = `
+.book, .book * { user-select: none; -webkit-user-select: none; }
+.paper { width:100%; height:100%; position:absolute; top:0; left:0; transform-style: preserve-3d; }
+.page  { width:100%; height:100%; position:absolute; top:0; left:0; display:flex; align-items:center; justify-content:center; backface-visibility:hidden; -webkit-backface-visibility:hidden; border:1px solid #ddd; }
+.back  { transform: rotateY(180deg); }
+.paper.dir-ltr { transform-origin: left center; }
+.paper.dir-rtl { transform-origin: right center; }
+.single-stage { width:100%; height:100%; position:relative; overflow:hidden; }
+.single-page  { width:100%; height:100%; position:absolute; top:0; left:0; display:flex; align-items:center; justify-content:center; border:1px solid #ddd; will-change: transform; }
+      `;
+      document.head.appendChild(style);
+    }
+    function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
+
+    class BookFlipSpread {
+      constructor(el, { direction='ltr', speed=500, perspective=2000, startPageIndex=0 } = {}) {
+        this.el = el;
+        this.papers = Array.from(el.querySelectorAll('.paper'));
+        this.current = clamp(Math.floor(startPageIndex/2), 0, this.papers.length);
+        this.isAnimating = false;
+        this.direction = direction;
+        this.speed = speed;
+        this.perspective = perspective;
+        this.applyDirection();
+        this.applyPerspective();
+        this.update();
+      }
+      applyDirection(){
+        this.papers.forEach(p => {
+          p.classList.remove('dir-ltr','dir-rtl');
+          p.classList.add(this.direction==='rtl' ? 'dir-rtl' : 'dir-ltr');
+        });
+      }
+      applyPerspective(){ this.el.style.perspective = this.perspective + 'px'; }
+      flipTransform(isFlipped){ return isFlipped ? (this.direction==='rtl'?'rotateY(180deg)':'rotateY(-180deg)') : 'rotateY(0deg)'; }
+      update(){
+        this.papers.forEach((paper, idx) => {
+          paper.style.transition = `transform ${this.speed}ms ease-in-out`;
+          const flipped = idx < this.current;
+          paper.style.transform = this.flipTransform(flipped);
+          paper.style.zIndex = flipped ? idx : (this.papers.length - idx);
+        });
+      }
+      next(){
+        if (this.isAnimating || this.current >= this.papers.length) return;
+        this.isAnimating = true;
+        const paper = this.papers[this.current];
+        paper.style.zIndex = this.papers.length + 1;
+        paper.style.transition = `transform ${this.speed}ms ease-in-out`;
+        paper.style.transform = this.flipTransform(true);
+        paper.addEventListener('transitionend', () => { this.current++; this.update(); this.isAnimating = false; }, { once:true });
+      }
+      prev(){
+        if (this.isAnimating || this.current <= 0) return;
+        this.isAnimating = true;
+        this.current--;
+        const paper = this.papers[this.current];
+        paper.style.zIndex = this.papers.length + 1;
+        paper.style.transition = `transform ${this.speed}ms ease-in-out`;
+        paper.style.transform = this.flipTransform(false);
+        paper.addEventListener('transitionend', () => { this.update(); this.isAnimating = false; }, { once:true });
+      }
+      destroy(){}
+    }
+
+    class SinglePager {
+      constructor(el, { speed=300, perspective=0, startPageIndex=0 } = {}){
+        this.el = el;
+        this.stage = el.querySelector('.single-stage');
+        this.pages = Array.from(el.querySelectorAll('.single-page'));
+        this.current = clamp(startPageIndex, 0, this.pages.length-1);
+        this.isAnimating = false;
+        this.speed = speed;
+        this.perspective = perspective;
+        if (this.perspective) this.el.style.perspective = this.perspective + 'px';
+        this.setup();
+        this.bindSwipe();
+      }
+      setup(){
+        this.pages.forEach((pg, i) => {
+          pg.style.transition = `transform ${this.speed}ms ease`;
+          pg.style.transform = (i < this.current) ? 'translateX(-100%)' : (i === this.current) ? 'translateX(0)' : 'translateX(100%)';
+        });
+      }
+      to(idx){
+        if (this.isAnimating) return;
+        if (idx < 0 || idx >= this.pages.length || idx === this.current) return;
+        this.isAnimating = true;
+        const cur = this.pages[this.current];
+        const next = this.pages[idx];
+        const dir = (idx > this.current) ? -1 : 1;
+        next.style.transform = `translateX(${dir*-100}%)`;
+        requestAnimationFrame(() => {
+          cur.style.transform  = `translateX(${dir*100}%)`;
+          next.style.transform = `translateX(0)`;
+        });
+        const done = () => { cur.removeEventListener('transitionend', done); this.current = idx; this.isAnimating = false; };
+        cur.addEventListener('transitionend', done, { once:true });
+      }
+      next(){ this.to(this.current + 1); }
+      prev(){ this.to(this.current - 1); }
+      bindSwipe(){
+        let startX = 0;
+        this.el.addEventListener('touchstart', e => { if (!e.touches[0]) return; startX = e.touches[0].clientX; }, { passive:true });
+        this.el.addEventListener('touchend', e => { const endX = e.changedTouches && e.changedTouches[0] ? e.changedTouches[0].clientX : 0; const d = endX - startX; if (d > 50) this.prev(); if (d < -50) this.next(); }, { passive:true });
+      }
+      destroy(){}
+    }
+
+    class BookFlip {
+      constructor(elSelector, options = {}) {
+        injectCoreCSS();
+        this.el = (typeof elSelector === 'string') ? document.querySelector(elSelector) : elSelector;
+        this.opts = Object.assign({ mode:'spread', direction:'ltr', speed:500, singleSpeed:300, perspective:2000, data:null, startPageIndex:0 }, options);
+        this._controller = null;
+        this._cursorPage = this.opts.startPageIndex;
+        this._pairs = []; this._flatPages = [];
+        this._buildFromDataOrDom();
+        this._mountCurrent();
+      }
+      loadData({ pairs = null, pages = null } = {}) {
+        if (pairs) this._pairs = pairs.slice();
+        if (pages) this._flatPages = pages.slice();
+        if (!this._flatPages.length && this._pairs.length) this._flatPages = this._pairs.flatMap(p => [p.frontHTML ?? '', p.backHTML ?? '']);
+        this._mountCurrent();
+      }
+      setMode(mode) {
+        if (mode !== 'spread' && mode !== 'single') return;
+        if (this.opts.mode === 'spread' && mode === 'single') { if (this._controller && typeof this._controller.current === 'number') this._cursorPage = Math.max(0, Math.min((this._controller.current * 2), this._flatPages.length - 1)); }
+        else if (this.opts.mode === 'single' && mode === 'spread') { if (this._controller && typeof this._controller.current === 'number') this._cursorPage = Math.floor(this._controller.current / 2) * 2; }
+        this.opts.mode = mode; this._mountCurrent();
+      }
+      setDirection(dir) { if (dir !== 'ltr' && dir !== 'rtl') return; this.opts.direction = dir; if (this.opts.mode === 'spread') this._mountCurrent(); }
+      next(){ if (!this._controller) return; this._controller.next(); this._cursorPage = (this.opts.mode==='spread') ? Math.max(0, Math.min((this._controller.current + 1) * 2, this._flatPages.length - 1)) : Math.max(0, Math.min(this._controller.current + 1, this._flatPages.length - 1)); }
+      prev(){ if (!this._controller) return; this._controller.prev(); this._cursorPage = (this.opts.mode==='spread') ? Math.max(0, Math.min((this._controller.current - 1) * 2, this._flatPages.length - 1)) : Math.max(0, Math.min(this._controller.current - 1, this._flatPages.length - 1)); }
+      destroy(){ if (this._controller && this._controller.destroy) this._controller.destroy(); this._controller = null; }
+      _buildFromDataOrDom() {
+        if (this.opts.data && (this.opts.data.pairs || this.opts.data.pages)) {
+          if (this.opts.data.pairs) { this._pairs = this.opts.data.pairs.slice(); this._flatPages = this._pairs.flatMap(p => [p.frontHTML ?? '', p.backHTML ?? '']); }
+          else { this._flatPages = this.opts.data.pages.slice(); this._pairs = []; for (let i=0;i<this._flatPages.length;i+=2) this._pairs.push({ frontHTML:this._flatPages[i] ?? '', backHTML:this._flatPages[i+1] ?? '' }); }
+        } else {
+          const papers = Array.from(this.el.querySelectorAll('.paper'));
+          if (papers.length) { this._pairs = papers.map(p => ({ frontHTML: (p.querySelector('.front') || {}).innerHTML || '', backHTML: (p.querySelector('.back') || {}).innerHTML || '' })); this._flatPages = this._pairs.flatMap(p => [p.frontHTML, p.backHTML]); }
+          else { this._pairs = []; this._flatPages = []; }
+        }
+      }
+      _mountCurrent(){
+        this.el.innerHTML = '';
+        if (this.opts.mode === 'spread') {
+          const html = this._pairs.map(p => `
+            <div class="paper ${this.opts.direction==='rtl'?'dir-rtl':'dir-ltr'}">
+              <div class="page front">${p.frontHTML ?? ''}</div>
+              <div class="page back">${p.backHTML ?? ''}</div>
+            </div>`).join('');
+          this.el.innerHTML = html;
+          const startPaper = Math.max(0, Math.min(Math.floor(this._cursorPage / 2), this._pairs.length));
+          this._controller = new BookFlipSpread(this.el, { direction:this.opts.direction, speed:this.opts.speed, perspective:this.opts.perspective, startPageIndex: startPaper * 2 });
+        } else {
+          const html = `
+            <div class="single-stage">
+              ${this._flatPages.map(pg => `<div class="single-page">${pg ?? ''}</div>`).join('')}
+            </div>`;
+          this.el.innerHTML = html;
+          this._controller = new SinglePager(this.el, { speed:this.opts.singleSpeed, perspective:0, startPageIndex: Math.max(0, Math.min(this._cursorPage, this._flatPages.length - 1)) });
+        }
+      }
+    }
+
+    if (typeof module !== 'undefined' && typeof module.exports !== 'undefined') module.exports = BookFlip; else global.BookFlip = BookFlip;
+  })(typeof window !== 'undefined' ? window : this);
+  </script>
+
+  <!-- ===== 薄整合層：把你的 book 資料與 UI 按鈕接到 BookFlip ===== -->
+  <script>
+  (function () {
+    if (!window.BookFlip) return;
+    const el = document.getElementById('bookCanvas');
+    if (!el) return;
+
+    // ===== 你的全域 book 狀態（沿用 app.js） =====
+    // 這裡只使用 book.pages / book.title / book.viewMode / book.direction / book.chapters
+
+    function esc(s){return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+    const isCover = (p)=> p && p.type==='cover-front';
+function shouldMeta(p){
+  if (!p || p.type==='cover-front' || p.type==='blank') return false;
+  const t = p.type;
+  return t!=='divider-light' && t!=='divider-dark' && t!=='illustration';
+}
+
+
+    function nearestChapter(pageNo){
+      if (!window.book?.chapters) return '';
+      const pages = window.book.pages||[];
+      let i = pages.findIndex(p=>p.page_no===pageNo);
+      if (i<0) return '';
+      for(let x=i; x>=0; x--){ const P=pages[x]; if (P.page_no>0){ const e=window.book.chapters[P.id]; if(e&&e.title) return e.title; } }
+      return '';
+    }
+
+    function pageHTML(page){
+      if (isCover(page)){
+        if (page.image_url){
+          return `<div class="page" style="padding:0"><img src="${esc(page.image_url)}" alt="" style="width:100%;height:100%;object-fit:cover;display:block"></div>`;
+        }
+        return `<div class="page" style="display:grid;place-items:center;text-align:center;padding:24px"><div style="font-size:1.6em;font-weight:700;line-height:1.2">${esc(window.book?.title||'未命名書籍')}</div><div style="margin-top:10px;opacity:.65">～ 封面 ～</div></div>`;
+      }
+      if (page.type==='illustration'){
+        return `<div class="page">${page.image_url?`<img src="${esc(page.image_url)}" alt="" style="width:100%;height:100%;object-fit:cover;display:block">`:`<div class="ph" style="color:#6b7280;display:grid;place-items:center;height:100%">（雙擊貼上圖片網址）</div>`}</div>`;
+      }
+
+if (page.type === 'blank'){
+  return `<div class="page" style="background:#fff"></div>`;
+}
+
+
+      const chips=[];
+      if (shouldMeta(page)){
+        const ch=nearestChapter(page.page_no); if(ch) chips.push(`<div class="chapter-chip">${esc(ch)}</div>`);
+        chips.push(`<div class="page-no">${page.page_no||''}</div>`);
+      }
+      const bodyHTML = page.content_html ? page.content_html : esc(page.content_text||'');
+      return `<div class="page">${chips.join('')}<div class="body-text" contenteditable="true" data-ph="${page.type==='novel'?'正文…':'置中文字…'}">${bodyHTML}</div></div>`;
+    }
+
+    function buildPairsFromBook(){
+      const pages=(window.book&&window.book.pages)?window.book.pages.slice():[];
+      if (pages.length%2===1){ pages.push({ id:'__blank__', page_no:0, type:'novel', content_text:'', content_html:'', image_url:null }); }
+      const pairs=[]; for(let i=0;i<pages.length;i+=2){ pairs.push({ frontHTML:pageHTML(pages[i]), backHTML:pageHTML(pages[i+1]) }); }
+      return pairs;
+    }
+
+    let viewer = new BookFlip(el, {
+      mode: (window.book?.viewMode === 'single') ? 'single' : 'spread',
+      direction: window.book?.direction || 'ltr',
+      speed: 500,
+      singleSpeed: 300,
+      perspective: 2000,
+      data: { pairs: buildPairsFromBook() },
+      startPageIndex: 0
+    });
+
+    function wireEditableHandlers(){
+      document.querySelectorAll('#bookCanvas .body-text[contenteditable="true"]').forEach((body)=>{
+        let tmr=null; body.addEventListener('input', ()=>{
+          const no = body.closest('.page')?.querySelector('.page-no')?.textContent;
+          const pageNo = no ? Number(no) : null; if(!pageNo) return;
+          const p = (window.book?.pages||[]).find(pp=>pp.page_no===pageNo); if(!p) return;
+          p.content_html = body.innerHTML; p.content_text = body.textContent||'';
+          if (window.persist) window.persist();
+          clearTimeout(tmr); tmr=setTimeout(()=>{ if(window.autoPaginateFrom) window.autoPaginateFrom(pageNo, body); }, 60);
+        });
+      });
+    }
+
+    function refreshViewer(keepPage=true){
+      const at = keepPage ? viewer?._cursorPage||0 : 0;
+      viewer.loadData({ pairs: buildPairsFromBook() });
+      viewer.setMode(window.book?.viewMode==='single'?'single':'spread');
+      viewer.setDirection(window.book?.direction||'ltr');
+      viewer._cursorPage = at;
+      wireEditableHandlers();
+    }
+
+    // 綁 UI 按鈕（保留原體驗）
+    document.getElementById('btnleft') ?.addEventListener('click', ()=> viewer.prev());
+    document.getElementById('btnright')?.addEventListener('click', ()=> viewer.next());
+
+    document.getElementById('btnToggleView')?.addEventListener('click', ()=>{
+      if (!window.book) return; window.book.viewMode = (window.book.viewMode==='single')?'double':'single'; refreshViewer(true);
+    });
+    document.getElementById('btnToggleDir')?.addEventListener('click', ()=>{
+      if (!window.book) return; window.book.direction = (window.book.direction==='rtl')?'ltr':'rtl'; refreshViewer(true);
+    });
+
+    // 初始一次
+    refreshViewer(false);
+    // 暴露給 app.js 需要時手動重繪
+    window.BookFlipRefresh = refreshViewer;
+  })();
+  </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
