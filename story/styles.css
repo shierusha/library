@@ -1,8 +1,18 @@
 :root{
-  --mm:3.7795275591px; --paper-w-mm:148; --paper-h-mm:210;
-  --pad:6%; --ink:#111827; --muted:#6b7280;
-  --fs:1.02rem; --lh:1.8;
+  /* 紙張尺寸（A5 預設）：可自行調整 */
+  --mm:3.7795275591px; /* 1mm => px */
+  --paper-w-mm:148;     /* 短邊寬度（直放） */
+  --paper-h-mm:210;     /* 長邊高度（直放） */
+
+  /* 版心與排版 */
+  --pad:6%;             /* 內縮 */
+  --ink:#111827;        /* 文字色 */
+  --muted:#6b7280;      /* 次色 */
+  --fs:1.02rem;         /* 正文字號（js 會覆蓋） */
+  --lh:1.8;             /* 行距（js 會覆蓋） */
 }
+
+/* ========== Reset / Base ========== */
 *{box-sizing:border-box}
 html,body{height:100%}
 body{
@@ -11,189 +21,90 @@ body{
   background:#000 url('https://shierusha.github.io/school-battle/teachers/img/8.webp') center top / cover no-repeat fixed;
 }
 
-/* 上方導覽 */
+/* ========== App Bar ========== */
 .appbar{
-  position:sticky; 
-  top:0; 
-  z-index:100;
-  display:flex; 
-  justify-content:space-between; 
-  align-items:center; 
-  gap:10px;
-  padding:10px 14px; 
-  background:rgba(15,27,51,.85); 
-  border-bottom:1px solid #223057;
+  position:sticky; top:0; z-index:100;
+  display:flex; justify-content:space-between; align-items:center; gap:10px;
+  padding:10px 14px; background:rgba(15,27,51,.85); border-bottom:1px solid #223057;
 }
 .brand{display:flex;gap:.6rem;align-items:center;font-weight:700}
 #bookTitle{outline:none}
 #bookTitle[contenteditable="true"]{border-bottom:1px dashed #8aa1ff}
 .tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.btn{
-  background:#16244a;
-  border:1px solid #3a4a78;
-  color:#fff;
-  padding:5px 10px;
+
+/* ========== Buttons ========== */
+.btn{ background:#16244a; border:1px solid #3a4a78; color:#fff; padding:5px 10px; border-radius:10px; cursor:pointer }
+.btn.primary{ background:#6f82ff; border-color:#6f82ff }
+.btn.danger{ background:#2a0f18; border-color:#6b1b2e; color:#ffb3c2 }
+.btn.ghost{ background:#ffffff18; border-color:#ffffff33 }
+.btn:disabled{ opacity:.5; cursor:default }
+
+/* ========== Side Toolbars / Dock ========== */
+.side{ position:fixed; top:5%; display:flex; gap:8px; z-index:90 }
+.side.left{ left:10px }
+.side.right{ right:10px }
+.dock{ position:fixed; left:0; right:0; bottom:1%; display:flex; gap:10px; justify-content:center; z-index:90 }
+.dock:nth-of-type(1){ bottom:10px }
+.dock:nth-of-type(2){ bottom:60px }
+
+/* ========== Stage / Scaler ========== */
+.stage{ display:grid; place-items:center; min-height:calc(100vh - 160px); padding:12px; position:relative; z-index:10; }
+.scaler{ transform-origin:top center }
+
+/* ========== Book (由 BookFlip 掛載) ========== */
+.book{
+  position:relative;
+  width:calc(var(--paper-w-mm)*var(--mm));
+  height:calc(var(--paper-h-mm)*var(--mm));
+  /* 你也可自行覆蓋 perspective：
+     perspective: 2000px;  // 若想在 CSS 固定，也可，預設走 JS options.perspective */
+}
+
+/* ====== 下面這些是「可改外觀」的樣式（不影響功能） ====== */
+/* 紙張容器（BookFlip 會產生 .paper，這裡只做外觀） */
+.book .paper{
   border-radius:10px;
-  cursor:pointer}
-.btn.primary{background:#6f82ff;border-color:#6f82ff}
-.btn.danger{background:#2a0f18;border-color:#6b1b2e;color:#ffb3c2}
-.btn.ghost{background:#ffffff18;border-color:#ffffff33}
-.btn:disabled{opacity:.5;cursor:default}
-
-/* 工具列 & Dock */
-.side{
-  position:fixed;
-  top:5%;
-  display:flex;
-  gap:8px;
-  z-index:90}
-.side.left{left:10px}
-.side.right{right:10px}
-.dock{position:fixed;left:0;right:0;bottom: 1%;display:flex;gap:10px;justify-content:center;z-index:90}
-.dock:nth-of-type(1){bottom:10px}
-.dock:nth-of-type(2){bottom:60px}
-
-/* 舞台與紙張 */
-.stage{display:grid;place-items:center;min-height:calc(100vh - 160px);padding:12px;position:relative;z-index:10;perspective:1600px;transform-style:preserve-3d;justify-content: center;}
-.scaler{transform-origin:top center}
-.papers{display:grid;grid-template-columns:1fr 1fr;gap:0;position:relative;}
-.paper{
-  position:relative; background:#fff; color:var(--ink);
-  width:calc(var(--paper-w-mm)*var(--mm)); height:calc(var(--paper-h-mm)*var(--mm));
-  box-shadow:0 8px 30px rgba(0,0,0,.25); overflow:hidden;
+  box-shadow:0 8px 30px rgba(0,0,0,.25);
+  overflow:hidden;
 }
-.paper.left{border-radius:10px 0 0 10px}
-.paper.right{border-radius:0 10px 10px 0}
-
-
-/* 翻頁覆蓋層層級：白遮罩在下，翻頁在上 */
-#flipOverlay .flipMask{ position:absolute; z-index:0; }
-#flipOverlay .turn{ z-index:1; }
-
-/* 長邊（橫放紙） */
-.landscape .paper{
-  width:calc(var(--paper-h-mm)*var(--mm));
-  height:calc(var(--paper-w-mm)*var(--mm));
+/* 內頁 */
+.book .page{
+  position:absolute; inset:0; padding:var(--pad);
+  display:flex; flex-direction:column; background:#fff; color:var(--ink);
 }
-.landscape .tpl-illustration img{
-  transform:rotate(90deg); object-fit:contain; width:auto; height:100%;
-}
+/* 正反面（你可自由換背景或漸層） */
+.book .front{ background:#fff; }
+.book .back { background:#fafafa;transform: rotateY(180deg);  }
 
-/* 單頁（不鎖手機，使用者可切） */
-.single .papers{grid-template-columns:1fr}
-.single .paper.left{display:none}
-.single .paper.right{border-radius:10px}
+/* 章節籤 / 頁碼（你的 app.js 也會產生） */
+.chapter-chip{ position:absolute; top:var(--pad); font-size:.85rem; color:#6b7280 }
+.page-no{ position:absolute; bottom:var(--pad); font-variant-numeric:tabular-nums; color:#9aa3b2 }
+/* 左右頁各自的對齊，可按需覆蓋 */
+.paper.left  .chapter-chip{ left:var(--pad) }
+.paper.right .chapter-chip{ right:var(--pad) }
+.paper.left  .page-no{ left:var(--pad) }
+.paper.right .page-no{ right:var(--pad) }
 
-/* 版心（6% 內縮）＋ Tab 寬度 */
-.page{position:absolute; inset:0; padding:var(--pad); display:flex; flex-direction:column}
+/* 正文區（可編輯） */
 .body-text{
   flex:1; margin-top:.25rem; white-space:pre-wrap; line-height:var(--lh); font-size:var(--fs);
   overflow:hidden; outline:none; tab-size:2;
 }
-.ph:empty::before{content:attr(data-ph); color:#95a0c2}
+.ph:empty::before{ content:attr(data-ph); color:#95a0c2 }
 
-/* 章節 */
-.chapter-block{font-weight:700; font-size:1.25rem; line-height:1.6; margin-bottom:.6rem; outline:none}
-.chapter-chip{position:absolute; top:var(--pad); font-size:.85rem; color:#6b7280}
-.paper.left  .chapter-chip{ left:var(--pad) }
-.paper.right .chapter-chip{ right:var(--pad) }
-.page-no{position:absolute; bottom:var(--pad); font-variant-numeric:tabular-nums; color:#9aa3b2}
-.paper.left  .page-no{ left:var(--pad) }
-.paper.right .page-no{ right:var(--pad) }
+/* 直排（章節籤與頁碼位置不變，僅正文排版改直書） */
+.vertical .body-text{ writing-mode:vertical-rl; text-orientation:upright; line-height:1.9 }
 
-/* 直排（章節/頁碼位置不變） */
-.vertical .body-text{writing-mode:vertical-rl;text-orientation:upright;line-height:1.9}
-
-/* 版型 */
+/* 版型模板（與原版一致） */
 .tpl-divider-light .page{ display:grid; place-items:center; text-align:center }
 .tpl-divider-dark  { background:#555; color:#fff }
 .tpl-divider-dark .page{ display:grid; place-items:center; text-align:center }
 .tpl-illustration .page{ padding:0 }
 .tpl-illustration img{ width:100%; height:100%; object-fit:cover; display:block }
 
-/* 翻頁覆蓋層：雙頁＝高級；單頁＝簡易卷葉 */
-#flipOverlay{
-  position:absolute;
-  inset:0;
-  pointer-events:none;
-  z-index:20;
-  perspective:2000px;
-  transform-style:preserve-3d;
-}
-.turn,
-.singleTurn{
-  position:absolute;
-  backface-visibility:hidden;
-  transform-style:preserve-3d;
-  box-shadow:0 0 0 1px #00000012, 0 20px 60px #0000001f;
-  border-radius:10px;
-}
-.turn::before,
-.singleTurn::before{
-  content:"";
-  position:absolute;
-  inset:0;
-  width:8px;
-  left:-4px;
-  background:linear-gradient(90deg, rgba(0,0,0,.18), rgba(0,0,0,0) 35%, rgba(0,0,0,0) 65%, rgba(0,0,0,.12));
-  filter:blur(2px);
-  pointer-events:none;
-  opacity:.6;
-  border-radius:inherit;
-}
-.turn.turn-right::before,
-.singleTurn.turn-right::before{ left:-4px; }
-.turn.turn-left::before,
-.singleTurn.turn-left::before{
-  left:auto;
-  right:-4px;
-  transform:scaleX(-1);
-}
-.turn .face{
-  position:absolute;
-  inset:0;
-  backface-visibility:hidden;
-  overflow:hidden;
-  background:#fff;
-  border-radius:inherit;
-}
-.turn .face .paper{ box-shadow:none; }
-.turn .front{ transform:rotateY(0deg) translateZ(.5px); }
-.turn .back{ transform:rotateY(180deg) translateZ(.5px); background:#fafafa; }
-.turn.turn-right{ transform-origin:left center; }
-.turn.turn-left{ transform-origin:right center; }
-.foldShade{
-  position:absolute;
-  inset:0;
-  pointer-events:none;
-  mix-blend-mode:multiply;
-  opacity:.28;
-  border-radius:inherit;
-}
-@keyframes flipRightNext{
-  from{ transform:rotateY(0deg); }
-  to{ transform:rotateY(-180deg); }
-}
-@keyframes flipLeftPrev{
-  from{ transform:rotateY(0deg); }
-  to{ transform:rotateY(180deg); }
-}
-
-/* 單頁簡易卷葉（不閃、不抖） */
-.singleTurn{
-  width:0;
-  height:0;
-  overflow:hidden;
-  background:#fff;
-}
-.singleTurn.turn-right{ transform-origin:left center; }
-.singleTurn.turn-left{ transform-origin:right center; }
-.singleTurn > .paper{ position:absolute; inset:0; border-radius:10px; overflow:hidden; }
-@keyframes singleCurl{
-  0%{ transform:rotateY(0deg); }
-  100%{ transform:rotateY(-165deg); }
-}
-@keyframes singleCurlReverse{
-  0%{ transform:rotateY(0deg); }
-  100%{ transform:rotateY(165deg); }
-}
+/* =========================
+   已刪除：舊翻頁動畫相關 CSS
+   - #flipOverlay, .turn, .singleTurn, .foldShade, .face
+   - @keyframes flipRightNext / flipLeftPrev / singleCurl / singleCurlReverse
+   以上全部交給 BookFlip 插件處理
+========================= */
