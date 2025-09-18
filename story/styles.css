@@ -64,7 +64,6 @@ body{
 /* 紙張容器（BookFlip 會產生 .paper，這裡只做外觀） */
 .book .paper{
   border-radius:10px;
-  box-shadow:0 8px 30px rgba(0,0,0,.25);
   overflow:hidden;
 }
 /* 內頁 */
@@ -108,3 +107,4 @@ body{
    - @keyframes flipRightNext / flipLeftPrev / singleCurl / singleCurlReverse
    以上全部交給 BookFlip 插件處理
 ========================= */
+
