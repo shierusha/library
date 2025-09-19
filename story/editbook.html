@@ -71,7 +71,7 @@
       overflow: hidden;
     }
 
-    .book .page {
+   .book .page {
       position: absolute;
       inset: 0;
       padding: var(--pad);
@@ -79,6 +79,18 @@
       flex-direction: column;
       background: #fff;
       color: var(--ink);
+    }
+
+    .page-content {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      justify-content: flex-start;
+      flex: 1;
+      align-self: stretch;
     }
 
     .cover-inner {
@@ -315,11 +327,18 @@
 
     function esc(s){return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]))}
     const isCover = (p)=> p && p.type==='cover-front';
-function shouldMeta(p){
-  if (!p || p.type==='cover-front' || p.type==='blank') return false;
-  const t = p.type;
-  return t!=='divider-light' && t!=='divider-dark' && t!=='illustration';
-}
+    function shouldMeta(p){
+      if (!p || p.type==='cover-front' || p.type==='blank') return false;
+      const t = p.type;
+      return t!=='divider-light' && t!=='divider-dark' && t!=='illustration';
+    }
+
+    function isTextualPage(page) {
+      if (!page) return false;
+      if (isCover(page)) return false;
+      const t = page.type;
+      return t !== 'illustration' && t !== 'blank' && t !== 'divider-light' && t !== 'divider-dark';
+    }
 
 
     function nearestChapter(pageNo){
@@ -332,6 +351,12 @@ function shouldMeta(p){
     }
 
     function pageHTML(page){
+      const wrapContent = (innerHTML, textual = false) => {
+        const classes = ['page-content'];
+        if (textual && window.book?.direction === 'rtl') classes.push('vertical');
+        return `<div class="${classes.join(' ')}">${innerHTML}</div>`;
+      };
+
       if (isCover(page)){
         if (page.image_url){
           return `<img class="cover-image" src="${esc(page.image_url)}" alt="">`;
@@ -348,6 +373,7 @@ function shouldMeta(p){
         return `<div class="page-blank"></div>`;
       }
 
+      const textual = isTextualPage(page);
       const chips=[];
       if (shouldMeta(page)){
         const ch=nearestChapter(page.page_no); if(ch) chips.push(`<div class="chapter-chip">${esc(ch)}</div>`);
@@ -358,9 +384,9 @@ function shouldMeta(p){
       const body = `<div class="body-text" contenteditable="true" data-ph="${esc(placeholder)}">${bodyHTML}</div>`;
       if (page.type==='divider-light' || page.type==='divider-dark'){
         const tone = page.type==='divider-dark'?'dark':'light';
-        return `${chips.join('')}<div class="page-divider ${tone}">${body}</div>`;
+        return wrapContent(`${chips.join('')}<div class="page-divider ${tone}">${body}</div>`, textual);
       }
-      return `${chips.join('')}${body}`;
+      return wrapContent(`${chips.join('')}${body}`, textual);
     }
     function buildPairsFromBook(){
       const pages = Array.isArray(window.book?.pages) ? window.book.pages.slice() : [];
@@ -447,13 +473,16 @@ function shouldMeta(p){
         refreshViewer._waitHandle = setTimeout(()=>refreshViewer(keepPage), 50);
         return;
       }
-      clearTimeout(refreshViewer._waitHandle);
+       clearTimeout(refreshViewer._waitHandle);
       const at = keepPage
         ? (typeof viewer.getCurrentPage === 'function' ? viewer.getCurrentPage() : (viewer?._cursorPage || 0))
         : 0;
-      viewer.loadData({ pairs: buildPairsFromBook() });
-      viewer.setMode(window.book?.viewMode==='single'?'single':'spread');
-      viewer.setDirection(window.book?.direction||'ltr');
+      const pairs = buildPairsFromBook();
+      const mode = (window.book?.viewMode === 'single') ? 'single' : 'spread';
+      const direction = (window.book?.direction === 'rtl') ? 'rtl' : 'ltr';
+      if (viewer?.opts?.mode !== mode) viewer.setMode(mode);
+      if (viewer?.opts?.direction !== direction) viewer.setDirection(direction);
+      viewer.loadData({ pairs });
       viewer.goTo(at);
       wireEditableHandlers();
       const layout = ()=>{ updateStageLayout(); if (window.requestStageFit) window.requestStageFit(); };
@@ -480,4 +509,5 @@ function shouldMeta(p){
   </script>
 </body>
 </html>
+
 
