@@ -114,7 +114,7 @@
     function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
 
     class BookFlipSpread {
-      constructor(el, { direction='ltr', speed=500, perspective=2000, startPageIndex=0 } = {}) {
+      constructor(el, { direction='ltr', speed=500, perspective=3000, startPageIndex=0 } = {}) {
         this.el = el;
         this.papers = Array.from(el.querySelectorAll('.paper'));
         this.current = clamp(Math.floor(startPageIndex/2), 0, this.papers.length);
@@ -414,4 +414,5 @@ function shouldMeta(p){
   </script>
 </body>
 </html>
+
 
