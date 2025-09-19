@@ -48,8 +48,11 @@ body{
 .dock:nth-of-type(2){ bottom:60px }
 
 /* ========== Stage / Scaler ========== */
-.stage{ display:grid; place-items:center; min-height:calc(100vh - 160px); padding:12px; position:relative; z-index:10; }
-.scaler{ transform-origin:top center }
+.stage{ display:flex; justify-content:center; align-items:center; min-height:calc(100vh - 160px); padding:12px; position:relative; z-index:10; overflow:hidden; }
+.scaler{ transform-origin:top center; display:flex; justify-content:center; width:fit-content; }
+.scaler.align-left{ justify-content:flex-start; }
+.scaler.align-right{ justify-content:flex-end; }
+.scaler.align-center{ justify-content:center; }
 
 /* ========== Book (由 BookFlip 掛載) ========== */
 .book{
@@ -57,7 +60,11 @@ body{
   width:calc(var(--paper-w-mm)*var(--mm));
   height:calc(var(--paper-h-mm)*var(--mm));
   /* 你也可自行覆蓋 perspective：
-     perspective: 2000px;  // 若想在 CSS 固定，也可，預設走 JS options.perspective */
+     perspective: 3000px;  // 若想在 CSS 固定，也可，預設走 JS options.perspective */
+}
+.binding-long .book{
+  width:calc(var(--paper-h-mm)*var(--mm));
+  height:calc(var(--paper-w-mm)*var(--mm));
 }
 
 /* ====== 下面這些是「可改外觀」的樣式（不影響功能） ====== */
@@ -107,4 +114,5 @@ body{
    - @keyframes flipRightNext / flipLeftPrev / singleCurl / singleCurlReverse
    以上全部交給 BookFlip 插件處理
 ========================= */
+
 
