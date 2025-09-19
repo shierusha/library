@@ -34,31 +34,30 @@
       image_url: null
     };
   }
-  function newCover() { return { id: 'cover_front', page_no: 0, type: 'cover-front', content_text: '', content_html: '', image_url: null }; }
-// 新增：固定白紙（不編號、不計數）
-function newBlank(){
-  return {
-    id:'blank_'+Math.random().toString(36).slice(2,9),
-    page_no:0,
-    type:'blank',
-    content_text:'',
-    content_html:'',
-    image_url:null
-  };
-}
+   function newCover() { return { id: 'cover_front', page_no: 0, type: 'cover-front', content_text: '', content_html: '', image_url: null }; }
+  function newBlank() {
+    return {
+      id: 'blank_' + Math.random().toString(36).slice(2, 9),
+      page_no: 0,
+      type: 'blank',
+      content_text: '',
+      content_html: '',
+      image_url: null
+    };
+  }
 
 
   // 初始資料
- window.book = Store.load() || {
-  title:'未命名書籍',
-  direction:'ltr',       // 'ltr' 橫排；'rtl' 直排
-  binding:'short',       // 'short' 直放；'long' 橫放
-  viewMode:'double',     // 'single' | 'double'
-  textStyle:{ fs:1.02, lh:1.8 },
-  chapters:{},
-  // 封面 + 固定白紙 + 兩頁正文
-  pages:[ newCover(), newBlank(), newPage(), newPage() ]
-};
+  window.book = Store.load() || {
+    title: '未命名書籍',
+    direction: 'ltr',       // 'ltr' 橫排；'rtl' 直排
+    binding: 'short',       // 'short' 直放；'long' 橫放
+    viewMode: 'double',     // 'single' | 'double'
+    textStyle: { fs: 1.02, lh: 1.8 },
+    chapters: {},
+    // 封面 + 固定白紙 + 兩頁正文
+    pages: [newCover(), newBlank(), newPage(), newPage()]
+  };
 
 
   // 保證開頭是封面、至少兩張內容頁
@@ -68,33 +67,33 @@ function newBlank(){
     }
   }
 
-function ensureLeadingBlankAfterCover(){
-  if (book.pages.length < 2 || book.pages[0].type !== 'cover-front' || book.pages[1].type !== 'blank'){
-    // 若第 2 頁不是白紙，就插入
-    book.pages.splice(1, 0, newBlank());
+  function ensureLeadingBlankAfterCover() {
+    if (book.pages.length < 2 || book.pages[0].type !== 'cover-front' || book.pages[1].type !== 'blank') {
+      // 若第 2 頁不是白紙，就插入
+      book.pages.splice(1, 0, newBlank());
+    }
   }
-}
 
   function ensureMinPages() {
-    const contents = book.pages.filter(p => p.type !== 'cover-front');
+    const contents = book.pages.filter(p => p.type !== 'cover-front' && p.type !== 'blank');
     while (contents.length < 2) {
       const extra = newPage();
       book.pages.push(extra);
       setChapterTitleMeta(extra, null);
-      contents.push(1);
+      contents.push(extra);
     }
   }
- function renumberPages(){
-  let n = 1;
-  for (let i = 0; i < book.pages.length; i++){
-    const p = book.pages[i];
-    if (p.type === 'cover-front' || p.type === 'blank'){
-      p.page_no = 0; // 不編號
-    }else{
-      p.page_no = n++;
+  function renumberPages() {
+    let n = 1;
+    for (let i = 0; i < book.pages.length; i++) {
+      const p = book.pages[i];
+      if (p.type === 'cover-front' || p.type === 'blank') {
+        p.page_no = 0; // 不編號
+      } else {
+        p.page_no = n++;
+      }
     }
   }
-}
 
 
   /* ======================
@@ -318,18 +317,25 @@ function ensureLeadingBlankAfterCover(){
   /* ======================
      6) 版面縮放（同一個 .scaler，依單/雙頁調整）
   ====================== */
-  const scaler = $('#scaler');
+   const scaler = $('#scaler');
   const stage = $('.stage');
+  function applyBindingClass() {
+    const root = document.documentElement;
+    if (!root) return;
+    root.classList.toggle('binding-long', book.binding === 'long');
+    root.classList.toggle('binding-short', book.binding !== 'long');
+  }
   function fit() {
     if (!scaler || !stage) return;
-    const mm = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--mm'));
-    const Wmm = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--paper-w-mm'));
-    const Hmm = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--paper-h-mm'));
-    const paperW = (book.binding === 'long' ? Hmm * mm : Wmm * mm);
-    const stageW = stage.clientWidth - 30;
-    const needW = (book.viewMode === 'single') ? paperW : paperW * 2;
-    const s = Math.min(1, stageW / needW);
+    applyBindingClass();
+    const bookEl = $('#bookCanvas');
+    if (!bookEl) return;
+    const bookW = bookEl.offsetWidth;
+    const stageW = Math.max(0, stage.clientWidth - 30);
+    const needW = (book.viewMode === 'single') ? bookW : bookW * 2;
+    const s = needW > 0 ? Math.min(1, stageW / needW) : 1;
     scaler.style.transform = `scale(${s})`;
+    if (window.updateStageLayout) window.updateStageLayout();
   }
   window.addEventListener('resize', fit);
 
@@ -619,3 +625,4 @@ ensureCover(); ensureLeadingBlankAfterCover(); ensureMinPages(); renumberPages()
   window.setType = setType;
   window.setFont = setFont;
 })();
+
