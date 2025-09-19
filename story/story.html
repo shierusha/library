@@ -220,9 +220,12 @@
   .book-sub{font-size:.88rem;color:#6b7280;}
   .book-actions{margin-left:auto;}
   .go-btn{
-    display:inline-block;padding:.45rem .7rem;border-radius:.55rem;border:1px solid #d1d5db;background:#f9fafb;cursor:pointer;text-decoration:none;color:#111827;
+    display:inline-block;
+    padding:.45rem .7rem;border-radius:.55rem;border:1px solid #d1d5db;
+    background:#f9fafb;
+    cursor:pointer;text-decoration:none;color:#111827;
   }
-  .go-btn:hover{background:#eef2f7;}
+  .go-btn:hover{background:#ca4040;}
 
   @media (max-width: 640px){
     .book-list{grid-template-columns:1fr;}
@@ -513,7 +516,7 @@ async function getPlayerProfile(playerId){
       actions.className = 'book-actions';
       const link = document.createElement('a');
       link.className = 'go-btn';
-      link.textContent = '前往閱讀';
+      link.textContent = '前往<br>閱讀';
       link.href = `./reader.html?book_id=${encodeURIComponent(b.id)}`;
       actions.appendChild(link);
 
