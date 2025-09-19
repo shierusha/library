@@ -313,7 +313,7 @@
     // ===== 你的全域 book 狀態（沿用 app.js） =====
     // 這裡只使用 book.pages / book.title / book.viewMode / book.direction / book.chapters
 
-    function esc(s){return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+    function esc(s){return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]))}
     const isCover = (p)=> p && p.type==='cover-front';
 function shouldMeta(p){
   if (!p || p.type==='cover-front' || p.type==='blank') return false;
@@ -355,7 +355,7 @@ function shouldMeta(p){
       }
       const bodyHTML = page.content_html ? page.content_html : esc(page.content_text||'');
       const placeholder = page.type==='novel'?'正文…':'置中文字…';
-      const body = `<div class="body-text" contenteditable="true" data-ph="${placeholder}">${bodyHTML}</div>`;
+      const body = `<div class="body-text" contenteditable="true" data-ph="${esc(placeholder)}">${bodyHTML}</div>`;
       if (page.type==='divider-light' || page.type==='divider-dark'){
         const tone = page.type==='divider-dark'?'dark':'light';
         return `${chips.join('')}<div class="page-divider ${tone}">${body}</div>`;
@@ -480,3 +480,4 @@ function shouldMeta(p){
   </script>
 </body>
 </html>
+
