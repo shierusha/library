@@ -10,8 +10,14 @@
   const $ = (s, r = document) => r.querySelector(s);
   const $all = (s, r = document) => Array.from(r.querySelectorAll(s));
   const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
-  const esc = (s) => (s || '').replace(/[&<>"']/g, c => ({ '&': '&', '<': '<', '>': '>', '"': '"' }[c]));
-
+const esc = (s) => (s || '').replace(/[&<>"']/g, c => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[c]));
+  
   /* ======================
      1) 儲存：LocalStorage
   ====================== */
@@ -635,5 +641,6 @@ ensureCover(); ensureLeadingBlankAfterCover(); ensureMinPages(); renumberPages()
   window.setFont = setFont;
   window.requestStageFit = queueFit;
 })();
+
 
 
