@@ -44,9 +44,19 @@
         p.classList.remove('dir-ltr', 'dir-rtl');
         p.classList.add(this.direction === 'rtl' ? 'dir-rtl' : 'dir-ltr');
       });
+      this.updateSideClasses();
     }
     applyPerspective() {
       if (this.el) this.el.style.perspective = this.perspective + 'px';
+    }
+     updateSideClasses() {
+      const isRTL = this.direction === 'rtl';
+      this.papers.forEach((paper, idx) => {
+        const flipped = idx < this.current;
+        const shouldBeLeft = isRTL ? !flipped : flipped;
+        paper.classList.remove('left', 'right');
+        paper.classList.add(shouldBeLeft ? 'left' : 'right');
+      });
     }
     flipTransform(isFlipped) {
       if (this.direction === 'rtl') return isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)';
@@ -60,6 +70,8 @@
         paper.style.zIndex = flipped ? idx : (this.papers.length - idx);
       });
     }
+          this.updateSideClasses();
+
     goToPage(pageIndex = 0) {
       this.current = clamp(Math.floor(pageIndex / 2), 0, this.papers.length);
       this.isAnimating = false;
