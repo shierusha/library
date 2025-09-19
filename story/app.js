@@ -34,7 +34,8 @@
       image_url: null
     };
   }
-   function newCover() { return { id: 'cover_front', page_no: 0, type: 'cover-front', content_text: '', content_html: '', image_url: null }; }
+    
+  function newCover() { return { id: 'cover_front', page_no: 0, type: 'cover-front', content_text: '', content_html: '', image_url: null }; }
   function newBlank() {
     return {
       id: 'blank_' + Math.random().toString(36).slice(2, 9),
@@ -45,7 +46,7 @@
       image_url: null
     };
   }
-
+  const isCover = (page) => !!(page && page.type === 'cover-front');
 
   // 初始資料
   window.book = Store.load() || {
@@ -67,7 +68,7 @@
     }
   }
 
-  function ensureLeadingBlankAfterCover() {
+   function ensureLeadingBlankAfterCover() {
     if (book.pages.length < 2 || book.pages[0].type !== 'cover-front' || book.pages[1].type !== 'blank') {
       // 若第 2 頁不是白紙，就插入
       book.pages.splice(1, 0, newBlank());
@@ -233,7 +234,7 @@
     // 點封面 → 跳到第 1 頁（或封面）
     box.querySelector('[data-cover]')?.addEventListener('click', () => {
       if (window.BookFlipGoTo) { window.BookFlipGoTo(0); } // 若 integration 有提供
-      else if (window.BookFlipRefresh) { window.BookFlipRefresh(true); }
+      else { rerenderBook(true); }
       $('#tocDialog')?.close();
     });
 
@@ -243,7 +244,7 @@
         const targetNo = parseInt(row.getAttribute('data-no'), 10);
         const targetIdx = book.pages.findIndex(p => p.page_no === targetNo);
         const flatIndex = Math.max(0, targetIdx); // 以「頁」為單位
-        if (window.BookFlipGoTo) window.BookFlipGoTo(flatIndex); else window.BookFlipRefresh && window.BookFlipRefresh(true);
+        if (window.BookFlipGoTo) window.BookFlipGoTo(flatIndex); else rerenderBook(true);
         $('#tocDialog')?.close();
       });
     });
@@ -259,7 +260,7 @@
       book.title = (titleEl.textContent || '').trim() || '未命名書籍';
       persist();
       // 書名變動 → 重繪（封面需要）
-      window.BookFlipRefresh && window.BookFlipRefresh(true);
+      rerenderBook(true);
     });
     // 雙擊書名 → 開啟目錄
     titleEl.addEventListener('dblclick', () => { $('#tocDialog')?.showModal(); });
@@ -317,7 +318,7 @@
   /* ======================
      6) 版面縮放（同一個 .scaler，依單/雙頁調整）
   ====================== */
-   const scaler = $('#scaler');
+  const scaler = $('#scaler');
   const stage = $('.stage');
   function applyBindingClass() {
     const root = document.documentElement;
@@ -337,7 +338,15 @@
     scaler.style.transform = `scale(${s})`;
     if (window.updateStageLayout) window.updateStageLayout();
   }
-  window.addEventListener('resize', fit);
+  function queueFit() {
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => fit());
+    else setTimeout(() => fit(), 16);
+  }
+  function rerenderBook(keepPage = true) {
+    if (window.BookFlipRefresh) window.BookFlipRefresh(keepPage);
+    queueFit();
+  }
+  window.addEventListener('resize', fit)
 
   /* ======================
      7) 自動換頁（維持你原本的二分法量測）
@@ -380,7 +389,7 @@ while(j<book.pages.length && (book.pages[j].type==='illustration' || isCover(boo
     const nextPageNo = book.pages[j].page_no;
     persist();
     // 重繪 BookFlip 畫面
-    window.BookFlipRefresh && window.BookFlipRefresh(true);
+    rerenderBook(true);
 
     if (remain) {
       const nextBody = findBodyForPage(nextPageNo);
@@ -403,66 +412,66 @@ while(j<book.pages.length && (book.pages[j].type==='illustration' || isCover(boo
     return book.pages.find(p => p.page_no > 0) || book.pages[0];
   }
 
-  function setType(p, type) { if (!p || p.type === 'cover-front') return; p.type = type; persist(); window.BookFlipRefresh && window.BookFlipRefresh(true); }
+  function setType(p, type) { if (!p || p.type === 'cover-front') return; p.type = type; persist(); rerenderBook(true); }
   function setFont(nextRem) {
     const MIN = 0.7, MAX = 1.8; if (!isFinite(nextRem) || nextRem <= 0) nextRem = 1.02;
     book.textStyle.fs = Math.max(MIN, Math.min(MAX, nextRem));
     document.documentElement.style.setProperty('--fs', book.textStyle.fs + 'rem');
-    persist(); window.BookFlipRefresh && window.BookFlipRefresh(true);
+    persist(); rerenderBook(true);
   }
 
   function insertChapter() {
     const raw = prompt('章節名稱：', '');
     if (raw === null) return; const title = raw.trim(); if (!title) return;
     const cur = getCurPage(); if (!cur || cur.type === 'cover-front') return;
-    applyHeadingToPage(cur, title); setChapterTitleMeta(cur, title); persist(); window.BookFlipRefresh && window.BookFlipRefresh(true);
+        applyHeadingToPage(cur, title); setChapterTitleMeta(cur, title); persist(); rerenderBook(true);
   }
- function insertAfter(){
-  const cur = getCurPage();
-  const at  = book.pages.indexOf(cur);
-  if (at < 0) return;
+function insertAfter() {
+    const cur = getCurPage();
+    const at = book.pages.indexOf(cur);
+    if (at < 0) return;
 
-  // 一次插入兩頁（同一張紙：front/back）
-  const p1 = newPage();
-  const p2 = newPage();
-  book.pages.splice(at + 1, 0, p1, p2);
+    // 一次插入兩頁（同一張紙：front/back）
+    const p1 = newPage();
+    const p2 = newPage();
+    book.pages.splice(at + 1, 0, p1, p2);
 
-  setChapterTitleMeta(p1, null);
-  setChapterTitleMeta(p2, null);
-  renumberPages(); persist();
+    setChapterTitleMeta(p1, null);
+    setChapterTitleMeta(p2, null);
+    renumberPages(); persist();
 
-  // 重新渲染 BookFlip
-  window.BookFlipRefresh && window.BookFlipRefresh(true);
-}
-function isPageReallyBlank(p){
-  if (!p) return false;
-  if (p.type === 'cover-front') return false;
-  if (p.type === 'illustration') return !p.image_url;
-  if (p.type === 'blank') return true; // 固定白紙 or 動態白紙
-  // 其他（novel/divider-*）：看有無文字
-  return !(p.content_text && p.content_text.trim().length > 0);
-}
-
-function deleteBlank(){
-  // 至少保留：封面 + 固定白紙 + 一張紙（兩頁）
-  if (book.pages.length <= 4) { alert('已是最少頁數，無法刪除'); return; }
-
-  const a = book.pages[book.pages.length - 1];
-  const b = book.pages[book.pages.length - 2];
-
-  // 不允許刪到固定白紙（index 1）
-  const idxA = book.pages.length - 1;
-  const idxB = book.pages.length - 2;
-  if (idxA <= 1 || idxB <= 1){ alert('無可刪除的末尾空白紙'); return; }
-
-  if (isPageReallyBlank(a) && isPageReallyBlank(b)){
-    book.pages.splice(book.pages.length - 2, 2);
-    ensureMinPages(); renumberPages(); persist();
-    window.BookFlipRefresh && window.BookFlipRefresh(true);
-  }else{
-    alert('最後一張不是雙面空白紙');
+    // 重新渲染 BookFlip
+    rerenderBook(true);
   }
-}
+  function isPageReallyBlank(p) {
+    if (!p) return false;
+    if (p.type === 'cover-front') return false;
+    if (p.type === 'illustration') return !p.image_url;
+    if (p.type === 'blank') return true; // 固定白紙 or 動態白紙
+    // 其他（novel/divider-*）：看有無文字
+    return !(p.content_text && p.content_text.trim().length > 0);
+  }
+
+  function deleteBlank() {
+    // 至少保留：封面 + 固定白紙 + 一張紙（兩頁）
+    if (book.pages.length <= 4) { alert('已是最少頁數，無法刪除'); return; }
+
+    const a = book.pages[book.pages.length - 1];
+    const b = book.pages[book.pages.length - 2];
+
+    // 不允許刪到固定白紙（index 1）
+    const idxA = book.pages.length - 1;
+    const idxB = book.pages.length - 2;
+    if (idxA <= 1 || idxB <= 1) { alert('無可刪除的末尾空白紙'); return; }
+
+    if (isPageReallyBlank(a) && isPageReallyBlank(b)) {
+      book.pages.splice(book.pages.length - 2, 2);
+      ensureMinPages(); renumberPages(); persist();
+      rerenderBook(true);
+    } else {
+      alert('最後一張不是雙面空白紙');
+    }
+  }
 
 
   /* ======================
@@ -612,7 +621,7 @@ const count = book.pages.reduce((acc, p) => acc + ((p.type==='cover-front'||p.ty
   }
 
   // 首次啟動：確保封面、頁碼、章節；並縮放
-ensureCover(); ensureLeadingBlankAfterCover(); ensureMinPages(); renumberPages(); initializeChapterMetadata(); syncChapterMetadata(); updateCountAndTypography(); fit();
+ensureCover(); ensureLeadingBlankAfterCover(); ensureMinPages(); renumberPages(); initializeChapterMetadata(); syncChapterMetadata(); updateCountAndTypography(); fit(); rerenderBook(false);
 
   // 將重要 API 掛到 window，提供 integration 使用
   window.persist = persist;
@@ -622,7 +631,9 @@ ensureCover(); ensureLeadingBlankAfterCover(); ensureMinPages(); renumberPages()
   window.getChapterTitleMeta = getChapterTitleMeta;
   window.nearestChapter = nearestChapter;
   window.buildTOC = buildTOC;
-  window.setType = setType;
+   window.setType = setType;
   window.setFont = setFont;
+  window.requestStageFit = queueFit;
 })();
+
 
