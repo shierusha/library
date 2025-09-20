@@ -1,11 +1,20 @@
-// ===== DOM =====
+/* app.js — 輕量穩定版（配合你的 CSS 基準）
+ * 規則：
+ * - 封面（第一張 .paper 的 front/back）不算頁碼、不顯角標
+ * - DB 的 page_index 從 1 起算，直接作為顯示頁碼（divider/image 也算頁）
+ * - 頁型 enum：novel / divider_white / divider_black / image
+ *   會正規化為：novel / divider_light / divider_dark / illustration（背景滿版）
+ * - 單頁/雙頁、左右開切換，手勢：單頁內建、雙頁這裡加
+ */
+
+/* ===== DOM ===== */
 const elStage  = document.getElementById('scaler');
 const elBook   = document.getElementById('bookCanvas');
 const lblCount = document.getElementById('lblCount');
 const urlq = new URLSearchParams(location.search);
 const BOOK_TITLE_Q = (urlq.get('book') || '').trim();
 
-// ===== 狀態 =====
+/* ===== 狀態 ===== */
 const state = {
   mode: 'spread',        // 'spread' | 'single'
   direction: 'ltr',      // 'ltr' | 'rtl'
@@ -14,20 +23,31 @@ const state = {
   aspectLong:  7/5
 };
 
-// ===== 變數 =====
+/* ===== 變數 ===== */
 let ACTIVE_BOOK = null;
 let PAGES_DB = [];        // [{id,page_index,type,image_url,content_json}]
 let CHAPTERS_DB = [];     // [{title,page_index}]
 let book = null;
 let detachSpreadSwipe = null;
 
-// ========== Supabase ==========
+/* ===== Utils ===== */
+function escapeHTML(str){ return String(str || '').replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s])); }
+function normalizeType(t) {
+  const x = String(t || '').trim().toLowerCase().replace(/-/g, '_');
+  if (x === 'divider_black') return 'divider_dark';
+  if (x === 'divider_white') return 'divider_light';
+  if (x === 'image')        return 'illustration';
+  if (x === 'novel' || x === 'divider_light' || x === 'divider_dark' || x === 'illustration') return x;
+  return 'novel';
+}
+
+/* ===== Supabase 讀取 ===== */
 async function fetchBookByTitleOrId() {
   if (BOOK_TITLE_Q) {
     const { data, error } = await SB
       .from('books')
       .select('id,title,cover_image,cover_color,binding,direction')
-      .ilike('title', BOOK_TITLE_Q)
+      .ilike('title', BOOK_TITLE_Q) // 書名全站唯一（忽略大小寫）
       .single();
     if (error) throw error;
     return data;
@@ -53,6 +73,7 @@ async function fetchPages(bookId) {
   return data || [];
 }
 
+/* 章節：用 page_id 對應到 pages.page_index，再本地排序 */
 async function fetchChaptersSimple(bookId, pageIndexMap) {
   const { data, error } = await SB
     .from('chapters')
@@ -66,20 +87,7 @@ async function fetchChaptersSimple(bookId, pageIndexMap) {
   })).sort((a,b)=>a.page_index - b.page_index);
 }
 
-// ========== 工具 ==========
-function escapeHTML(str){ return String(str || '').replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s])); }
-
-// 型別正規化（底線版本）；容忍別名；image → illustration
-function normalizeType(t) {
-  const x = String(t || '').trim().toLowerCase().replace(/-/g, '_');
-  if (x === 'divider_black') return 'divider_dark';
-  if (x === 'divider_white') return 'divider_light';
-  if (x === 'image')        return 'illustration';
-  if (x === 'novel' || x === 'divider_light' || x === 'divider_dark' || x === 'illustration') return x;
-  return 'novel';
-}
-
-// ========== 封面（書皮，不算頁碼）==========
+/* ===== 封面（第一張 .paper，不算頁碼） ===== */
 function applyCoverFromBook() {
   const title = ACTIVE_BOOK?.title || '未命名書籍';
   const coverURL = (ACTIVE_BOOK?.cover_image || '').trim();
@@ -122,18 +130,18 @@ function applyCoverFromBook() {
       front.style.justifyContent = 'center';
       front.innerHTML = `<div style="font-size:1.8em;font-weight:700">${escapeHTML(title)}</div>`;
     }
-    if (back) { back.style.background = '#fff'; }
+    if (back) back.style.background = '#fff';
   }
 
   const titleNode = document.getElementById('bookTitle');
   if (titleNode) titleNode.textContent = title;
 }
 
-// ========== pairs ==========
+/* ===== DB → pairs（封面之外的內容）===== */
 function htmlFromPage(p) {
   if (!p) return '';
   const t = normalizeType(p.type);
-  if (t === 'illustration') return ''; // 圖片頁改由背景圖
+  if (t === 'illustration') return ''; // 圖片頁改以背景顯示
   return (p.content_json && p.content_json.text_html) ? p.content_json.text_html : '';
 }
 function buildPairsFromPages() {
@@ -146,7 +154,7 @@ function buildPairsFromPages() {
   return pairs;
 }
 
-// ========== 版面（實寬高 + 字級比例）==========
+/* ===== 版面（實寬高 + 字級比例） ===== */
 function applyLayout(){
   const stageW   = elStage.clientWidth;
   const isSpread = state.mode === 'spread';
@@ -163,6 +171,7 @@ function applyLayout(){
   elBook.classList.add('book-scope');
   elBook.style.setProperty('--scale', String(scale));
 
+  // 對齊
   elBook.style.left  = (state.direction === 'rtl') ? '0' : '';
   elBook.style.right = (state.direction === 'ltr') ? '0' : '';
 
@@ -170,10 +179,9 @@ function applyLayout(){
   document.body.classList.toggle('mode-ltr', state.direction === 'ltr');
 }
 
-// ========== 四種頁型（底線版）==========
+/* ===== 四種頁型（底線版） ===== */
 function setPageTypeOnElement(el, p){
   const t = normalizeType(p.type);
-
   el.classList.remove('page--novel','page--divider_light','page--divider_dark','page--illustration');
   el.style.backgroundImage = '';
   el.dataset.type = t;
@@ -194,7 +202,7 @@ function setPageTypeOnElement(el, p){
       el.style.backgroundImage = 'linear-gradient(45deg,#fbb,#fdd)';
       el.innerHTML = '<div style="margin:auto;color:#900;font-weight:700">缺少 image_url</div>';
     }
-    el.innerHTML = ''; // 圖片頁本身不顯示文字
+    el.innerHTML = ''; // 圖片頁不顯文字
 
   } else {
     el.classList.add('page--novel');
@@ -226,14 +234,11 @@ function applyPageTypesNow(){
   }
 }
 
-// ========== 頁碼 / 章節角標 ==========
-/*
-  新規則：
-  - 封面（DOM 1、2）不算頁碼、不顯示角標
-  - DB 內容頁 page_index 1 就是頁碼 1；divider / illustration 也算頁碼
-  - divider / illustration 頁「不顯示角標」，但 TOC 與計數一律包含
-*/
-
+/* ===== 頁碼／章節角標 =====
+ * - 封面（DOM 1,2）不顯示
+ * - divider/image 也算頁碼，但不顯角標
+ * - 顯示頁碼 = DB.page_index（1-based）
+ */
 function getChapterForDbIndex(dbIndex){
   let cur = null;
   for (const ch of CHAPTERS_DB){
@@ -259,22 +264,19 @@ function renderMetaForAllPages(){
 
 function renderMetaOnDomPage(node, pageDomIndex){
   node.querySelectorAll('.page-meta').forEach(m => m.remove());
+  if (pageDomIndex <= 2) return; // 封面不顯
 
-  // 封面不顯示
-  if (pageDomIndex <= 2) return;
-
-  const dbIndex = pageDomIndex - 2;            // DB 的 page_index
+  const dbIndex = pageDomIndex - 2;     // DB page_index
   const p = PAGES_DB[dbIndex - 1];
   if (!p) return;
 
   const t = normalizeType(p.type);
   const showCorner = !(t === 'divider_light' || t === 'divider_dark' || t === 'illustration');
-  const displayNo = dbIndex;                    // ★ 直接等於 DB 的頁碼（1-based）
+  const displayNo  = dbIndex;           // 直接使用 DB page_index
 
-  // 章節標題（跟隨最近一次插入章節）
   const chapter = getChapterForDbIndex(dbIndex);
 
-  // 決定角落
+  // 角落位置
   let chapterCorner = 'meta-tr', pageCorner = 'meta-br';
   if (state.mode === 'single') {
     chapterCorner = 'meta-tr'; pageCorner = 'meta-br';
@@ -289,7 +291,6 @@ function renderMetaOnDomPage(node, pageDomIndex){
     }
   }
 
-  // 只在內容頁加角標；divider/image 不加，但仍計數
   if (showCorner) {
     const metaChapter = document.createElement('div');
     metaChapter.className = `page-meta meta-chapter ${chapterCorner}`;
@@ -304,12 +305,51 @@ function renderMetaOnDomPage(node, pageDomIndex){
   }
 }
 
-// ========== 頁數顯示（只排除封面；divider/image 也算）==========
+/* ===== 頁數顯示（封面不算，其他都算） ===== */
 function updateCount(){
   lblCount.textContent = String(PAGES_DB.length);
 }
 
-// ========== 跳頁（TOC 用）==========
+/* ===== TOC（目錄） ===== */
+const tocModal = document.getElementById('tocModal');
+const tocBody  = document.getElementById('tocBody');
+
+function openTOC(){ buildTOC(); tocModal.classList.add('show'); tocModal.setAttribute('aria-hidden','false'); }
+function closeTOC(){ tocModal.classList.remove('show'); tocModal.setAttribute('aria-hidden','true'); }
+tocModal?.addEventListener('click', (e)=>{ if (e.target === tocModal) closeTOC(); });
+document.getElementById('btnTOC')?.addEventListener('click', openTOC);
+
+function buildTOC(){
+  if (!tocBody) return;
+  const title = (ACTIVE_BOOK?.title || '未命名書籍').trim();
+
+  const head = document.createElement('div');
+  head.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin:2px 0 10px 0;';
+  head.innerHTML = `<div style="font-weight:700;width: 11em;letter-spacing:1px">${escapeHTML(title)}</div>
+                    <button class="btn ghost" style="padding:2px 8px;border-color: #ffffff33; background: #ffffff00; color: #FFF;" id="tocGotoCover">去封面</button>`;
+  tocBody.innerHTML = '';
+  tocBody.appendChild(head);
+
+  CHAPTERS_DB.forEach(ch=>{
+    const row = document.createElement('div');
+    row.className = 'toc-row';
+    row.innerHTML = `
+      <div class="toc-title">${escapeHTML(ch.title)}</div>
+      <div class="toc-page">${ch.page_index}</div>`;
+    row.addEventListener('click', ()=>{
+      gotoPageDomByDbIndex(ch.page_index);
+      closeTOC();
+    });
+    tocBody.appendChild(row);
+  });
+
+  document.getElementById('tocGotoCover')?.addEventListener('click', ()=>{
+    gotoDomPage(1);
+    closeTOC();
+  });
+}
+
+/* ===== 跳頁（TOC） ===== */
 function gotoPageDomByDbIndex(dbIndex){
   const domIndex = dbIndex + 2; // 封面佔 1、2
   gotoDomPage(domIndex);
@@ -326,47 +366,7 @@ function gotoDomPage(domIndex){
   afterLayoutRedraw();
 }
 
-// ========== TOC ==========
-const tocModal = document.getElementById('tocModal');
-const tocBody  = document.getElementById('tocBody');
-
-function openTOC(){ buildTOC(); tocModal.classList.add('show'); tocModal.setAttribute('aria-hidden','false'); }
-function closeTOC(){ tocModal.classList.remove('show'); tocModal.setAttribute('aria-hidden','true'); }
-tocModal?.addEventListener('click', (e)=>{ if (e.target === tocModal) closeTOC(); });
-document.getElementById('btnTOC').addEventListener('click', openTOC);
-
-function buildTOC(){
-  if (!tocBody) return;
-  const title = (ACTIVE_BOOK?.title || '未命名書籍').trim();
-
-  const head = document.createElement('div');
-  head.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin:2px 0 10px 0;';
-  head.innerHTML = `<div style="font-weight:700;letter-spacing:1px">${escapeHTML(title)}</div>
-                    <button class="btn ghost" style="padding:2px 8px" id="tocGotoCover">去封面</button>`;
-  tocBody.innerHTML = '';
-  tocBody.appendChild(head);
-
-  CHAPTERS_DB.forEach(ch=>{
-    const displayNo = ch.page_index; // 直接用 DB 的頁碼
-    const row = document.createElement('div');
-    row.className = 'toc-row';
-    row.innerHTML = `
-      <div class="toc-title">${escapeHTML(ch.title)}</div>
-      <div class="toc-page">${displayNo}</div>`;
-    row.addEventListener('click', ()=>{
-      gotoPageDomByDbIndex(ch.page_index);
-      closeTOC();
-    });
-    tocBody.appendChild(row);
-  });
-
-  document.getElementById('tocGotoCover')?.addEventListener('click', ()=>{
-    gotoDomPage(1);
-    closeTOC();
-  });
-}
-
-// ========== 左右鍵 ==========
+/* ===== 左右鍵（保留你的邏輯） ===== */
 function goLeft(){
   if (state.mode === 'single') book.prev();
   else { if (state.direction === 'rtl') book.next(); else book.prev(); }
@@ -375,19 +375,18 @@ function goRight(){
   if (state.mode === 'single') book.next();
   else { if (state.direction === 'rtl') book.prev(); else book.next(); }
 }
+document.getElementById('btnleft') .addEventListener('click', goLeft);
+document.getElementById('btnright').addEventListener('click', goRight);
 
-// ========== 三顆主控 ==========
+/* ===== 三顆主控 ===== */
 function toggleDir(){ state.direction = (state.direction === 'ltr') ? 'rtl' : 'ltr'; book.setDirection(state.direction); applyLayout(); afterLayoutRedraw(); }
 function toggleBind(){ state.bind = (state.bind === 'short') ? 'long' : 'short'; applyLayout(); afterLayoutRedraw(); }
 function toggleView(){ state.mode = (state.mode === 'spread') ? 'single' : 'spread'; book.setMode(state.mode); applyLayout(); ensureSwipeBinding(); afterLayoutRedraw(); }
-
-document.getElementById('btnToggleDir').addEventListener('click', toggleDir);
+document.getElementById('btnToggleDir') .addEventListener('click', toggleDir);
 document.getElementById('btnToggleBind').addEventListener('click', toggleBind);
 document.getElementById('btnToggleView').addEventListener('click', toggleView);
-document.getElementById('btnleft').addEventListener('click', goLeft);
-document.getElementById('btnright').addEventListener('click', goRight);
 
-// ========== 雙頁手勢（手機）==========
+/* ===== 雙頁手勢（單頁由插件內建） ===== */
 function attachSpreadSwipe() {
   const THRESH = 50;
   let startX = 0;
@@ -411,20 +410,15 @@ function ensureSwipeBinding(){
   else { if (detachSpreadSwipe) detachSpreadSwipe(); }
 }
 
-// ========== 共同重繪 ==========
+/* ===== 共同重繪 ===== */
 function afterLayoutRedraw(){
-  applyCoverFromBook();     // 封面不顯示頁碼
-  applyPageTypesNow();      // 四種頁型套上（divider/image 不顯角標）
-  renderMetaForAllPages();  // 內容頁角標（頁碼 = DB page_index）
-  updateCount();            // 計數：只排除封面，其他都算
+  applyCoverFromBook();     // 封面不顯角標
+  applyPageTypesNow();      // 四種頁型
+  renderMetaForAllPages();  // 內容頁角標（頁碼 = DB.page_index）
+  updateCount();            // 計數：封面不算，其他都算
 }
 
-// ========== 外掛掛載完成時 ==========
-elBook.addEventListener('bookflip:mounted', () => {
-  afterLayoutRedraw();
-});
-
-// ========== 初始化 ==========
+/* ===== 初始化 ===== */
 (async function init(){
   try {
     ACTIVE_BOOK = await fetchBookByTitleOrId();
@@ -436,9 +430,11 @@ elBook.addEventListener('bookflip:mounted', () => {
     const pages = await fetchPages(ACTIVE_BOOK.id);
     PAGES_DB = pages || [];
 
+    // 章節：page_id → page_index
     const idToIndex = new Map(PAGES_DB.map(r => [r.id, r.page_index]));
     CHAPTERS_DB = await fetchChaptersSimple(ACTIVE_BOOK.id, idToIndex);
 
+    // 初始化 BookFlip（封面保留 1 張 .paper）
     const pairs = buildPairsFromPages();
     book = new BookFlip('#bookCanvas', {
       mode: state.mode,
@@ -448,13 +444,13 @@ elBook.addEventListener('bookflip:mounted', () => {
       perspective: 2000,
       data: { pairs },
       startPageIndex: 0,
-      coverPapers: 1 // 保留封面那張紙（不覆蓋）
+      coverPapers: 1
     });
 
     window.addEventListener('resize', ()=>{ applyLayout(); afterLayoutRedraw(); });
     applyLayout();
     ensureSwipeBinding();
-    afterLayoutRedraw(); // 初始化後先刷新一次（確保單頁封面也生效）
+    afterLayoutRedraw(); // 單頁封面也立即處理
 
   } catch (e) {
     console.error(e);
