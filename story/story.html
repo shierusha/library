@@ -220,12 +220,22 @@
   .book-sub{font-size:.88rem;color:#6b7280;}
   .book-actions{margin-left:auto;}
   .go-btn{
-    display:inline-block;
-    padding:.45rem .7rem;border-radius:.55rem;border:1px solid #d1d5db;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    padding:.55rem .9rem;
+    border-radius:.55rem;
+    border:1px solid #d1d5db;
     background:#f9fafb;
-    cursor:pointer;text-decoration:none;color:#111827;
+    cursor:pointer;
+    text-decoration:none;
+    color:#111827;
+    line-height:1.2;
+    text-align:center;
+    white-space: normal;   /* 允許換行 */
+    min-width: 4.5em;      /* 稍給寬避免太窄 */
   }
-  .go-btn:hover{background:#ca4040;}
+  .go-btn:hover{background:#eef2f7;}
 
   @media (max-width: 640px){
     .book-list{grid-template-columns:1fr;}
@@ -327,10 +337,11 @@ img {
     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmaHdodm9kZ2lrcGR1Y3JoZ2RhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgwMTAwNjEsImV4cCI6MjA2MzU4NjA2MX0.P6P-x4SxjiR4VdWH6VFgY_ktgMac_OzuI4Bl7HWskz8'
   );
 
-  // 常數：書 ICON
+  // 常數：書 ICON（列表固定用）
   const BOOK_ICON = 'https://shierusha.github.io/school-battle/images/book.png';
-const BOOK_SHELF_1_12  = 'https://shierusha.github.io/library/img/book1.png';
-const BOOK_SHELF_13_24 = 'https://shierusha.github.io/library/img/book2.png';
+  // 書架兩層的預設圖
+  const BOOK_SHELF_1_12  = 'https://shierusha.github.io/library/img/book1.png';
+  const BOOK_SHELF_13_24 = 'https://shierusha.github.io/library/img/book2.png';
 
   // Debug 開關（網址加 ?debug=1 啟用）
   const DEBUG = new URLSearchParams(location.search).get('debug') === '1';
@@ -344,10 +355,10 @@ const BOOK_SHELF_13_24 = 'https://shierusha.github.io/library/img/book2.png';
     if (Number.isNaN(d.getTime())) return '';
     return d.toLocaleDateString('zh-TW', { year:'numeric', month:'2-digit', day:'2-digit' });
   }
-function bookImg(b, fallback = BOOK_ICON){
-  const src = (b?.cover_image || '').trim();
-  return src || fallback;
-}
+  // 永遠用 fallback，不讀取資料中的封面欄位
+  function bookImg(_b, fallback){
+    return fallback;
+  }
 
   // =============================
   // 主要流程狀態
@@ -362,39 +373,37 @@ function bookImg(b, fallback = BOOK_ICON){
   // 讀取登入玩家 & 角色
   // =============================
   async function getCurrentPlayer(){
-  const res = await client.auth.getUser();
-  // 沒登入時 v2 會回 error=AuthSessionMissingError；把它當作未登入即可
-  if (res.error) {
-    if (res.error.name === 'AuthSessionMissingError' ||
-        /Auth session missing/i.test(res.error.message || '')) {
-      return null; // ✅ 關鍵：不要 throw
+    const res = await client.auth.getUser();
+    // 沒登入時 v2 會回 error=AuthSessionMissingError；把它當作未登入即可
+    if (res.error) {
+      if (res.error.name === 'AuthSessionMissingError' ||
+          /Auth session missing/i.test(res.error.message || '')) {
+        return null; // ✅ 關鍵：不要 throw
+      }
+      console.warn('[auth.getUser] unexpected error:', res.error);
+      return null; // 其他錯也別炸整個 init
     }
-    console.warn('[auth.getUser] unexpected error:', res.error);
-    return null; // 其他錯也別炸整個 init
+
+    const user = res.data?.user;
+    if (!user) return null;
+
+    // 只有真的有登入才嘗試讀 players 表（可失敗不致命）
+    const { data: p, error: pErr } = await client
+      .from('players')
+      .select('player_id, username')
+      .eq('player_id', user.id)
+      .maybeSingle();
+
+    if (pErr) {
+      console.warn('[getCurrentPlayer] players query error:', pErr);
+      return { id: user.id, username: user.user_metadata?.name || '玩家' };
+    }
+
+    return {
+      id: user.id,
+      username: p?.username || user.user_metadata?.name || '玩家'
+    };
   }
-
-  const user = res.data?.user;
-  if (!user) return null;
-
-  // 只有真的有登入才去查 players（避免匿名去打 A.players）
-  const { data: p, error: pErr } = await client
-    .from('players')
-    .select('player_id, username')
-    .eq('player_id', user.id)
-    .maybeSingle();
-
-  if (pErr) {
-    console.warn('[getCurrentPlayer] players query error:', pErr);
-    // 讀不到 profile 也不致命，至少回 user.id
-    return { id: user.id, username: user.user_metadata?.name || '玩家' };
-  }
-
-  return {
-    id: user.id,
-    username: p?.username || user.user_metadata?.name || '玩家'
-  };
-}
-
 
   async function getStudentByCode(code){
     if (!code) return null;
@@ -407,21 +416,28 @@ function bookImg(b, fallback = BOOK_ICON){
     return data || null;
   }
 
-async function getPlayerProfile(playerId){
-  const { data, error } = await client
-    .from('players')
-    .select('player_id, username')   
-    .eq('player_id', playerId)
-    .maybeSingle();
-
-  if (error) {
-    console.warn('[getPlayerProfile] error:', error);
-    return { id: playerId, username: '玩家' };
+  // ===== 用 RPC 取玩家名稱（非登入者也可）=====
+  async function getPlayerUsernameByRPC(playerId){
+    if (!playerId) return '玩家';
+    try{
+      const { data, error } = await client.rpc('get_player_username', { p_id: playerId });
+      if (error) {
+        console.warn('[getPlayerUsernameByRPC] error:', error);
+        return '玩家';
+      }
+      const name = (data && String(data).trim()) || '玩家';
+      return name;
+    }catch(e){
+      console.warn('[getPlayerUsernameByRPC] exception:', e);
+      return '玩家';
+    }
   }
-  if (!data) return { id: playerId, username: '玩家' };
-  return { id: data.player_id, username: data.username || '玩家' };
-}
 
+  // 以 RPC 取得名稱的 getPlayerProfile
+  async function getPlayerProfile(playerId){
+    const username = await getPlayerUsernameByRPC(playerId);
+    return { id: playerId, username };
+  }
 
   async function getOwnerStudents(playerId){
     const { data, error } = await client
@@ -446,6 +462,7 @@ async function getPlayerProfile(playerId){
 
     let q = booksClient
       .from('books')
+      // 雖然不使用封面圖，但保留選取欄位以後續擴充
       .select('id, title, cover_image, cover_color, updated_at, sort_order, student_id, owner_id')
       .eq('owner_id', ownerId)
       .order('sort_order', { ascending: true })
@@ -502,8 +519,8 @@ async function getPlayerProfile(playerId){
 
       const icon = document.createElement('div');
       icon.className = 'book-icon';
-      const filterStr = (b.cover_color || '').trim();
-      icon.innerHTML = `<img draggable="false" alt="book" src="${bookImg(b)}" style="${/^filter:/.test(filterStr) ? filterStr : ''}">`;
+      // ✅ 列表永遠用預設書封，不讀取資料的封面欄位
+      icon.innerHTML = `<img draggable="false" alt="book" src="${BOOK_ICON}">`;
 
       const meta = document.createElement('div');
       meta.className = 'book-meta';
@@ -516,7 +533,8 @@ async function getPlayerProfile(playerId){
       actions.className = 'book-actions';
       const link = document.createElement('a');
       link.className = 'go-btn';
-      link.textContent = '前往<br>閱讀';
+      // ✅ 兩行顯示
+      link.innerHTML = '前往<br>閱讀';
       link.href = `./reader.html?book_id=${encodeURIComponent(b.id)}`;
       actions.appendChild(link);
 
@@ -527,47 +545,44 @@ async function getPlayerProfile(playerId){
   }
 
   // 把最多 24 本書渲染到兩層書架上
- function renderShelves(books){
-  const shelf1 = document.querySelector('.book1-12');
-  const shelf2 = document.querySelector('.book13-24');
-  if (!shelf1 || !shelf2) return;
+  function renderShelves(books){
+    const shelf1 = document.querySelector('.book1-12');
+    const shelf2 = document.querySelector('.book13-24');
+    if (!shelf1 || !shelf2) return;
 
-  const leftStart = 3;    // 第一本 left%
-  const delta = 6;        // 每本 +6%
-  const heights = [75,80,85,90,95,100];
+    const leftStart = 3;    // 第一本 left%
+    const delta = 6;        // 每本 +6%
+    const heights = [75,80,85,90,95,100];
 
-  function renderShelf(el, slice, fallbackUrl){
-    el.innerHTML = '';
-    slice.forEach((b, i) => {
-      const img = document.createElement('img');
-      img.draggable = false;
-      const left = leftStart + i*delta;
-      const h = heights[Math.floor(Math.random()*heights.length)];
+    function renderShelf(el, slice, fallbackUrl){
+      el.innerHTML = '';
+      slice.forEach((b, i) => {
+        const img = document.createElement('img');
+        img.draggable = false;
+        const left = leftStart + i*delta;
+        const h = heights[Math.floor(Math.random()*heights.length)];
 
-      // ✅ 有 cover_image 用 cover；沒有就用這層的 fallback
-      img.src = bookImg(b, fallbackUrl);
+        // ✅ 無條件使用該層的 fallback，不讀取 cover_image/cover_color
+        img.src = bookImg(b, fallbackUrl);
 
-      img.style.left = left + '%';
-      img.style.height = h + '%';
-      img.title = b.title;
-      img.style.cursor = 'pointer';
+        img.style.left = left + '%';
+        img.style.height = h + '%';
+        img.title = b.title;
+        img.style.cursor = 'pointer';
 
-      const filterStr = (b.cover_color || '').trim();
-      if (/^filter:/.test(filterStr)) {
-        img.style.cssText += ';' + filterStr;  // 支援你的 filter: ... 設計
-      }
+        // 不套用任何來自資料的 filter
 
-      img.addEventListener('click', () => {
-        window.location.href = `./reader.html?book_id=${encodeURIComponent(b.id)}`;
+        img.addEventListener('click', () => {
+          window.location.href = `./reader.html?book_id=${encodeURIComponent(b.id)}`;
+        });
+        el.appendChild(img);
       });
-      el.appendChild(img);
-    });
-  }
+    }
 
-  // 第一層（1~12）：book1.png；第二層（13~24）：book2.png
-  renderShelf(shelf1, books.slice(0, 12),  BOOK_SHELF_1_12);
-  renderShelf(shelf2, books.slice(12, 24), BOOK_SHELF_13_24);
-}
+    // 第一層（1~12）：book1.png；第二層（13~24）：book2.png
+    renderShelf(shelf1, books.slice(0, 12),  BOOK_SHELF_1_12);
+    renderShelf(shelf2, books.slice(12, 24), BOOK_SHELF_13_24);
+  }
 
   async function refreshBooks(){
     if (!OWNER_PLAYER?.id) {
@@ -664,7 +679,7 @@ async function getPlayerProfile(playerId){
         const stu = await getStudentByCode(stuCode);
         if (stu){
           DEFAULT_STUDENT = stu;
-          OWNER_PLAYER = await getPlayerProfile(stu.player_id);
+          OWNER_PLAYER = await getPlayerProfile(stu.player_id); // 用 RPC 取名
         }
       }
 
