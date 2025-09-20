@@ -22,6 +22,20 @@ html, body { overflow-y: auto; }
 body { -ms-overflow-style: none; scrollbar-width: none; }
 body::-webkit-scrollbar { width:0; height:0; }
 
+
+#btnTOC{
+    background: #b36969;
+    border: 1px solid #3a4a78;
+    color: #fff;}
+ #btnBack{
+    background: #b36969;
+    border: 1px solid #3a4a78;
+    color: #fff;}
+#btnToggleView{
+    background: #b36969;
+    border: 1px solid #3a4a78;
+    color: #fff;}
+
 /* ========== App Bar ========== */
 .appbar {
     position: fixed;
@@ -34,7 +48,7 @@ body::-webkit-scrollbar { width:0; height:0; }
     padding: 10px 14px;
     background: rgba(15, 27, 51, .85);
     border-bottom: 1px solid #223057;
-    height: 30px; 
+    height: 45px; 
     width: 100vw;
 }
 .brand{display:flex;gap:.6rem;align-items:center;font-weight:700}
@@ -55,14 +69,14 @@ body::-webkit-scrollbar { width:0; height:0; }
 .scaler{ position:relative; width:100%; }
 
 /* ========== 按鈕（保留你的） ========== */
-.btn{ background:#16244a; border:1px solid #3a4a78; color:#fff; padding:2px 10px; border-radius:10px; cursor:pointer }
+.btn{padding:2px 10px; border-radius:10px; cursor:pointer }
 .btn.primary{ background:#6f82ff; border-color:#6f82ff }
 .btn.danger{ background:#2a0f18; border-color:#6b1b2e; color:#ffb3c2 }
 .btn.ghost{border-color:#ffffff33 }
 .side{ position:fixed;  display:flex; gap:8px; z-index:90 }
-.side.left{     left: 10px;   top: 33px; }
-.side.right{ right:10px; top: 33px; }
-.dock{ position:fixed; left:0; right:0; bottom:1%; display:flex; gap:10px; justify-content:center; z-index:90 }
+.side.left{     left: 10px;   top: 50px; }
+.side.right{ right:10px; top: 50px; }
+.dock{ position:fixed; left:0; right:0; bottom:1%; display:flex; gap:10px; justify-content:center; z-index:90;    top: 75px;    bottom: 35px; }
 
 /* ========== 文字方向（外觀） ========== */
 .mode-ltr .page{ writing-mode: horizontal-tb; }
@@ -149,14 +163,15 @@ body::-webkit-scrollbar { width:0; height:0; }
 .toc-row .toc-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .toc-row .toc-page  { opacity: .9; }
 
-/* 650px 以下換版型 */
+/* 650px 以下換版型  */
 @media (max-width: 650px) {
   #bookTitle { width: 10em; }
   .appbar    { height: 65px; }
   .tools     { gap: 1px; flex-direction: column-reverse; }
   .stage     { top: 85px;  }
-  .side.right{ bottom: 65px; left: 50%; transform: translateX(-50%); right: 0; top: auto; justify-content:center; width: 100%; }
+  .side.right{ bottom: 10px; left: 50%; transform: translateX(-50%); right: 0; top: auto; justify-content:center; width: 100%; }
   .side.left { top: 65px; }
+.dock{top: 99%;    bottom: 1%; }
 }
 
 /* ========== Reader 模式（只保留 TOC、上一頁、下一頁、單/雙頁切換） ========== */
@@ -218,14 +233,41 @@ body::-webkit-scrollbar { width:0; height:0; }
     </div>
   </div>
 
-  <!-- 下方 Dock（閱讀器保留左右鍵） -->
-  <div class="dock" style="bottom:34px;">
-    <button class="btn ghost" id="btnleft">&lt;</button>
-    <button class="btn" id="btnInsertChapter">插入章節</button>
-    <button class="btn" id="btnInsertPage">插入白紙</button>
-    <button class="btn danger" id="btnDeleteBlank">刪除白紙</button>
-    <button class="btn ghost" id="btnright">&gt;</button>
-  </div>
+
+<div class="dock" >
+
+
+    <button class="btn ghost" id="btnleft" 
+style="
+    width: 45%;
+    background: #00000000;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    height: 100%;
+"
+></button>
+
+
+    <button class="btn ghost" id="btnright" 
+style="
+    width: 45%;
+    background: #160a0a00;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    height: 100%;
+"
+></button>
+
+
+  </div> 
+
+
+
+
+
+
   <div class="dock">
     <button class="btn" data-style="novel">一般文本</button>
     <button class="btn" data-style="divider-light">白置中</button>
