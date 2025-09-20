@@ -2,21 +2,19 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="utf-8" />
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>謝爾夏|休息室</title>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
   <!-- Supabase JS v2 -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
- <style>
+  <style>
   :root{
     --room-bg: url("https://shierusha.github.io/library/img/ROOM.webp");
     --panel-bg: #ffffffec;
     --panel-stroke: rgba(0,0,0,.08);
     --text: #1f2937;
     --radius-2xl: 24px;
-    --control-h: 38px; /* 基本等高，會被 .modal-content2 .modal-header 內的 clamp 覆蓋 */
+    --control-h: 38px;
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; }
@@ -67,7 +65,7 @@
     cursor: pointer;
   }
 
-  /* ===== Modal（沿用你的視覺，調整排版） ===== */
+  /* ===== Modal ===== */
   .modal-overlay {
     position: fixed;
     inset: 0;
@@ -111,158 +109,93 @@
     to   { opacity: 1; transform: scale(1); }
   }
 
-  /* ===== Header：左右區塊、右側等高並靠右、分界線滿寬 ===== */
   .modal-header {
     background: none;
     padding: 15px 20px 0px 24px;
     font-size: 1.5em; font-weight: bold;
     letter-spacing: 1px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;            /* 需要時允許換行；若想永遠單行可改為 nowrap */
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
   }
   .modal-header::after {
-    content: "";
-    display: block;
-    height: 5px;
-    width: 100%;                /* 滿寬分界線 */
-    margin:.5rem 0 0;
-    border-radius: 2px;
+    content: ""; display: block; height: 5px; width: 100%;
+    margin:.5rem 0 0; border-radius: 2px;
     background: linear-gradient(to right,#53e2ff99 65%,#53e2ff00 100%);
-    pointer-events: none;
-    flex-basis: 100%;           /* 讓分界線獨佔一行 */
+    pointer-events: none; flex-basis: 100%;
   }
-.header-title{
-  flex: 1;
-  min-width: 0;
-  white-space: normal;      /* 允許換行 */
-  display: -webkit-box;
-  -webkit-line-clamp: 3;    /* 最多 2 行 */
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-  .header-actions{
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-left: auto;          /* 右側貼齊 */
+  .header-title{
+    flex: 1; min-width: 0; white-space: normal;
+    display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 2;
+    -webkit-box-orient: vertical; overflow: hidden;
   }
+  .header-actions{ display:flex; align-items:center; gap:10px; margin-left:auto; }
 
-  /* === 讓標題/下拉/按鈕字級與高度隨寬度縮放（重點） === */
   .modal-content2 .modal-header{
-    /* 基準字級：最小14px、最大24px，隨視窗寬度流動 */
     font-size: clamp(14px, 2.2vw, 22px);
-    /* 控件高度也跟著縮放，避免字變小但高度過大 */
     --control-h: clamp(30px, 5.5vw, 42px);
   }
 
-  /* 等高：選單與按鈕高度一致；字級跟 header 繼承 */
   #student-filter{
     font-size: 1em;
     height: var(--control-h);
-    padding: 0 0.8em;               /* 用 em，隨字級縮放 */
+    padding: 0 0.8em;
     border-radius: .5rem;
     border: 1px solid var(--panel-stroke);
     background: #fff;
   }
   .manage-btn{
-    display: inline-flex;
-    align-items: center;
+    display: inline-flex; align-items: center;
     height: var(--control-h);
-    padding: 0 1em;                 /* 用 em，隨字級縮放 */
-    border-radius: .55rem;
-    border: 1px solid #d1d5db;
-    background: #f9fafb;
-    cursor: pointer;
-    text-decoration: none;
-    color: #111827;
-    line-height: 1;
+    padding: 0 1em;
+    border-radius: .55rem; border: 1px solid #d1d5db;
+    background: #f9fafb; cursor: pointer; text-decoration: none;
+    color: #111827; line-height: 1;
   }
   .manage-btn:hover{ background:#eef2f7; }
 
   .modal-body {
-    color: #fff;
-    padding: 12px 24px 24px 24px;
-    font-size: 1em;
-    overflow-y: auto;
-    max-height: 60vh;
-
+    color: #fff; padding: 12px 24px 24px 24px; font-size: 1em;
+    overflow-y: auto; max-height: 60vh;
   }
   .modal-body::-webkit-scrollbar { display:none; }
 
   /* 書卡片 */
-  .book-list{
-    display:grid;
-  }
+  .book-list{ display:grid; }
   .book-card{
-    display: grid;
-    grid-template-columns: 54px 60% 1fr;
-    gap: 15px;
-    align-items: center;
-    padding: 7px 12px;
-    color: #111827;
+    display:grid; grid-template-columns: 54px 60% 1fr;
+    gap: 15px; align-items:center; padding: 7px 12px; color:#111827;
   }
-  .book-icon{
-    width:56px;
-    height:70px;
-    flex:0 0 auto;
-    border-radius:6px;
-    overflow:hidden;
-    display:grid;
-    place-items:center;
-  }
-  .book-icon img{max-width:100%;max-height:100%;display:block;}
-  .book-meta{min-width:0;display:flex;flex-direction:column;gap:4px;}
-  .book-title{font-weight:700;line-height:1.2;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;}
-  .book-sub{font-size:.88rem;color:#6b7280;}
-  .book-actions{margin-left:auto;}
+  .book-icon{ width:56px; height:70px; flex:0 0 auto; border-radius:6px; overflow:hidden; display:grid; place-items:center; }
+  .book-icon img{ max-width:100%; max-height:100%; display:block; }
+  .book-meta{ min-width:0; display:flex; flex-direction:column; gap:4px; }
+  .book-title{ font-weight:700; line-height:1.2; white-space:nowrap; text-overflow:ellipsis; overflow:hidden; }
+  .book-sub{ font-size:.88rem; color:#6b7280; }
+  .book-actions{ margin-left:auto; }
   .go-btn{
-    display:inline-flex;
-    align-items:center;
-    justify-content:center;
-    padding:.55rem .9rem;
-    border-radius:.55rem;
-    border:1px solid #d1d5db;
-    background:#f9fafb;
-    cursor:pointer;
-    text-decoration:none;
-    color:#111827;
-    line-height:1.2;
-    text-align:center;
-    white-space: normal;   /* 允許換行 */
-    min-width: 4.5em;      /* 稍給寬避免太窄 */
+    display:inline-flex; align-items:center; justify-content:center;
+    padding:.55rem .9rem; border-radius:.55rem;
+    border:1px solid #d1d5db; background:#f9fafb;
+    cursor:pointer; text-decoration:none; color:#111827;
+    line-height:1.2; text-align:center; white-space: normal; min-width:4.5em;
   }
-  .go-btn:hover{background:#eef2f7;}
+  .go-btn:hover{ background:#eef2f7; }
 
-  @media (max-width: 640px){
-    .book-list{grid-template-columns:1fr;}
-  }
+  @media (max-width: 640px){ .book-list{ grid-template-columns:1fr; } }
 
-
-/* 禁止所有 <img> 被拖移（含 Safari、行動裝置） */
-img {
-  -webkit-user-drag: none;
-  user-select: none;
-  -webkit-touch-callout: none; /* iOS 長按避免呼叫選單 */
-}
-
-</style>
-
+  /* 禁止所有 <img> 被拖移（含 Safari、行動裝置） */
+  img { -webkit-user-drag: none; user-select: none; -webkit-touch-callout: none; }
+  </style>
 </head>
 <body>
 
   <!-- 旋轉提示（不可關閉） -->
   <div id="orientation-modal" class="modal-overlay" style="display: flex;">
     <div class="modal-content">
-      <div class="modal-header"style="color:#fff;text-shadow:0 1px 4px #000a;">請旋轉螢幕</div>
+      <div class="modal-header" style="color:#fff;text-shadow:0 1px 4px #000a;">請旋轉螢幕</div>
       <div class="modal-body">為了最佳體驗，請將裝置轉成橫向模式</div>
     </div>
   </div>
 
-  <!-- 書櫃彈窗（預設開啟；id 修正為 library-modal） -->
+  <!-- 書櫃彈窗 -->
   <div id="library-modal" class="modal-overlay" style="display: flex;">
     <div class="modal-content2">
       <div class="modal-header">
@@ -286,12 +219,11 @@ img {
     <div class="book book13-24" style="bottom: 64.2%;"></div>
 
     <!-- 蓋在書本上方的書櫃 -->
-<img draggable="false" style="position: absolute; height: 100%; width: 100%;" src="https://shierusha.github.io/library/img/ROOM-TOP.png" alt="bookshelf overlay">
+    <img draggable="false" style="position: absolute; height: 100%; width: 100%;" src="https://shierusha.github.io/library/img/ROOM-TOP.png" alt="bookshelf overlay">
 
     <!-- 可點擊的隱形大按鈕（打開彈窗） -->
     <button class="book-btn" aria-label="打開書櫃"></button>
   </div>
-
 
   <script>
   // ====== 快捷選擇器 ======
@@ -308,7 +240,7 @@ img {
   window.addEventListener('load', resizeAllTexts);
   window.addEventListener('resize', resizeAllTexts);
 
-  // ====== 強制橫向（使用你的 Modal）======
+  // ====== 強制橫向 ======
   function isPortrait(){
     return window.matchMedia('(orientation: portrait)').matches || window.innerHeight > window.innerWidth;
   }
@@ -321,7 +253,7 @@ img {
   enforceLandscape();
   window.addEventListener('resize', enforceLandscape);
   window.addEventListener('orientationchange', enforceLandscape);
-  if (orientationModal) orientationModal.addEventListener('click', e => e.stopPropagation()); // 不可關閉，只阻止冒泡
+  if (orientationModal) orientationModal.addEventListener('click', e => e.stopPropagation());
 
   // =============================
   // Supabase：兩個專案
@@ -337,9 +269,8 @@ img {
     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmaHdodm9kZ2lrcGR1Y3JoZ2RhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgwMTAwNjEsImV4cCI6MjA2MzU4NjA2MX0.P6P-x4SxjiR4VdWH6VFgY_ktgMac_OzuI4Bl7HWskz8'
   );
 
-  // 常數：書 ICON（列表固定用）
+  // 常數：列表預設書 ICON；書架兩層預設圖
   const BOOK_ICON = 'https://shierusha.github.io/school-battle/images/book.png';
-  // 書架兩層的預設圖
   const BOOK_SHELF_1_12  = 'https://shierusha.github.io/library/img/book1.png';
   const BOOK_SHELF_13_24 = 'https://shierusha.github.io/library/img/book2.png';
 
@@ -354,10 +285,6 @@ img {
     const d = new Date(x);
     if (Number.isNaN(d.getTime())) return '';
     return d.toLocaleDateString('zh-TW', { year:'numeric', month:'2-digit', day:'2-digit' });
-  }
-  // 永遠用 fallback，不讀取資料中的封面欄位
-  function bookImg(_b, fallback){
-    return fallback;
   }
 
   // =============================
@@ -374,20 +301,17 @@ img {
   // =============================
   async function getCurrentPlayer(){
     const res = await client.auth.getUser();
-    // 沒登入時 v2 會回 error=AuthSessionMissingError；把它當作未登入即可
     if (res.error) {
       if (res.error.name === 'AuthSessionMissingError' ||
           /Auth session missing/i.test(res.error.message || '')) {
-        return null; // ✅ 關鍵：不要 throw
+        return null;
       }
       console.warn('[auth.getUser] unexpected error:', res.error);
-      return null; // 其他錯也別炸整個 init
+      return null;
     }
-
     const user = res.data?.user;
     if (!user) return null;
 
-    // 只有真的有登入才嘗試讀 players 表（可失敗不致命）
     const { data: p, error: pErr } = await client
       .from('players')
       .select('player_id, username')
@@ -398,11 +322,7 @@ img {
       console.warn('[getCurrentPlayer] players query error:', pErr);
       return { id: user.id, username: user.user_metadata?.name || '玩家' };
     }
-
-    return {
-      id: user.id,
-      username: p?.username || user.user_metadata?.name || '玩家'
-    };
+    return { id: user.id, username: p?.username || user.user_metadata?.name || '玩家' };
   }
 
   async function getStudentByCode(code){
@@ -444,7 +364,7 @@ img {
       .from('students')
       .select('student_id, name, student_code')
       .eq('player_id', playerId)
-      .not('student_code', 'is', null)     // 只要有 student_code 的
+      .not('student_code', 'is', null)
       .order('name', { ascending: true });
     if (error) throw error;
     return data || [];
@@ -454,7 +374,6 @@ img {
   // 依分類抓書（books 專案）
   // =============================
   async function fetchBooksByFilter(ownerId, filterStudentId){
-    // 防呆：ownerId 缺失時不要組出 eq.undefined 造成 400
     if (!ownerId) {
       if (DEBUG) console.warn('[books] missing ownerId, skip querying');
       return [];
@@ -462,8 +381,7 @@ img {
 
     let q = booksClient
       .from('books')
-      // 雖然不使用封面圖，但保留選取欄位以後續擴充
-      .select('id, title, cover_image, cover_color, updated_at, sort_order, student_id, owner_id')
+      .select('id, title, cover_color, updated_at, sort_order, student_id, owner_id') // 不取 cover_image
       .eq('owner_id', ownerId)
       .order('sort_order', { ascending: true })
       .order('updated_at', { ascending: false });
@@ -487,16 +405,13 @@ img {
     if (!sel) return;
     sel.innerHTML = '';
 
-    // 只列出有 student_code 的學生
     PLAYER_STUDENTS.forEach(s => {
       const opt = new Option(s.name, s.student_id, false, false);
       sel.appendChild(opt);
     });
 
-    // 額外的「其他」（沒有綁學生）
     sel.appendChild(new Option('其他', 'OTHER', false, false));
 
-    // 預設選到 ?stu 的學生；沒有就選第一個或「其他」
     if (DEFAULT_STUDENT){
       sel.value = DEFAULT_STUDENT.student_id;
     }else{
@@ -517,12 +432,11 @@ img {
       const card = document.createElement('div');
       card.className = 'book-card';
 
-   const icon = document.createElement('div');
-icon.className = 'book-icon';
-const filterStr = (b.cover_color || '').trim();
-// 固定用預設圖，並保留 cover_color 的濾鏡
-icon.innerHTML = `<img draggable="false" alt="book" src="${BOOK_ICON}" style="${/^filter:/.test(filterStr) ? filterStr : ''}">`;
-ction renderShelf(el, slice, fallbac
+      const icon = document.createElement('div');
+      icon.className = 'book-icon';
+      const filterStr = (b.cover_color || '').trim();
+      // 固定用預設圖，但保留 cover_color 的濾鏡（僅當字串以 filter: 開頭）
+      icon.innerHTML = `<img draggable="false" alt="book" src="${BOOK_ICON}" style="${/^filter:/.test(filterStr) ? filterStr : ''}">`;
 
       const meta = document.createElement('div');
       meta.className = 'book-meta';
@@ -535,9 +449,8 @@ ction renderShelf(el, slice, fallbac
       actions.className = 'book-actions';
       const link = document.createElement('a');
       link.className = 'go-btn';
-      // ✅ 兩行顯示
-      link.innerHTML = '前往<br>閱讀';
-      link.href = `./reader.html?book_id=${encodeURIComponent(b.id)}`;
+      link.innerHTML = '前往<br>閱讀';                      // 兩行
+      link.href = \`./reader.html?book_id=\${encodeURIComponent(b.id)}\`;
       actions.appendChild(link);
 
       card.append(icon, meta, actions);
@@ -556,38 +469,35 @@ ction renderShelf(el, slice, fallbac
     const delta = 6;        // 每本 +6%
     const heights = [75,80,85,90,95,100];
 
-   function renderShelf(el, slice, fallbackUrl){
-  el.innerHTML = '';
-  slice.forEach((b, i) => {
-    const img = document.createElement('img');
-    img.draggable = false;
-    const left = leftStart + i*delta;
-    const h = heights[Math.floor(Math.random()*heights.length)];
+    function renderShelf(el, slice, fallbackUrl){
+      el.innerHTML = '';
+      slice.forEach((b, i) => {
+        const img = document.createElement('img');
+        img.draggable = false;
+        const left = leftStart + i*delta;
+        const h = heights[Math.floor(Math.random()*heights.length)];
 
-    // 固定使用該層 fallback，不讀 cover_image
-    img.src = fallbackUrl;
+        // 固定使用該層的 fallback，不讀 cover_image
+        img.src = fallbackUrl;
 
-    img.style.left = left + '%';
-    img.style.height = h + '%';
-    img.title = b.title;
-    img.style.cursor = 'pointer';
+        img.style.left = left + '%';
+        img.style.height = h + '%';
+        img.title = b.title;
+        img.style.cursor = 'pointer';
 
-    // 仍然套用 cover_color（若是 filter: 開頭）
-    const filterStr = (b.cover_color || '').trim();
-    if (/^filter:/.test(filterStr)) {
-      // 加在 style 上（保留既有 left/height 等）
-      img.style.cssText += ';' + filterStr;
+        // 套用 cover_color（若字串以 filter: 開頭）
+        const filterStr = (b.cover_color || '').trim();
+        if (/^filter:/.test(filterStr)) {
+          img.style.cssText += ';' + filterStr;
+        }
+
+        img.addEventListener('click', () => {
+          window.location.href = \`./reader.html?book_id=\${encodeURIComponent(b.id)}\`;
+        });
+        el.appendChild(img);
+      });
     }
 
-    img.addEventListener('click', () => {
-      window.location.href = `./reader.html?book_id=${encodeURIComponent(b.id)}`;
-    });
-    el.appendChild(img);
-  });
-}
-
-
-    // 第一層（1~12）：book1.png；第二層（13~24）：book2.png
     renderShelf(shelf1, books.slice(0, 12),  BOOK_SHELF_1_12);
     renderShelf(shelf2, books.slice(12, 24), BOOK_SHELF_13_24);
   }
@@ -606,7 +516,7 @@ ction renderShelf(el, slice, fallbac
     renderBookList(books);
     renderShelves(books);
 
-    if (DEBUG) await runDiagnostics(); // 只在 debug 模式下執行深度檢查
+    if (DEBUG) await runDiagnostics();
   }
 
   // =============================
@@ -617,7 +527,7 @@ ction renderShelf(el, slice, fallbac
     if (booksChannel) { booksClient.removeChannel(booksChannel); booksChannel = null; }
     booksChannel = booksClient
       .channel('books-room-' + ownerId)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'books', filter: `owner_id=eq.${ownerId}` },
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'books', filter: \`owner_id=eq.\${ownerId}\` },
         payload => { refreshBooks(); })
       .subscribe();
   }
@@ -631,7 +541,6 @@ ction renderShelf(el, slice, fallbac
 
     console.log('%c[diag] ownerId / studentId', 'color:#0aa', ownerId, stuId);
 
-    // 1) owner + student
     const q1 = await booksClient
       .from('books')
       .select('id,owner_id,student_id,title', { count: 'exact' })
@@ -641,7 +550,6 @@ ction renderShelf(el, slice, fallbac
     console.log('[diag] owner+student → count=', q1.count, 'error=', q1.error);
     if (q1.data?.length) console.table(q1.data);
 
-    // 2) only student
     const q2 = await booksClient
       .from('books')
       .select('id,owner_id,student_id,title', { count: 'exact' })
@@ -650,7 +558,6 @@ ction renderShelf(el, slice, fallbac
     console.log('[diag] only student → count=', q2.count, 'error=', q2.error);
     if (q2.data?.length) console.table(q2.data);
 
-    // 3) only owner
     const q3 = await booksClient
       .from('books')
       .select('id,owner_id,student_id,title', { count: 'exact' })
@@ -659,15 +566,12 @@ ction renderShelf(el, slice, fallbac
     console.log('[diag] only owner → count=', q3.count, 'error=', q3.error);
     if (q3.data?.length) console.table(q3.data);
 
-    // 4) sample
     const q4 = await booksClient
       .from('books')
       .select('id,owner_id,student_id,title', { count: 'exact' })
       .limit(5);
     console.log('[diag] sample(any) → count=', q4.count, 'error=', q4.error);
-    if (q4.data?.length) console.table(q4.data);
 
-    // 5) books 專案的 auth 狀態（純顯示，與 public read 無關）
     const auth = await booksClient.auth.getUser();
     console.log('[diag] books auth user =', auth?.data?.user ?? null);
   }
@@ -678,59 +582,49 @@ ction renderShelf(el, slice, fallbac
   async function init(){
     try{
       const params = new URLSearchParams(location.search);
-      const stuCode = params.get('stu');          // ?stu=student_code
+      const stuCode = params.get('stu'); // ?stu=student_code
 
       CURRENT_PLAYER = await getCurrentPlayer();
 
       if (stuCode){
-        // 以 stuCode 找到房間持有者（該學生的 player_id）
         const stu = await getStudentByCode(stuCode);
         if (stu){
           DEFAULT_STUDENT = stu;
-          OWNER_PLAYER = await getPlayerProfile(stu.player_id); // 用 RPC 取名
+          OWNER_PLAYER = await getPlayerProfile(stu.player_id); // 用 RPC 取名（非登入者也可）
         }
       }
 
-      // 沒有 stu 或找不到 → 預設用登入者當持有者（若有登入）
       if (!OWNER_PLAYER && CURRENT_PLAYER){
         OWNER_PLAYER = { id: CURRENT_PLAYER.id, username: CURRENT_PLAYER.username };
       }
 
-      // 將 OWNER 掛到 window 便於除錯
       window.OWNER_PLAYER = OWNER_PLAYER;
       if (DEBUG) console.log('[INIT] OWNER_PLAYER =', OWNER_PLAYER);
 
-      // 更新標題
       $('#owner-name').textContent = OWNER_PLAYER?.username || '玩家';
 
-      // 取得持有者的所有「有 student_code」的學生清單
       if (OWNER_PLAYER?.id){
         PLAYER_STUDENTS = await getOwnerStudents(OWNER_PLAYER.id);
       }else{
         PLAYER_STUDENTS = [];
       }
 
-      // 下拉：只放有 student_code 的；預設選到 stuCode 指向的那位
       renderFilterOptions();
       if (DEBUG) {
         console.log('[DEBUG] selected student filter =', $('#student-filter')?.value);
         console.log('[DEBUG] ownerId =', OWNER_PLAYER?.id);
       }
 
-      // 管理按鈕：持有者 = 登入者 才顯示
       const manageBtn = $('#manage-btn');
       if (manageBtn){
         manageBtn.style.display = (CURRENT_PLAYER && OWNER_PLAYER && CURRENT_PLAYER.id === OWNER_PLAYER.id) ? 'inline-flex' : 'none';
       }
 
-      // 初次載入書籍 + 書架
       await refreshBooks();
 
-      // 監聽下拉切換
       const selEl = document.getElementById('student-filter');
       if (selEl) selEl.addEventListener('change', refreshBooks);
 
-      // 書架彈窗開啟按鈕（點書櫃）
       const openBtn = document.querySelector('.book-btn');
       if (openBtn){
         openBtn.addEventListener('click', () => {
@@ -739,7 +633,6 @@ ction renderShelf(el, slice, fallbac
         });
       }
 
-      // 點背景關閉（如不想關可註解）
       const libModal = document.getElementById('library-modal');
       if (libModal){
         libModal.addEventListener('click', (e) => {
@@ -747,7 +640,6 @@ ction renderShelf(el, slice, fallbac
         });
       }
 
-      // 啟用 Realtime 監聽
       if (OWNER_PLAYER?.id) setupRealtime(OWNER_PLAYER.id);
 
     }catch(err){
@@ -756,21 +648,17 @@ ction renderShelf(el, slice, fallbac
     }
   }
 
-  // 預設開啟彈窗 & 初始化
   window.addEventListener('load', () => {
     enforceLandscape();
     init();
   });
 
-  // ====== 全域保險：禁止拖曳所有 <img>（不影響點擊）======
   document.addEventListener('dragstart', e => {
     if (e.target && e.target.tagName === 'IMG') {
       e.preventDefault();
     }
   });
-</script>
-
-
+  </script>
 
 </body>
 </html>
