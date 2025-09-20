@@ -1,0 +1,350 @@
+// ===== DOM =====
+const elStage  = document.getElementById('scaler');
+const elBook   = document.getElementById('bookCanvas');
+const lblCount = document.getElementById('lblCount');
+const urlq = new URLSearchParams(location.search);
+const BOOK_TITLE_Q = (urlq.get('book') || '').trim();
+
+// ===== 狀態 =====
+const state = {
+  mode: 'spread',        // 'spread' | 'single'
+  direction: 'ltr',      // 'ltr' | 'rtl'
+  bind: 'short',         // 'short' | 'long'
+  aspectShort: 5/7,      // 高/寬
+  aspectLong:  7/5
+};
+
+// ===== 變數 =====
+let ACTIVE_BOOK = null;
+let PAGES_DB = [];        // [{id,page_index,type,image_url,content_json}]
+let CHAPTERS_DB = [];     // [{title,page_index}]
+let book = null;
+
+// ========== Supabase ==========
+async function fetchBookByTitleOrId() {
+  if (BOOK_TITLE_Q) {
+    const { data, error } = await SB
+      .from('books')
+      .select('id,title,cover_image,cover_color,binding,direction')
+      .ilike('title', BOOK_TITLE_Q)
+      .single();
+    if (error) throw error;
+    return data;
+  } else if (BOOK_ID) {
+    const { data, error } = await SB
+      .from('books')
+      .select('id,title,cover_image,cover_color,binding,direction')
+      .eq('id', BOOK_ID)
+      .single();
+    if (error) throw error;
+    return data;
+  }
+  throw new Error('缺少 book 參數或 BOOK_ID。');
+}
+
+async function fetchPages(bookId) {
+  const { data, error } = await SB
+    .from('pages')
+    .select('id,page_index,type,image_url,content_json')
+    .eq('book_id', bookId)
+    .order('page_index', { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+async function fetchChaptersSimple(bookId, pageIndexMap) {
+  const { data, error } = await SB
+    .from('chapters')
+    .select('title,page_id,created_at')
+    .eq('book_id', bookId)
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return (data || []).map(r => ({
+    title: r.title,
+    page_index: pageIndexMap.get(r.page_id) || 1
+  })).sort((a,b)=>a.page_index - b.page_index);
+}
+
+// ========== 工具 ==========
+function escapeHTML(str){ return String(str || '').replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s])); }
+
+// 這裡統一換成底線版本；同時容忍你 DB 可能存的別名
+function normalizeType(t) {
+  const x = String(t || '').trim().toLowerCase().replace(/-/g, '_');
+  if (x === 'divider_black') return 'divider_dark';
+  if (x === 'divider_white') return 'divider_light';
+  if (x === 'image')        return 'illustration';   // ★ 這行：DB 的 image 視為 illustration
+  // 允許的四種
+  if (x === 'novel' || x === 'divider_light' || x === 'divider_dark' || x === 'illustration') return x;
+  return 'novel';
+}
+
+
+// ========== 封面 ==========
+function applyCoverFromBook() {
+  const coverFront = elBook.querySelector('.paper .page.front');
+  const coverBack  = elBook.querySelector('.paper .page.back');
+  if (!coverFront) return;
+  const title = ACTIVE_BOOK.title || '未命名書籍';
+  if (ACTIVE_BOOK.cover_image) {
+    coverFront.style.background = `url("${ACTIVE_BOOK.cover_image}") center/cover no-repeat`;
+    coverFront.innerHTML = '';
+  } else {
+    coverFront.style.background = '#fff';
+    coverFront.style.display = 'flex';
+    coverFront.style.alignItems = 'center';
+    coverFront.style.justifyContent = 'center';
+    coverFront.innerHTML = `<div style="font-size:1.8em;font-weight:700">${escapeHTML(title)}</div>`;
+  }
+  if (coverBack) coverBack.style.background = '#fff';
+  const titleNode = document.getElementById('bookTitle');
+  if (titleNode) titleNode.textContent = title;
+}
+
+// ========== pairs ==========
+function htmlFromPage(p) {
+  if (!p) return '';
+  const t = normalizeType(p.type);
+  if (t === 'illustration') return ''; // 圖片頁改由背景圖
+  return (p.content_json && p.content_json.text_html) ? p.content_json.text_html : '';
+}
+function buildPairsFromPages() {
+  const pairs = [];
+  for (let i = 0; i < PAGES_DB.length; i += 2) {
+    const pFront = PAGES_DB[i];
+    const pBack  = PAGES_DB[i + 1];
+    pairs.push({ frontHTML: htmlFromPage(pFront), backHTML: htmlFromPage(pBack) });
+  }
+  return pairs;
+}
+
+// ========== 版面（實寬高 + 字級比例） ==========
+function applyLayout(){
+  const stageW   = elStage.clientWidth;
+  const isSpread = state.mode === 'spread';
+  const aspect   = (state.bind === 'short') ? state.aspectShort : state.aspectLong;
+  const desiredW = isSpread ? stageW / 2 : stageW;
+  const desiredH = Math.round(desiredW * aspect);
+
+  elBook.style.width  = desiredW + 'px';
+  elBook.style.height = desiredH + 'px';
+  elBook.style.transform = '';
+
+  // 面積基準字級（以短邊 5:7 的 700 為寬基準）
+  const BASE_W = 700, BASE_H_SHORT = BASE_W * (5/7);
+  const scale = Math.sqrt((desiredW * desiredH) / (BASE_W * BASE_H_SHORT));
+  elBook.classList.add('book-scope');
+  elBook.style.setProperty('--scale', String(scale));
+
+  elBook.style.left  = (state.direction === 'rtl') ? '0' : '';
+  elBook.style.right = (state.direction === 'ltr') ? '0' : '';
+
+  document.body.classList.toggle('mode-rtl', state.direction === 'rtl');
+  document.body.classList.toggle('mode-ltr', state.direction === 'ltr');
+}
+
+// ========== 四種頁型（底線版） ==========
+function setPageTypeOnElement(el, p){
+  const t = normalizeType(p.type);
+
+  el.classList.remove('page--novel','page--divider_light','page--divider_dark','page--illustration');
+  el.style.backgroundImage = '';
+  el.dataset.type = t;
+
+  if (t === 'divider_light') {
+    el.classList.add('page--divider_light');
+    if (p.content_json?.text_html) el.innerHTML = p.content_json.text_html;
+
+  } else if (t === 'divider_dark') {
+    el.classList.add('page--divider_dark');
+    if (p.content_json?.text_html) el.innerHTML = p.content_json.text_html;
+
+  } else if (t === 'illustration') {
+    el.classList.add('page--illustration');
+    if (p.image_url && p.image_url.trim()) {
+      el.style.backgroundImage = `url("${p.image_url}")`;
+    } else {
+      // 視覺提醒：有吃到 illustration 但缺圖
+      el.style.backgroundImage = 'linear-gradient(45deg,#fbb,#fdd)';
+      el.innerHTML = '<div style="margin:auto;color:#900;font-weight:700">缺少 image_url</div>';
+    }
+    el.innerHTML = ''; // 圖片頁不顯示文字
+
+  } else {
+    // novel
+    el.classList.add('page--novel');
+    if (p.content_json?.text_html) el.innerHTML = p.content_json.text_html;
+  }
+}
+
+function applyPageTypesNow(){
+  if (!PAGES_DB.length) return;
+
+  // 收集 DOM 上的頁（包含封面兩頁）
+  let domPages = [];
+  if (state.mode === 'spread') {
+    elBook.querySelectorAll('.paper').forEach(paper=>{
+      const f = paper.querySelector('.page.front');
+      const b = paper.querySelector('.page.back');
+      if (f) domPages.push(f);
+      if (b) domPages.push(b);
+    });
+  } else {
+    domPages = Array.from(elBook.querySelectorAll('.single-page'));
+  }
+
+  // DB.page_index 從 1 開始；DOMIndex = DB.page_index + 2（封面佔 1、2）
+  for (const p of PAGES_DB) {
+    const domIdx = (p.page_index + 2) - 1; // 0-based
+    const el = domPages[domIdx];
+    if (!el) continue;
+    setPageTypeOnElement(el, p);
+  }
+}
+
+// ========== 頁碼 / 章節角標（不計封面與 divider） ==========
+function isDividerAtDbIndex(dbIndex) {
+  const p = PAGES_DB[dbIndex - 1];
+  if (!p) return false;
+  const t = normalizeType(p.type);
+  return t === 'divider_light' || t === 'divider_dark';
+}
+function computeDisplayPageNumber(dbIndex) {
+  let cnt = 0;
+  for (let i=1; i<=dbIndex; i++) if (!isDividerAtDbIndex(i)) cnt++;
+  return cnt;
+}
+function getChapterForDbIndex(dbIndex){
+  let cur = null;
+  for (const ch of CHAPTERS_DB){
+    if (ch.page_index <= dbIndex) cur = ch; else break;
+  }
+  return cur;
+}
+function renderMetaForAllPages(){
+  if (state.mode === 'spread') {
+    const list = [];
+    elBook.querySelectorAll('.paper').forEach(paper=>{
+      const f = paper.querySelector('.page.front');
+      const b = paper.querySelector('.page.back');
+      if (f) list.push(f);
+      if (b) list.push(b);
+    });
+    list.forEach((node, domIdx)=> renderMetaOnDomPage(node, domIdx + 1));
+  } else {
+    elBook.querySelectorAll('.single-page').forEach((node, domIdx)=> renderMetaOnDomPage(node, domIdx + 1));
+  }
+}
+function renderMetaOnDomPage(node, pageDomIndex){
+  node.querySelectorAll('.page-meta').forEach(m => m.remove());
+  if (pageDomIndex <= 2) return; // 封面不顯示
+
+  const dbIndex = pageDomIndex - 2;
+  const p = PAGES_DB[dbIndex - 1];
+  if (!p) return;
+  const t = normalizeType(p.type);
+  if (t === 'divider_light' || t === 'divider_dark') return;
+
+  const chapter = getChapterForDbIndex(dbIndex);
+  const displayNo = computeDisplayPageNumber(dbIndex);
+
+  let chapterCorner = 'meta-tr', pageCorner = 'meta-br';
+  if (state.mode === 'single') {
+    chapterCorner = 'meta-tr'; pageCorner = 'meta-br';
+  } else {
+    const isFront = node.classList.contains('front');
+    if (state.direction === 'rtl') {
+      if (isFront) { chapterCorner = 'meta-tl'; pageCorner = 'meta-bl'; }
+      else         { chapterCorner = 'meta-tr'; pageCorner = 'meta-br'; }
+    } else {
+      if (isFront) { chapterCorner = 'meta-tr'; pageCorner = 'meta-br'; }
+      else         { chapterCorner = 'meta-tl'; pageCorner = 'meta-bl'; }
+    }
+  }
+
+  const metaChapter = document.createElement('div');
+  metaChapter.className = `page-meta meta-chapter ${chapterCorner}`;
+  metaChapter.textContent = chapter ? chapter.title : '';
+
+  const metaPage = document.createElement('div');
+  metaPage.className = `page-meta meta-page ${pageCorner}`;
+  metaPage.textContent = String(displayNo);
+
+  node.appendChild(metaChapter);
+  node.appendChild(metaPage);
+}
+
+// ========== 頁數顯示 ==========
+function updateCount(){
+  let effective = 0;
+  for (let i=1; i<=PAGES_DB.length; i++){
+    if (!isDividerAtDbIndex(i)) effective++;
+  }
+  lblCount.textContent = String(effective);
+}
+
+// ========== 左右鍵 ==========
+function goLeft(){
+  if (state.mode === 'single') book.prev();
+  else { if (state.direction === 'rtl') book.next(); else book.prev(); }
+}
+function goRight(){
+  if (state.mode === 'single') book.next();
+  else { if (state.direction === 'rtl') book.prev(); else book.next(); }
+}
+
+// ========== 三顆主控 ==========
+function toggleDir(){ state.direction = (state.direction === 'ltr') ? 'rtl' : 'ltr'; book.setDirection(state.direction); applyLayout(); }
+function toggleBind(){ state.bind = (state.bind === 'short') ? 'long' : 'short'; applyLayout(); }
+function toggleView(){ state.mode = (state.mode === 'spread') ? 'single' : 'spread'; book.setMode(state.mode); applyLayout(); }
+
+// 綁定
+document.getElementById('btnToggleDir').addEventListener('click', toggleDir);
+document.getElementById('btnToggleBind').addEventListener('click', toggleBind);
+document.getElementById('btnToggleView').addEventListener('click', toggleView);
+document.getElementById('btnleft').addEventListener('click', goLeft);
+document.getElementById('btnright').addEventListener('click', goRight);
+
+// ========== 當外掛渲染完成，套型別與角標 ==========
+elBook.addEventListener('bookflip:mounted', () => {
+  applyCoverFromBook();
+  applyPageTypesNow();
+  renderMetaForAllPages();
+  updateCount();
+});
+
+// ========== 初始化 ==========
+(async function init(){
+  try {
+    ACTIVE_BOOK = await fetchBookByTitleOrId();
+    if (ACTIVE_BOOK.direction === 'rtl' || ACTIVE_BOOK.direction === 'ltr') state.direction = ACTIVE_BOOK.direction;
+    if (ACTIVE_BOOK.binding === 'long'  || ACTIVE_BOOK.binding === 'short') state.bind = ACTIVE_BOOK.binding;
+    document.body.classList.toggle('mode-rtl', state.direction === 'rtl');
+    document.body.classList.toggle('mode-ltr', state.direction === 'ltr');
+
+    const pages = await fetchPages(ACTIVE_BOOK.id);
+    PAGES_DB = pages || [];
+
+    const idToIndex = new Map(PAGES_DB.map(r => [r.id, r.page_index]));
+    CHAPTERS_DB = await fetchChaptersSimple(ACTIVE_BOOK.id, idToIndex);
+
+    const pairs = buildPairsFromPages();
+    book = new BookFlip('#bookCanvas', {
+      mode: state.mode,
+      direction: state.direction,
+      speed: 450,
+      singleSpeed: 300,
+      perspective: 2000,
+      data: { pairs },
+      startPageIndex: 0,
+      coverPapers: 1
+    });
+
+    window.addEventListener('resize', applyLayout);
+    applyLayout();
+
+  } catch (e) {
+    console.error(e);
+    alert('載入書籍資料失敗：' + (e?.message || e));
+  }
+})();
