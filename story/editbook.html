@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="utf-8">
-  <title>謝爾夏｜電子書</title>
+  <title>謝爾夏｜電子書編輯器</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
   <!-- 字體 -->
@@ -140,7 +140,14 @@ body::-webkit-scrollbar { width:0; height:0; }
 .toc-row .toc-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .toc-row .toc-page  { opacity: .9; }
 
-
+/* 讓頁碼永遠水平書寫（單頁/雙頁都適用） */
+.page .meta-page,
+.single-page .meta-page {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important; /* 確保數字不是直立顯示 */
+  letter-spacing: 0 !important;       /* 避免繼承垂直模式的字距 */
+  text-combine-upright: none !important;
+}
 
 /* 650px 以下換版型 */
 @media (max-width: 650px) {
