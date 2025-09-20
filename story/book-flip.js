@@ -1,42 +1,35 @@
 /*!
- * BookFlip v1.0.2 (no CSS injection)
+ * BookFlip v1.0.3 (no CSS injection) — add "bookflip:mounted" event
  * 支援：左右開（ltr/rtl）、單頁/雙頁（single/spread）、手勢滑動（單頁）
- * 新增：coverPapers（保留最前 N 張 .paper，不覆蓋你的封面）
- * 注意：本檔不再注入任何 CSS，請在 HTML 提供必要 CSS。
+ * 新增：coverPapers（保留最前 N 張 .paper）
  */
 (function (global) {
   function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
 
-  /* ================= 雙頁控制器（旋轉翻頁） ================= */
   class BookFlipSpread {
     constructor(el, { direction = 'ltr', speed = 500, perspective = 2000, startPageIndex = 0 } = {}) {
       this.el = el;
       this.papers = Array.from(el.querySelectorAll('.paper'));
-      this.current = clamp(Math.floor(startPageIndex / 2), 0, this.papers.length); // 以「紙」為單位
+      this.current = clamp(Math.floor(startPageIndex / 2), 0, this.papers.length);
       this.isAnimating = false;
       this.direction = direction;
       this.speed = speed;
       this.perspective = perspective;
-
       this.applyDirection();
       this.applyPerspective();
       this.update();
     }
-
     applyDirection() {
       this.papers.forEach(p => {
         p.classList.remove('dir-ltr', 'dir-rtl');
         p.classList.add(this.direction === 'rtl' ? 'dir-rtl' : 'dir-ltr');
       });
     }
-
     applyPerspective() { this.el.style.perspective = this.perspective + 'px'; }
-
     flipTransform(isFlipped) {
       if (!isFlipped) return 'rotateY(0deg)';
       return (this.direction === 'rtl') ? 'rotateY(180deg)' : 'rotateY(-180deg)';
     }
-
     update() {
       this.papers.forEach((paper, idx) => {
         paper.style.transition = `transform ${this.speed}ms ease-in-out`;
@@ -45,7 +38,6 @@
         paper.style.zIndex = flipped ? idx : (this.papers.length - idx);
       });
     }
-
     next() {
       if (this.isAnimating || this.current >= this.papers.length) return;
       this.isAnimating = true;
@@ -54,12 +46,9 @@
       paper.style.transition = `transform ${this.speed}ms ease-in-out`;
       paper.style.transform = this.flipTransform(true);
       paper.addEventListener('transitionend', () => {
-        this.current++;
-        this.update();
-        this.isAnimating = false;
+        this.current++; this.update(); this.isAnimating = false;
       }, { once: true });
     }
-
     prev() {
       if (this.isAnimating || this.current <= 0) return;
       this.isAnimating = true;
@@ -69,15 +58,12 @@
       paper.style.transition = `transform ${this.speed}ms ease-in-out`;
       paper.style.transform = this.flipTransform(false);
       paper.addEventListener('transitionend', () => {
-        this.update();
-        this.isAnimating = false;
+        this.update(); this.isAnimating = false;
       }, { once: true });
     }
-
     destroy() {}
   }
 
-  /* ================= 單頁控制器（滑動翻頁） ================= */
   class SinglePager {
     constructor(el, { speed = 300, perspective = 0, startPageIndex = 0 } = {}) {
       this.el = el;
@@ -87,12 +73,10 @@
       this.isAnimating = false;
       this.speed = speed;
       this.perspective = perspective;
-
       if (this.perspective) this.el.style.perspective = this.perspective + 'px';
       this.setup();
       this.bindSwipe();
     }
-
     setup() {
       this.pages.forEach((pg, i) => {
         pg.style.transition = `transform ${this.speed}ms ease`;
@@ -102,66 +86,37 @@
           'translateX(100%)';
       });
     }
-
     to(idx) {
       if (this.isAnimating) return;
       if (idx < 0 || idx >= this.pages.length || idx === this.current) return;
       this.isAnimating = true;
-
       const cur = this.pages[this.current];
       const nxt = this.pages[idx];
-      const dir = (idx > this.current) ? -1 : 1; // -1 往左，+1 往右
-
+      const dir = (idx > this.current) ? -1 : 1;
       nxt.style.transform = `translateX(${dir * -100}%)`;
       requestAnimationFrame(() => {
         cur.style.transform = `translateX(${dir * 100}%)`;
         nxt.style.transform = 'translateX(0)';
       });
-
-      const done = () => {
-        cur.removeEventListener('transitionend', done);
-        this.current = idx;
-        this.isAnimating = false;
-      };
+      const done = () => { cur.removeEventListener('transitionend', done); this.current = idx; this.isAnimating = false; };
       cur.addEventListener('transitionend', done, { once: true });
     }
-
     next() { this.to(this.current + 1); }
     prev() { this.to(this.current - 1); }
-
     bindSwipe() {
       let startX = 0;
-      this.el.addEventListener('touchstart', e => {
-        if (!e.touches[0]) return; startX = e.touches[0].clientX;
-      }, { passive: true });
+      this.el.addEventListener('touchstart', e => { if (!e.touches[0]) return; startX = e.touches[0].clientX; }, { passive: true });
       this.el.addEventListener('touchend', e => {
         const t = e.changedTouches && e.changedTouches[0]; if (!t) return;
-        const d = t.clientX - startX;
-        if (d > 50) this.prev();
-        if (d < -50) this.next();
+        const d = t.clientX - startX; if (d > 50) this.prev(); if (d < -50) this.next();
       }, { passive: true });
     }
-
     destroy() {}
   }
 
-  /* ================= 主插件 ================= */
   class BookFlip {
-    /**
-     * @param {string|Element} elSelector  容器（.book）
-     * @param {Object} options
-     *   - mode: 'spread' | 'single'
-     *   - direction: 'ltr' | 'rtl'
-     *   - speed, singleSpeed, perspective
-     *   - data: { pairs?: [{frontHTML, backHTML}], pages?: string[] }
-     *   - startPageIndex: number（以「頁」為單位）
-     *   - coverPapers: number（最前保留幾張 .paper）
-     */
     constructor(elSelector, options = {}) {
-      this.el = (typeof elSelector === 'string')
-        ? document.querySelector(elSelector)
-        : elSelector;
-
+      this.el = (typeof elSelector === 'string') ? document.querySelector(elSelector) : elSelector;
       this.opts = Object.assign({
         mode: 'spread',
         direction: 'ltr',
@@ -172,13 +127,11 @@
         startPageIndex: 0,
         coverPapers: 0
       }, options);
-
       this._controller = null;
       this._cursorPage = this.opts.startPageIndex;
       this._pairs = [];
       this._flatPages = [];
 
-      // 保留封面 .paper
       const existingPapers = Array.from(this.el.querySelectorAll('.paper'));
       this._keepCount = Math.max(0, Math.min(this.opts.coverPapers, existingPapers.length));
       this._keptPapersHTML = existingPapers.slice(0, this._keepCount).map(p => p.outerHTML).join('');
@@ -191,7 +144,6 @@
           this._keptFlatPages.push(frontHTML, backHTML);
         }
       }
-
       this._buildFromDataOrDom();
       this._mountCurrent();
     }
@@ -241,10 +193,7 @@
           this._flatPages = this.opts.data.pages.slice();
           this._pairs = [];
           for (let i = 0; i < this._flatPages.length; i += 2) {
-            this._pairs.push({
-              frontHTML: this._flatPages[i] ?? '',
-              backHTML:  this._flatPages[i + 1] ?? ''
-            });
+            this._pairs.push({ frontHTML: this._flatPages[i] ?? '', backHTML: this._flatPages[i + 1] ?? '' });
           }
         }
       } else {
@@ -261,6 +210,15 @@
           this._pairs = [];
           this._flatPages = [];
         }
+      }
+    }
+
+    _notifyMounted() {
+      const detail = { mode: this.opts.mode, direction: this.opts.direction, totalPages: this.totalPages() };
+      if (typeof queueMicrotask === 'function') {
+        queueMicrotask(() => this.el.dispatchEvent(new CustomEvent('bookflip:mounted', { detail })));
+      } else {
+        requestAnimationFrame(() => this.el.dispatchEvent(new CustomEvent('bookflip:mounted', { detail })));
       }
     }
 
@@ -283,6 +241,7 @@
           perspective: this.opts.perspective,
           startPageIndex: this._cursorPage
         });
+        this._notifyMounted();
 
       } else {
         const flat = [
@@ -301,6 +260,7 @@
           perspective: 0,
           startPageIndex: this._cursorPage
         });
+        this._notifyMounted();
       }
     }
   }
