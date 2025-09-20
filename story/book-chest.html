@@ -1,600 +1,195 @@
 <!doctype html>
 <html lang="zh-Hant">
 <head>
-  <meta charset="utf-8" />
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>謝爾夏|玩家書櫃</title>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
-  <!-- Supabase JS v2 -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
- <style>
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap');
+  <meta charset="utf-8">
+  <title>謝爾夏｜電子書編輯器（底線版）</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 
-:root{
-  --panel:#0f1830; --line:#2a3555; --ink:#e6ebff; --muted:#98a3c7;
-  --primary:#6f82ff; --danger:#ef4444;
-  --radius:16px; --shadow:0 10px 30px rgba(16,24,40,.25);
-}
+  <!-- 字體 -->
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&family=Noto+Sans+TC:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <style>
+/* ========== Reset / Base ========== */
 *{box-sizing:border-box}
 html,body{height:100%}
 body{
-  margin:0; color:var(--ink);
+  margin:0; color:#e6ebff;
   font-family:'Noto Sans TC',system-ui,-apple-system,Segoe UI,sans-serif;
-  background:
-    linear-gradient(180deg, rgba(11,18,36,.25), rgba(16,25,54,.55)),
-    url('https://shierusha.github.io/school-battle/teachers/img/8.webp') center top / cover no-repeat fixed;
+  background:#000 url('https://shierusha.github.io/school-battle/teachers/img/8.webp') center top / cover no-repeat fixed;
 }
 
-/* App Bar */
+/* 隱藏滾動條但保留滾動 */
+html, body { overflow-y: auto; }
+body { -ms-overflow-style: none; scrollbar-width: none; }
+body::-webkit-scrollbar { width:0; height:0; }
+
+/* ========== App Bar ========== */
 .appbar{
-  position:sticky; top:0; z-index:20;
-  display:flex; justify-content:space-between; align-items:center;
-  padding:10px 14px; background:rgba(15,27,51,.7);
-  backdrop-filter:saturate(1.1) blur(6px);
-  border-bottom:1px solid rgba(34,48,87,.7);
+  position:sticky; top:0; z-index:100;
+  display:flex; justify-content:space-between; align-items:center; gap:10px;
+  padding:10px 14px; background:rgba(15,27,51,.85); border-bottom:1px solid #223057;
+  height: 30px;
 }
 .brand{display:flex;gap:.6rem;align-items:center;font-weight:700}
-.brand .dot{width:10px;height:10px;border-radius:999px;background:linear-gradient(135deg,#5aa7ff,#6ee7b7)}
-.appbar .tools{display:flex;gap:8px;align-items:center}
+#bookTitle{outline:none}
+#bookTitle[contenteditable="true"]{border-bottom:1px dashed #8aa1ff}
+.tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 
-/* Buttons */
-.btn{border:1px solid #3a4a78;background:#16244a;color:#fff;padding:.55rem .9rem;border-radius:12px;cursor:pointer}
-.btn:hover{filter:brightness(1.08)}
-.btn:active{transform:translateY(1px)}
-.btn.primary{background:var(--primary);border-color:var(--primary)}
-.btn.ghost{background:#ffffff13;border-color:#ffffff33}
-.btn.danger{background:#2a0f18;border-color:#6b1b2e;color:#ffb3c2}
-
-/* Layout */
-.view{display:none;min-height:calc(100vh - 56px)}
-.view.active{display:block}
-.wrap{padding:18px}
-
-/* Grid + Card */
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
-.card{
-  position:relative;background:var(--panel);border:1px solid var(--line);
-  border-radius:14px;padding:14px;box-shadow:var(--shadow);overflow:hidden;
+/* ========== 舞台區（保持你的版面） ========== */
+.stage{
+  position: absolute;
+  left: 50%;
+  top: 60px;
+  transform: translateX(-50%);
+  width: 90%;
+  max-width: 1100px;
+  height: 100vh;
 }
-.card h3{
-  margin:.1rem 0 .4rem 0; white-space:pre-line; min-height:2.8em; line-height:1.4; font-weight:700;
+.scaler{ position:relative; width:100%; }
+
+/* ========== 你的按鈕樣式（原樣） ========== */
+.btn{ background:#16244a; border:1px solid #3a4a78; color:#fff; padding:2px 10px; border-radius:10px; cursor:pointer }
+.btn.primary{ background:#6f82ff; border-color:#6f82ff }
+.btn.danger{ background:#2a0f18; border-color:#6b1b2e; color:#ffb3c2 }
+.btn.ghost{ background:#4d4d4de0; border-color:#ffffff33 }
+.side{ position:fixed; top:32px; display:flex; gap:8px; z-index:90 }
+.side.left{ left:10px }
+.side.right{ right:10px }
+.dock{ position:fixed; left:0; right:0; bottom:1%; display:flex; gap:10px; justify-content:center; z-index:90 }
+
+/* ========== 文字方向（外觀） ========== */
+.mode-ltr .page{ writing-mode: horizontal-tb; }
+.mode-rtl .page{ writing-mode: vertical-rl; text-orientation: upright; letter-spacing: 0.1em; }
+.mode-ltr .single-page{ writing-mode: horizontal-tb; }
+.mode-rtl .single-page{ writing-mode: vertical-rl; text-orientation: upright; letter-spacing: 0.1em; }
+
+/* ===== BookFlip 必要 CSS（請勿移除） ===== */
+.book, .book * { user-select:none; -webkit-user-select:none; }
+.book { position:absolute; top:0; color:black; }
+.paper {
+  width:100%; height:100%;
+  position:absolute; top:0; left:0;
+  transform-style:preserve-3d;
+  background:#FFF;
+  border: 1px solid #555;
 }
-.card .muted{color:var(--muted);font-size:.9rem}
-
-/* 右上縮圖 */
-.card .corner-tools { position:absolute; top:5%; right:0; display:flex; flex-direction:column; align-items:center; gap:6px; padding:5px; border-radius:10px; }
-.corner-tools img{ width:38px; height:38px; object-fit:contain; filter:drop-shadow(0 1px 3px rgba(0,0,0,.35)); pointer-events:none; }
-
-/* 主操作 */
-.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
-
-/* 排序箭頭 */
-.sort-btn{
-  position:absolute; z-index:2; width:34px; height:34px; display:grid; place-items:center;
-  background:rgba(15,27,51,.85); border:1px solid #31406b; color:#e6ebff;
-  border-radius:10px; cursor:pointer; opacity:0; pointer-events:none; transition:opacity .12s ease;
+.page {
+  width:100%; height:100%;
+  position:absolute; top:0; left:0;
+  display:flex;
+  backface-visibility:hidden; -webkit-backface-visibility:hidden;
+  padding: calc(16px * var(--scale, 1)); /* 內距跟字級一起縮放 */
 }
-.sort-btn.prev{ top:3px; left:3px }
-.sort-btn.next{ bottom:8px; right:8px }
-.card.near-left  .sort-btn.prev,
-.card.near-right .sort-btn.next{ opacity:1; pointer-events:auto }
+.back { transform: rotateY(180deg); }
+.paper.dir-ltr { transform-origin: left center; }
+.paper.dir-rtl { transform-origin: right center; }
 
-/* Dialog */
-dialog{border:none;border-radius:16px;background:#101a34;color:#fff;padding:0;min-width:min(500px,92vw)}
-dialog::backdrop{background:#0008}
-.modal-head{padding:14px 16px;border-bottom:1px solid #223057;font-weight:700}
-.modal-body{padding:10px}
-.modal-foot{padding:12px 16px;border-top:1px solid #223057;display:flex;gap:10px;justify-content:flex-end}
-.form-row{display:flex;gap:10px;align-items:center;margin:10px 0}
-.form-row label{min-width:60px;color:#c8d3ff}
-.form-row input,.form-row select{flex:1;padding:.4rem;border-radius:12px;border:1px solid #31406b;background:#0f1b33;color:#fff}
+.single-stage { width:100%; height:100%; position:relative; overflow:hidden; }
+.single-page  { width:100%; height:100%; position:absolute; top:0; left:0; display:flex; will-change:transform; background:#FFF; padding: calc(16px * var(--scale, 1)); }
 
-/* 書名小筆按鈕 */
-.card .title-wrap { position: relative; display: inline-block; }
-.card .title-edit {
-  position:absolute; top:20%; right:-15%; width:26px; height:23px; display:grid; place-items:center;
-  background:rgba(15,27,51,.9); color:#e6ebff; border:1px solid #31406b; border-radius:8px;
-  font-size:.9rem; cursor:pointer; opacity:0; pointer-events:none; transition:opacity .12s ease;
+/* 字級比例（方案2：非 transform） */
+.book-scope { font-size: calc(16px * var(--scale, 1)); }
+
+/* ========== 章節角標＋頁碼 ========== */
+.page-meta { position: absolute; pointer-events: none; font-size: .85em; opacity: .8; }
+.meta-chapter { max-width: 45%; }
+.meta-page    { min-width: 2.5em; text-align: right; }
+.meta-tl { top: 8px;  left: 10px; }
+.meta-tr { top: 8px;  right: 10px; }
+.meta-bl { bottom: 8px; left: 10px; }
+.meta-br { bottom: 8px; right: 10px; }
+
+/* ========== 四種頁型（底線版） ========== */
+.page.page--divider_light,
+.single-page.page--divider_light,
+.page.page--divider_dark,
+.single-page.page--divider_dark {
+  display:flex; align-items:center; justify-content:center; text-align:center;
 }
-.card .title-wrap:hover .title-edit { opacity:1; pointer-events:auto; }
-
-/* 書皮顏色窗 */
-#dlgFilter .filter-grid{ display:grid; grid-template-columns:1fr 280px; gap:16px; align-items:start; min-width:min(700px,92vw); }
-#dlgFilter .filter-inputs .form-row label{min-width:60px}
-#dlgFilter .filter-preview .preview-card{ background:#0f1b33; border:1px solid #31406b; border-radius:12px; padding:12px; display:grid; place-items:center; }
-#dlgFilter .filter-preview img{ width:160px; height:160px; object-fit:contain; filter: sepia(0.2) saturate(600%) hue-rotate(332deg) brightness(100%); }
-@media (max-width:780px){ #dlgFilter .filter-grid{ grid-template-columns:1fr; } }
-
-/* 色相滑桿 */
-.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-#dlgFilter .form-row.compact{align-items:center}
-#dlgFilter #f_hue_range{ width:100%; accent-color:var(--primary); height:20px; margin-top:2px; }
-#dlgFilter .range-scale{ display:flex; justify-content:space-between; font-size:.8rem; color:var(--muted); margin-top:2px; }
+/* 不顯示角標 */
+.page--divider_light .page-meta,
+.page--divider_dark  .page-meta,
+.page--illustration  .page-meta { display:none !important; }
 
 
-</style>
-
+/* 配色 */
+.page.page--divider_light, .single-page.page--divider_light { background:#fff; color:#000; }
+.page.page--divider_dark,  .single-page.page--divider_dark  { background:#555; color:#fff; }
+/* 圖片滿版 */
+.page.page--illustration, .single-page.page--illustration {
+  background-size: cover; background-position: center; background-repeat: no-repeat; padding:0 !important;
+}
+  </style>
 </head>
-<body>
 
-
-
-<!-- 頂端導覽 -->
-<div class="appbar">
-  <div class="brand"><span class="dot"></span><span id="topTitle">謝爾夏｜書籍一覽</span></div>
-  <div class="tools">
-    <button class="btn primary" id="btnNew">＋ 新增書籍</button>
-  </div>
-</div>
-
-<!-- 書庫列表 -->
-<section class="view active" id="viewLibrary">
-  <div class="wrap">
-    <h2 style="margin:0.1rem 0 10px 2rem;">書籍一覽</h2>
-    <div id="libGrid" class="grid"></div>
-  </div>
-</section>
-
-<!-- 新增書籍 -->
-<dialog id="dlgNew">
-  <div class="modal-head">新增書籍</div>
-  <form method="dialog" class="modal-body" id="formNew">
-    <div class="form-row"><label>書名</label><input id="f_title" placeholder="我的第一本書" required></div>
-    <div class="form-row"><label>翻頁邊</label>
-      <select id="f_binding">
-        <option value="short">短邊翻頁</option>
-        <option value="long">長邊翻頁</option>
-      </select>
-    </div>
-    <div class="form-row"><label>文本方向</label>
-      <select id="f_direction">
-        <option value="ltr">橫式文本</option>
-        <option value="rtl">直式文本</option>
-      </select>
-    </div>
-    <div class="form-row"><label>預設視圖</label>
-      <select id="f_view">
-        <option value="single">單頁</option>
-        <option value="double">雙頁</option>
-      </select>
-    </div>
-  </form>
-  <div class="modal-foot">
-    <button class="btn" data-close value="cancel">取消</button>
-    <button class="btn primary" id="btnCreate">建立</button>
-  </div>
-</dialog>
-
-<!-- 改書名 -->
-<dialog id="dlgRename">
-  <div class="modal-head">修改書名</div>
-  <form method="dialog" class="modal-body" id="formRename">
-    <div class="form-row">
-      <label>新書名</label>
-      <input id="rename_title" placeholder="最多 20 字" maxlength="20" required />
-    </div>
-  </form>
-  <div class="modal-foot">
-    <button class="btn" data-close>取消</button>
-    <button class="btn primary" id="btnRenameSave">確認</button>
-  </div>
-</dialog>
-
-<!-- 書皮顏色（cover_color 直接存完整 CSS：filter: ...;） -->
-<dialog id="dlgFilter">
-  <div class="modal-head">修改書皮顏色</div>
-  <form method="dialog" class="modal-body" id="formFilter">
-    <div class="filter-grid">
-      <div class="filter-inputs">
-        <div class="form-row">
-          <label>彩度</label>
-          <input id="f_sat" type="number" inputmode="numeric" min="0"  step="1" value="600" required>
-        </div>
-<!-- 彩度滑桿（0–2000） -->
-<div class="form-row compact">
-  <label class="sr-only">彩度滑桿</label>
-  <input id="f_sat_range" type="range" min="10" max="1000" step="1" value="600">
-</div>
-
-        <div class="form-row">
-          <label>色相</label>
-          <input id="f_hue" type="number" inputmode="numeric" min="1" max="360" step="1" value="332" required>
-        </div>
-        <!-- 色相滑桿（0–360） -->
-        <div class="form-row compact">
-          <label class="sr-only">色相滑桿</label>
-          <input id="f_hue_range" type="range" min="1" max="360" step="1" value="332">
-        </div>
-        <div class="form-row">
-          <label>亮度</label>
-          <input id="f_bri" type="number" inputmode="numeric" min="55" max="200" step="1" value="100" required>
-        </div>
-
-<!-- 亮度滑桿（55–200） -->
-<div class="form-row compact">
-  <label class="sr-only">亮度滑桿</label>
-  <input id="f_bri_range" type="range" min="55" max="200" step="1" value="100">
-</div>
-
+<body class="mode-ltr">
+  <!-- 上方導覽 -->
+  <div class="appbar">
+    <div class="brand">書名:<span id="bookTitle" contenteditable="true">未命名書籍</span></div>
+    <div class="tools">
+      <div>
+        <span>頁面數：</span><b id="lblCount">0</b>
+        <span style="width:5px"></span>
       </div>
-
-      <div class="filter-preview">
-        <div class="preview-card">
-          <img id="filterPreviewImg"
-               src="https://shierusha.github.io/school-battle/images/book.png"
-               alt="preview">
-        </div>
-        <div class="muted" style="text-align:center;margin-top:.4rem;">即時預覽</div>
+      <div>
+        <button class="btn primary" id="btnSave">儲存</button>
+        <button class="btn" id="btnBack">回書單</button>
       </div>
     </div>
-  </form>
-  <div class="modal-foot">
-    <button class="btn" data-close>取消</button>
-    <button class="btn primary" id="btnFilterSave">套用</button>
   </div>
-</dialog>
 
+  <!-- 左側工具列（保留） -->
+  <div class="side left">
+    <button class="btn ghost" id="btnTOC" style="display:none">目錄</button>
+    <button class="btn ghost" id="btnFontUp">A+</button>
+    <button class="btn ghost" id="btnFontDown">A-</button>
+    <button class="btn ghost" id="btnBold"><b>B</b></button>
+    <button class="btn ghost" id="btnItalic"><i>I</i></button>
+    <button class="btn ghost" id="btnUnderline"><u>U</u></button>
+  </div>
 
+  <!-- 右側工具列 -->
+  <div class="side right">
+    <button class="btn ghost" id="btnToggleDir">文字方向</button>
+    <button class="btn ghost" id="btnToggleBind">長/短邊</button>
+    <button class="btn ghost" id="btnToggleView">單/雙頁</button>
+  </div>
+
+  <!-- 中央舞台 -->
+  <div class="stage">
+    <div class="scaler" id="scaler">
+      <div class="book" id="bookCanvas">
+        <!-- ✅ 封面保留（插件不覆蓋） -->
+        <div class="paper">
+          <div class="page front">首頁</div>
+          <div class="page back">全白空頁面</div>
+        </div>
+        <!-- 正文由 JS 追加 -->
+      </div>
+    </div>
+  </div>
+
+  <!-- 下方 Dock（保留你的按鈕） -->
+  <div class="dock" style="bottom:34px;">
+    <button class="btn ghost" id="btnleft">&lt;</button>
+    <button class="btn" id="btnInsertChapter" style="display:none">插入章節</button>
+    <button class="btn" id="btnInsertPage" style="display:none">插入白紙</button>
+    <button class="btn danger" id="btnDeleteBlank" style="display:none">刪除白紙</button>
+    <button class="btn ghost" id="btnright">&gt;</button>
+  </div>
+
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
-  // =============================
-  // Supabase：兩個專案
-  // =============================
-  // 顯示「書」的專案（books）
-  const BOOKS_URL  = 'https://ogzpfrkwnqqaitytncla.supabase.co';
-  const BOOKS_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nenBmcmt3bnFxYWl0eXRuY2xhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxODQzNzEsImV4cCI6MjA3MDc2MDM3MX0.Ls83xOXcKIW7FUcavr8_sOs37I18VGFWYNW3sNFRS24';
-  const booksClient = window.supabase.createClient(BOOKS_URL, BOOKS_ANON);
+    const SUPABASE_URL = "https://ogzpfrkwnqqaitytncla.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nenBmcmt3bnFxYWl0eXRuY2xhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxODQzNzEsImV4cCI6MjA3MDc2MDM3MX0.Ls83xOXcKIW7FUcavr8_sOs37I18VGFWYNW3sNFRS24";
+    const BOOK_ID = ""; // 無 ?book= 時可填固定 id
+    const SB = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  </script>
 
-  // 登入/角色 專案（players/students）
-  const client = window.supabase.createClient(
-    'https://wfhwhvodgikpducrhgda.supabase.co',
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmaHdodm9kZ2lrcGR1Y3JoZ2RhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgwMTAwNjEsImV4cCI6MjA2MzU4NjA2MX0.P6P-x4SxjiR4VdWH6VFgY_ktgMac_OzuI4Bl7HWskz8'
-  );
-
-  // =============================
-
-(()=>{
-/* ========= 0) 基本設定 ========= */
-// 開啟書：每次先跳通知，再同頁導向
-const BOOK_URL = id => `/editor.html?book=${encodeURIComponent(id)}`;
-function openBook(id){
-  window.location.href = BOOK_URL(id);
-}
-
-// DOM helpers
-const $  = (s,r=document)=>r.querySelector(s);
-const $$ = (s,r=document)=>[...r.querySelectorAll(s)];
-const uid=()=>Math.random().toString(36).slice(2,10);
-const escapeHtml=s=>(s||'').replace(/[&<>"']/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const fmtDate=ts=> new Date(ts).toLocaleDateString();
-const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
-
-/* 書名排版：最多20字，10字自動換行 */
-const formatTitle=(t)=>{
-  t = (t||'未命名').slice(0,20);
-  if(t.length>10) t = t.slice(0,10) + '\n' + t.slice(10);
-  return t;
-};
-
-/* ========= 1) 濾鏡工具 —— cover_color 直接存完整 CSS（filter: ...;） ========= */
-const FILTER_DEFAULT = { sat:600, hue:332, bri:100 };
-const cssPropToFilterValue = (css) => (css||'').replace(/^\s*filter\s*:\s*/,'').replace(/\s*;?\s*$/,'');
-const toFilterValue = ({sat,hue,bri}) => `sepia(0.2) saturate(${sat}%) hue-rotate(${hue}deg) brightness(${bri}%)`;
-const toFilterCssProp = (vals) => `filter: ${toFilterValue(vals)};`;
-const parseFilterVals = (css) => {
-  if(!css) return {...FILTER_DEFAULT};
-  const s = cssPropToFilterValue(css);
-  return {
-    sat: +(s.match(/saturate\((\d+)%\)/)?.[1] ?? FILTER_DEFAULT.sat),
-    hue: +(s.match(/hue-rotate\((\d+)deg\)/)?.[1] ?? FILTER_DEFAULT.hue),
-    bri: +(s.match(/brightness\((\d+)%\)/)?.[1] ?? FILTER_DEFAULT.bri),
-  };
-};
-
-/* ========= 2) LocalStorage Store（純前端，不用資料庫） ========= */
-const LIB_KEY='xer_book_library_ok', BOOK_PREFIX='xer_book_';
-const LocalStore = {
-  async list(){ try{ return JSON.parse(localStorage.getItem(LIB_KEY))||[] }catch{ return [] } },
-  saveList(list){ localStorage.setItem(LIB_KEY, JSON.stringify(list)) },
-  async get(id){ try{ return JSON.parse(localStorage.getItem(BOOK_PREFIX+id))||null }catch{ return null } },
-  async create(meta){
-    const book={
-      id:uid(),
-      title:meta.title||'未命名書籍',
-      binding:meta.binding||'short',
-      direction:meta.direction||'ltr',
-      viewMode:meta.view||'single',
-      cover_color: toFilterCssProp(FILTER_DEFAULT),
-      cover_image:'https://shierusha.github.io/school-battle/images/book.png',
-      page_count:0, sort_order:1,
-      updated_at:new Date().toISOString(), created_at:new Date().toISOString()
-    };
-    localStorage.setItem(BOOK_PREFIX+book.id, JSON.stringify(book));
-    const list=await this.list();
-    list.unshift({
-      id:book.id, title:book.title, updatedAt:Date.now(),
-      coverColor:book.cover_color, coverImage:book.cover_image,
-      page_count:book.page_count, sort_order:book.sort_order
-    });
-    this.saveList(list);
-    return book;
-  },
-  async update(id, patch){
-    const b=await this.get(id); if(!b) return null;
-    Object.assign(b, patch, { updated_at:new Date().toISOString() });
-    localStorage.setItem(BOOK_PREFIX+id, JSON.stringify(b));
-    const list=await this.list(); const i=list.findIndex(x=>x.id===id);
-    if(i>-1){
-      list[i].title      = b.title;
-      list[i].updatedAt  = Date.now();
-      list[i].coverColor = b.cover_color;  // ★ 讓列表渲染用的新值
-      list[i].coverImage = b.cover_image;
-      list[i].page_count = b.page_count;
-      list[i].sort_order = b.sort_order;
-      this.saveList(list);
-    }
-    return b;
-  },
-  async delete(id){
-    localStorage.removeItem(BOOK_PREFIX+id);
-    this.saveList((await this.list()).filter(x=>x.id!==id));
-  },
-  async move(id,newIndex){
-    const list=await this.list(); const i=list.findIndex(x=>x.id===id); if(i<0) return;
-    const [item]=list.splice(i,1); const j=clamp(newIndex,0,list.length);
-    list.splice(j,0,item);
-    this.saveList(list);
-  }
-};
-
-// 這版固定使用 LocalStorage
-const Store = LocalStore;
-
-/* ========= 3) UI 渲染 ========= */
-const libGrid   = $('#libGrid');
-const dlgNew    = $('#dlgNew');
-const dlgRename = $('#dlgRename');
-const renameInp = $('#rename_title');
-let renameTargetId = null;
-
-function renderCardList(list){
-  if(!list.length){
-    libGrid.innerHTML = `
-      <div class="card">
-        <h3>${formatTitle('還沒有書籍')}</h3>
-        <div class="muted">點右上角「＋ 新增書籍」開始吧。</div>
-      </div>`;
-    return;
-  }
-  libGrid.innerHTML = list.map((m,idx)=>`
-    <div class="card" data-id="${m.id}">
-      <button class="sort-btn prev" title="往前排">←</button>
-      <button class="sort-btn next" title="往後排">→</button>
-
-      <div class="corner-tools">
-        <img alt="cover"
-             src="${escapeHtml(m.coverImage || 'https://shierusha.github.io/school-battle/images/book.png')}"
-             style="filter:${cssPropToFilterValue(m.coverColor)}">
-      </div>
-
-      <h3 class="title-wrap">
-        ${escapeHtml(formatTitle(m.title))}
-        <button class="title-edit" type="button" title="編輯書名">✎</button>
-      </h3>
-      <div class="muted">頁數：${m.page_count ?? 0}｜最後更新：${fmtDate(m.updatedAt)}</div>
-
-      <div class="actions">
-        <button class="btn primary" data-act="open">開啟</button>
-        <button class="btn ghost" data-act="filter">修改書皮顏色</button>
-        <button class="btn danger" data-act="del">刪除</button>
-      </div>
-    </div>
-  `).join('');
-
-  // 綁定每張卡片
-  $$('#libGrid .card').forEach((card, cardIndex)=>{
-    const id = card.dataset.id;
-    const img = card.querySelector('.corner-tools img');
-    const editBtn = card.querySelector('.title-edit');
-
-    // 開啟 → 跳通知 + 導向
-    card.querySelector('[data-act="open"]').onclick = ()=> openBook(id);
-
-    // 刪除
-    card.querySelector('[data-act="del"]').onclick  = async ()=>{
-      if(confirm('確定刪除此書？')){ await Store.delete(id); await renderLibrary(); }
-    };
-
-    // 排序箭頭
-    card.querySelector('.sort-btn.prev').onclick = async ()=>{ await Store.move(id, cardIndex-1); await renderLibrary(); };
-    card.querySelector('.sort-btn.next').onclick = async ()=>{ await Store.move(id, cardIndex+1); await renderLibrary(); };
-
-    // 邊界感應：靠近左右邊界顯示箭頭
-    card.addEventListener('mousemove', (e)=>{
-      const r=card.getBoundingClientRect(); const x=e.clientX-r.left; const edge=Math.max(24,r.width*0.12);
-      card.classList.toggle('near-left',  x<edge);
-      card.classList.toggle('near-right', (r.width-x)<edge);
-    });
-    card.addEventListener('mouseleave', ()=> card.classList.remove('near-left','near-right'));
-    card.addEventListener('click',(e)=>{
-      const tag=(e.target.tagName||'').toLowerCase();
-      if(['button','input','select','a'].includes(tag)) return;
-      const r=card.getBoundingClientRect(); const x=e.clientX-r.left;
-      card.classList.toggle('near-left', x<r.width/2);
-      card.classList.toggle('near-right', x>=r.width/2);
-      setTimeout(()=> card.classList.remove('near-left','near-right'), 2500);
-    });
-
-    // 改名
-    editBtn.addEventListener('click', async (ev)=>{
-      ev.stopPropagation();
-      renameTargetId = id;
-      const b = await Store.get(id);
-      renameInp.value = b?.title || '';
-      $('#dlgRename').showModal();
-    });
-
-    // 顏色小窗
-    const btnFilter = card.querySelector('[data-act="filter"]');
-    btnFilter.addEventListener('click', async ()=>{
-      const b = await Store.get(id);
-      const vals = parseFilterVals(b?.cover_color);
-      $('#f_sat').value = vals.sat;
-      $('#f_hue').value = vals.hue;
-      $('#f_bri').value = vals.bri;
-      const hueRange = $('#f_hue_range'); if (hueRange) hueRange.value = vals.hue;
-      // ★ 新增：亮度滑桿初值（限制在 55–200 區間）
-      const briRange = $('#f_bri_range'); if (briRange) briRange.value = Math.max(55, Math.min(200, vals.bri));
-      
-      const satRange = $('#f_sat_range'); if (satRange) satRange.value = Math.max(10, Math.min(1000, vals.sat));
-
-      
-      
-      $('#filterPreviewImg').src = b?.cover_image || 'https://shierusha.github.io/school-battle/images/book.png';
-      $('#filterPreviewImg').style.filter = toFilterValue(vals);
-      window.__FILTER_TARGET__ = { id, imgEl: img };
-      $('#dlgFilter').showModal();
-    });
-  });
-}
-
-async function renderLibrary(){
-  const list = await Store.list();
-  renderCardList(list);
-}
-
-/* ========= 4) 新增 & 改名 ========= */
-$('#btnNew').addEventListener('click',()=>{ $('#formNew').reset(); $('#dlgNew').showModal(); });
-$('#btnCreate').addEventListener('click', async ()=>{
-  const meta = {
-    title:    $('#f_title').value.trim() || '未命名書籍',
-    binding:  $('#f_binding').value,
-    direction:$('#f_direction').value,
-    view:     $('#f_view').value
-  };
-  const book = await Store.create(meta);
-  if(book){ $('#dlgNew').close(); await renderLibrary(); }
-});
-
-$('#btnRenameSave').addEventListener('click', async ()=>{
-  let t = (renameInp.value||'').replace(/\n/g,'').trim(); if(!t) t='未命名'; if(t.length>20) t=t.slice(0,20);
-  if(renameTargetId){ await Store.update(renameTargetId, { title:t }); }
-  $('#dlgRename').close();
-  renameTargetId=null; await renderLibrary();
-});
-
-/* ========= 5) 顏色小窗：即時預覽 + 套用（修好！） ========= */
-const fSat = $('#f_sat'), fHue = $('#f_hue'), fBri = $('#f_bri');
-const pvImg = $('#filterPreviewImg');
-const hueRangeGlobal = $('#f_hue_range');
-// ★ 新增：亮度滑桿節點
-const briRangeGlobal = $('#f_bri_range');
-// ★ 新增：彩度滑桿節點
-const satRangeGlobal = $('#f_sat_range');
-
-
-function clampNum(v,min,max){ const n = parseInt(String(v||'').replace(/[^\d]/g,''),10); return isNaN(n)?min: Math.max(min, Math.min(max, n)); }
-function getVals(){ return { sat:clampNum(fSat.value,0,2000), hue:clampNum(fHue.value,0,360), bri:clampNum(fBri.value,0,300) }; }
-function updatePreview(){ if(pvImg) pvImg.style.filter = toFilterValue(getVals()); }
-
-// 數字輸入：只允許數字、同步滑桿（for 色相）、即時預覽
-  [fSat, fHue, fBri].forEach(inp => {
-  inp.addEventListener('input', () => {
-    inp.value = inp.value.replace(/[^\d]/g, '');
-
-    if (inp === fHue && hueRangeGlobal) {
-      const v = Math.max(0, Math.min(360, parseInt(fHue.value || '0', 10) || 0));
-      hueRangeGlobal.value = String(v);
-    }
-    // ★ 新增：彩度數字 → 滑桿（10–1000）
-    if (inp === fSat && satRangeGlobal) {
-      const n = parseInt(fSat.value || '0', 10) || 0;
-      const v = Math.max(10, Math.min(1000, n));
-      satRangeGlobal.value = String(v);
-    }
-    // 既有：亮度數字 → 滑桿（55–200）
-    if (inp === fBri && briRangeGlobal) {
-      const n = parseInt(fBri.value || '0', 10) || 0;
-      const v = Math.max(55, Math.min(200, n));
-      briRangeGlobal.value = String(v);
-    }
-
-    updatePreview();
-  });
-});
-
-
-// 色相滑桿：拖動時同步數字欄位 + 預覽
-if (hueRangeGlobal) {
-  hueRangeGlobal.addEventListener('input', ()=>{
-    fHue.value = hueRangeGlobal.value;
-    updatePreview();
-  });
-}
-
-// ★ 新增：亮度滑桿 → 數字 + 預覽
-if (briRangeGlobal) {
-  briRangeGlobal.addEventListener('input', ()=>{
-    fBri.value = briRangeGlobal.value;
-    updatePreview();
-  });
-}
-  
-  // ★ 新增：彩度滑桿
-if (satRangeGlobal) {
-  satRangeGlobal.addEventListener('input', () => {
-    fSat.value = satRangeGlobal.value;
-    updatePreview();
-  });
-}
-  
-
-// ★★★ 關鍵：套用（寫回 LocalStorage + 即時更新卡片 + 關窗） ★★★
-$('#btnFilterSave').addEventListener('click', async ()=>{
-  const tgt = window.__FILTER_TARGET__;
-  if(!tgt?.id){ $('#dlgFilter').close(); return; }
-  const vals    = getVals();
-  const cssProp = toFilterCssProp(vals);       // "filter: sepia(...) ..."
-  try{ tgt.imgEl.style.filter = toFilterValue(vals); }catch{}
-  await Store.update(tgt.id, { cover_color: cssProp });
-  $('#dlgFilter').close();
-  window.__FILTER_TARGET__ = null;
-  await renderLibrary();                       // 保證列表用新值
-});
-
-/* ========= 6) Dialog 關閉 + 啟動 ========= */
-function bindDialogCloseButtons() {
-  document.querySelectorAll('dialog').forEach(dlg => {
-    dlg.addEventListener('click', (e) => {
-      const t = e.target;
-      if (t && t.closest('[data-close]')) {
-        dlg.close();
-        const form = dlg.querySelector('form');
-        if (form) form.reset?.();
-      }
-    });
-  });
-}
-function showTipOnce() {
-  const KEY = 'xer_book_tip_ok';
-  if (sessionStorage.getItem(KEY)) return;
-  sessionStorage.setItem(KEY, '1');
-  alert('小提示：\n• 書名右上 ✎ 可更改書名\n• 左上 ← / 右下 → 可排序\n• 「修改書皮顏色」按「套用」會即時更新\n• ');
-}
-
-async function boot(){
-  await renderLibrary();
-  bindDialogCloseButtons();
-  showTipOnce();
-}
-boot();
-})();
-
-
-</script>
-
-
-
+  <!-- 外掛：不注入 CSS，含 mounted 事件 -->
+  <script src="book-flip.js"></script>
+  <!-- 應用層（底線版） -->
+  <script src="app.js"></script>
 </body>
 </html>
