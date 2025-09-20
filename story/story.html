@@ -517,10 +517,12 @@ img {
       const card = document.createElement('div');
       card.className = 'book-card';
 
-      const icon = document.createElement('div');
-      icon.className = 'book-icon';
-      // ✅ 列表永遠用預設書封，不讀取資料的封面欄位
-      icon.innerHTML = `<img draggable="false" alt="book" src="${BOOK_ICON}">`;
+   const icon = document.createElement('div');
+icon.className = 'book-icon';
+const filterStr = (b.cover_color || '').trim();
+// 固定用預設圖，並保留 cover_color 的濾鏡
+icon.innerHTML = `<img draggable="false" alt="book" src="${BOOK_ICON}" style="${/^filter:/.test(filterStr) ? filterStr : ''}">`;
+ction renderShelf(el, slice, fallbac
 
       const meta = document.createElement('div');
       meta.className = 'book-meta';
@@ -554,30 +556,36 @@ img {
     const delta = 6;        // 每本 +6%
     const heights = [75,80,85,90,95,100];
 
-    function renderShelf(el, slice, fallbackUrl){
-      el.innerHTML = '';
-      slice.forEach((b, i) => {
-        const img = document.createElement('img');
-        img.draggable = false;
-        const left = leftStart + i*delta;
-        const h = heights[Math.floor(Math.random()*heights.length)];
+   function renderShelf(el, slice, fallbackUrl){
+  el.innerHTML = '';
+  slice.forEach((b, i) => {
+    const img = document.createElement('img');
+    img.draggable = false;
+    const left = leftStart + i*delta;
+    const h = heights[Math.floor(Math.random()*heights.length)];
 
-        // ✅ 無條件使用該層的 fallback，不讀取 cover_image/cover_color
-        img.src = bookImg(b, fallbackUrl);
+    // 固定使用該層 fallback，不讀 cover_image
+    img.src = fallbackUrl;
 
-        img.style.left = left + '%';
-        img.style.height = h + '%';
-        img.title = b.title;
-        img.style.cursor = 'pointer';
+    img.style.left = left + '%';
+    img.style.height = h + '%';
+    img.title = b.title;
+    img.style.cursor = 'pointer';
 
-        // 不套用任何來自資料的 filter
-
-        img.addEventListener('click', () => {
-          window.location.href = `./reader.html?book_id=${encodeURIComponent(b.id)}`;
-        });
-        el.appendChild(img);
-      });
+    // 仍然套用 cover_color（若是 filter: 開頭）
+    const filterStr = (b.cover_color || '').trim();
+    if (/^filter:/.test(filterStr)) {
+      // 加在 style 上（保留既有 left/height 等）
+      img.style.cssText += ';' + filterStr;
     }
+
+    img.addEventListener('click', () => {
+      window.location.href = `./reader.html?book_id=${encodeURIComponent(b.id)}`;
+    });
+    el.appendChild(img);
+  });
+}
+
 
     // 第一層（1~12）：book1.png；第二層（13~24）：book2.png
     renderShelf(shelf1, books.slice(0, 12),  BOOK_SHELF_1_12);
