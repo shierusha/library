@@ -534,7 +534,7 @@ img {
       const link = document.createElement('a');
       link.className = 'go-btn';
       link.innerHTML = '前往<br>閱讀';        // 兩行顯示
-      link.href = `./reader.html?book_id=${encodeURIComponent(b.id)}`;
+link.href = `./book?book=${encodeURIComponent(b.title)}`;
       actions.appendChild(link);
 
       card.append(icon, meta, actions);
