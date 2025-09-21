@@ -163,6 +163,14 @@ body::-webkit-scrollbar { width:0; height:0; }
 .toc-row .toc-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .toc-row .toc-page  { opacity: .9; }
 
+
+/* 封面（第一張紙的正面）強制置中顯示書名 */
+.book .paper:first-child .page.front {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
 /* 650px 以下換版型  */
 @media (max-width: 650px) {
   #bookTitle { width: 10em; }
