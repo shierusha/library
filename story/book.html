@@ -383,7 +383,92 @@ style="
   });
 })();
 </script>
+<script>
+(function () {
+  // ====== 偵測裝置：手機 / 桌機 ======
+  function isMobileLike() {
+    return window.matchMedia('(pointer: coarse)').matches ||
+           /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+  }
 
+  // ====== 生成並顯示提示彈窗（沿用你現成的 modal 樣式） ======
+  function showTipModal() {
+    const mobile = isMobileLike();
+    const html = `
+      <div class="modal-overlay show" id="tipModal" aria-hidden="false">
+        <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="tipTitle">
+          <div class="modal-header" id="tipTitle">閱讀提示</div>
+          <div class="modal-body">
+            <p style="margin:.4em 0">
+              ${mobile
+                ? '📱 <b>手機版</b>：請「手勢滑動」翻頁（左右滑）'
+                : '💻 <b>電腦版</b>：請用「左右方向鍵」或「點書本左右區塊」翻頁。'}
+            </p>
+            <div style="display:flex; gap:.5rem; margin-top:10px; justify-content:flex-end">
+<button id="tipClose" class="btn" style="    background: #ffffff00;    color: #FFF;    border: 2px solid #1eb5e5;">我知道了</button>
+
+              <button id="tipNever" class="btn ghost" style="    background: #ffffff00;    color: #FFF;    border: 2px solid #9ab5be;">不再提醒</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', html);
+
+    const $ = (s, r=document)=>r.querySelector(s);
+    $('#tipClose')?.addEventListener('click', () => {
+      $('#tipModal')?.remove();
+    });
+    $('#tipNever')?.addEventListener('click', () => {
+      localStorage.setItem('reader_tip_seen_v1', '1');
+      $('#tipModal')?.remove();
+    });
+    // 點背景關閉
+    $('#tipModal')?.addEventListener('click', (e) => {
+      if (e.target.id === 'tipModal') e.currentTarget.remove();
+    });
+  }
+
+  // ====== 確保「單頁模式」（手機才做） ======
+  function ensureSinglePageWhenReady() {
+    if (!isMobileLike()) return;
+
+    // 已是單頁就不處理（單頁容器會有 .single-stage）
+    function ensureOnce() {
+      const isSingle = !!document.querySelector('.single-stage');
+      if (isSingle) return true;
+
+      const toggleBtn = document.getElementById('btnToggleView');
+      if (!toggleBtn) return false;
+
+      // 還是雙頁 → 點一次切到單頁
+      toggleBtn.click();
+      return !!document.querySelector('.single-stage');
+    }
+
+    // 嘗試立即切
+    if (ensureOnce()) return;
+
+    // 若尚未掛載翻頁 DOM，掛個觀察器等它出現再切
+    const host = document.getElementById('bookCanvas') || document.body;
+    const mo = new MutationObserver(() => {
+      if (ensureOnce()) mo.disconnect();
+    });
+    mo.observe(host, { childList: true, subtree: true });
+
+    // 最後保險：2 秒後再試一次（避免極端情境漏掉）
+    setTimeout(ensureOnce, 2000);
+  }
+
+  // ====== 執行：第一次進站顯示提示、手機切單頁 ======
+  window.addEventListener('load', () => {
+    if (!localStorage.getItem('reader_tip_seen_v1')) {
+      showTipModal();
+    }
+    ensureSinglePageWhenReady();
+  });
+})();
+</script>
 
 
 </body>
