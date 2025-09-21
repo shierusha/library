@@ -753,10 +753,11 @@ link.href = `./book?book=${encodeURIComponent(b.title)}`;
   }
 
   // 預設開啟彈窗 & 初始化
-  window.addEventListener('load', () => {
- //   enforceLandscape();
-    init();
-  });
+window.addEventListener('load', () => {
+  if (typeof enforceLandscape === 'function') enforceLandscape();
+  init();
+});
+
 
   // ====== 全域保險：禁止拖曳所有 <img>（不影響點擊）======
   document.addEventListener('dragstart', e => {
