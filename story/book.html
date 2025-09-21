@@ -335,54 +335,54 @@ style="
 </script>
 <script>
 (function () {
-  const btnPrev  = document.getElementById('btnleft');   // 視為 -1
-  const btnNext  = document.getElementById('btnright');  // 視為 +1
-  if (!btnPrev || !btnNext) return;
+  // 取得左右大按鈕
+  const btnLeft  = document.getElementById('btnleft');
+  const btnRight = document.getElementById('btnright');
 
-  function isTypingTarget(el) {
-    if (!el) return false;
-    const tag = el.tagName;
-    const editable = el.closest('[contenteditable="true"]');
-    return editable || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+  if (!btnLeft || !btnRight) return;
+
+  // 判斷目前是否為 LTR（你的 <body> 會有 class="mode-ltr" 或 "mode-rtl"）
+  function isLTR() {
+    return document.body.classList.contains('mode-ltr');
   }
 
-  window.addEventListener('keydown', function (e) {
-    // 只攔截左右鍵；打字區、組合鍵時不理
-    if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
-    if (isTypingTarget(e.target)) return;
-    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-
-    const isRTL = document.body.classList.contains('mode-rtl');
-    const isLTR = document.body.classList.contains('mode-ltr');
-
-    // 預設用 LTR（如果兩個 class 都沒有）
-    const mode = isRTL ? 'rtl' : 'ltr';
-
-    // 依你的規則做對應
-    if (mode === 'rtl') {
-      if (e.key === 'ArrowRight') {
-        // 右鍵 = -1（上一頁）
-        e.preventDefault();
-        btnPrev.click();
-      } else if (e.key === 'ArrowLeft') {
-        // 左鍵 = +1（下一頁）
-        e.preventDefault();
-        btnNext.click();
-      }
-    } else { // ltr
-      if (e.key === 'ArrowLeft') {
-        // 左鍵 = -1（上一頁）
-        e.preventDefault();
-        btnPrev.click();
-      } else if (e.key === 'ArrowRight') {
-        // 右鍵 = -1（上一頁）
-        e.preventDefault();
-        btnPrev.click();
-      }
+  // 把鍵盤事件轉成點擊（避免重複觸發用 e.repeat 過濾）
+  document.addEventListener('keydown', function (e) {
+    // 在輸入欄位編輯時不攔截
+    const tag = (e.target && e.target.tagName) || '';
+    if (e.target && (e.target.isContentEditable ||
+        tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT')) {
+      return;
     }
-  }, { passive: false });
+    if (e.repeat) return;
+
+    // LTR：←=上一頁(左鍵)  →=下一頁(右鍵)
+    // RTL：←=下一頁(右鍵)  →=上一頁(左鍵)
+    const ltr = isLTR();
+
+    switch (e.key) {
+      case 'ArrowLeft':
+        (ltr ? btnLeft : btnRight).click();
+        e.preventDefault();
+        break;
+      case 'ArrowRight':
+        (ltr ? btnRight : btnLeft).click();
+        e.preventDefault();
+        break;
+      // 方便一點：空白鍵=下一頁、Backspace=上一頁
+      case ' ':
+        (ltr ? btnRight : btnLeft).click();
+        e.preventDefault();
+        break;
+      case 'Backspace':
+        (ltr ? btnLeft : btnRight).click();
+        e.preventDefault();
+        break;
+    }
+  });
 })();
 </script>
+
 
 
 </body>
