@@ -171,6 +171,15 @@ body::-webkit-scrollbar { width:0; height:0; }
   justify-content: center;
   text-align: center;
 }
+
+/* 單頁模式的封面保持同樣置中效果 */
+.single-stage .single-page:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
 /* 650px 以下換版型  */
 @media (max-width: 650px) {
   #bookTitle { width: 10em; }
