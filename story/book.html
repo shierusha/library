@@ -333,6 +333,57 @@ style="
   });
 })();
 </script>
+<script>
+(function () {
+  const btnPrev  = document.getElementById('btnleft');   // 視為 -1
+  const btnNext  = document.getElementById('btnright');  // 視為 +1
+  if (!btnPrev || !btnNext) return;
+
+  function isTypingTarget(el) {
+    if (!el) return false;
+    const tag = el.tagName;
+    const editable = el.closest('[contenteditable="true"]');
+    return editable || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+  }
+
+  window.addEventListener('keydown', function (e) {
+    // 只攔截左右鍵；打字區、組合鍵時不理
+    if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    if (isTypingTarget(e.target)) return;
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+
+    const isRTL = document.body.classList.contains('mode-rtl');
+    const isLTR = document.body.classList.contains('mode-ltr');
+
+    // 預設用 LTR（如果兩個 class 都沒有）
+    const mode = isRTL ? 'rtl' : 'ltr';
+
+    // 依你的規則做對應
+    if (mode === 'rtl') {
+      if (e.key === 'ArrowRight') {
+        // 右鍵 = -1（上一頁）
+        e.preventDefault();
+        btnPrev.click();
+      } else if (e.key === 'ArrowLeft') {
+        // 左鍵 = +1（下一頁）
+        e.preventDefault();
+        btnNext.click();
+      }
+    } else { // ltr
+      if (e.key === 'ArrowLeft') {
+        // 左鍵 = -1（上一頁）
+        e.preventDefault();
+        btnPrev.click();
+      } else if (e.key === 'ArrowRight') {
+        // 右鍵 = -1（上一頁）
+        e.preventDefault();
+        btnPrev.click();
+      }
+    }
+  }, { passive: false });
+})();
+</script>
+
 
 </body>
 </html>
