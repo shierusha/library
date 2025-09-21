@@ -158,6 +158,8 @@ body::-webkit-scrollbar { width:0; height:0; }
 .stage {  top: 85px;  width: 80%;}
 .side.right {bottom: 65px;        left: 50%;        transform: translateX(-50%);        right: 0px;        top: auto;        justify-content: center;        width: 100%;}
 .side.left {    top: 65px;}}
+
+
   </style>
 </head>
 
@@ -244,43 +246,7 @@ body::-webkit-scrollbar { width:0; height:0; }
   <script src="book-flip.js"></script>
   <!-- 應用層（底線＋TOC＋單頁封面修正） -->
   <script src="app.js"></script>
-  <script>
-(function () {
-  // 這裡改成你「書單頁」的固定網址做保底，例如：/books 或 /library
-  const FALLBACK_URL = 'books';
-
-  const btn = document.getElementById('btnBack');
-  if (!btn) return;
-
-  btn.addEventListener('click', function (e) {
-    e.preventDefault();
-
-    // 情況 1：有可回的歷史紀錄（通常 history.length > 1）
-    if (window.history.length > 1) {
-      const before = document.referrer;
-      window.history.back();
-
-      // 保底：有些環境 back 可能無效（或回到同頁），0.4 秒後檢查
-      setTimeout(function () {
-        // 若無 referrer（或 referrer 與當前相同），直接去 FALLBACK
-        if (!before || before === location.href) {
-          window.location.assign(FALLBACK_URL);
-        }
-      }, 400);
-      return;
-    }
-
-    // 情況 2：沒有 history，但有 referrer（可能跨網域）
-    if (document.referrer) {
-      window.location.href = document.referrer;
-      return;
-    }
-
-    // 情況 3：兩者都沒有 → 走保底固定頁
-    window.location.assign(FALLBACK_URL);
-  });
-})();
-</script>
+  
 
 </body>
 </html>
