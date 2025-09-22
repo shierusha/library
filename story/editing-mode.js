@@ -1,9 +1,5 @@
-
-/* editing-mode.js — 內頁輸入與自動分頁（角標上鎖 + 臨界多一行修正 + 往後推擠）
- * 依賴 app.js 提供的全域：
- *   - PAGES_DB, state, elBook, ACTIVE_BOOK, STORE, persistDraft()
- *   - applyLayout(), applyPageTypesNow(), renderMetaForAllPages(), updateCount(), afterLayoutRedraw()
- *   - buildPairsFromPages(), book (BookFlip instance)
+/* editing-mode.js — 內頁輸入與自動分頁（角標上鎖 + 臨界多一行修正 + 推擠 + 正文可編輯）
+ * 依賴 app.js 提供的全域變數與函式
  */
 
 /* ========== 小工具 ========== */
@@ -42,6 +38,11 @@ function setPlainTextTo(el, plain){
   el.style.wordBreak  = 'break-word';
   el.style.overflow   = 'hidden';
   el.style.display    = 'block';
+  // 這裡強制開啟可選取（即使全域 CSS 設定 user-select:none）
+  el.style.userSelect = 'text';
+  el.style.webkitUserSelect = 'text';
+  el.style.msUserSelect = 'text';
+  el.style.caretColor = 'auto';
 }
 
 // 同步到每頁 content_json（plain + html）
@@ -54,15 +55,15 @@ function ensurePagePlainToJson(pageObj, plain){
   pageObj.content_json.text_html  = html || '';
 }
 
-/* ========== 角標上鎖（contenteditable="false"） ========== */
+/* ========== 角標上鎖（contenteditable="false" + pointer-events:none） ========== */
 function lockMetaEditabilityIn(root){
   (root || document).querySelectorAll('.page-meta').forEach(m=>{
     m.setAttribute('contenteditable', 'false');
     m.setAttribute('draggable', 'false');
     m.setAttribute('spellcheck','false');
     m.setAttribute('tabindex', '-1');
-    // 再保險一點，避免鍵盤選取
     m.style.userSelect = 'none';
+    m.style.pointerEvents = 'none';
   });
 }
 const recallMeta = debounce(()=>{
@@ -223,6 +224,11 @@ function ensureEditableShell(dbIndex){
   pageNode.style.wordBreak  = 'break-word';
   pageNode.style.overflow   = 'hidden';
   pageNode.style.display    = 'block';
+  // ★ 這四行確保能選取和輸入
+  pageNode.style.userSelect = 'text';
+  pageNode.style.webkitUserSelect = 'text';
+  pageNode.style.msUserSelect = 'text';
+  pageNode.style.caretColor = 'auto';
 
   bindInputEvents(pageNode, dbIndex);
 
