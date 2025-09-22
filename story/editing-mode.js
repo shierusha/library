@@ -403,13 +403,43 @@ btnDelete?.addEventListener('click', ()=>{
 
 /* ========== 啟動 ========== */
 (function start(){
+    function scheduleMount(attempts){
+    let remain = (typeof attempts === 'number' && attempts >= 0) ? attempts : 10;
+    function tick(){
+      if (window.book && Array.isArray(PAGES_DB)) {
+        mountEditors();
+        return;
+      }
+      if (remain-- <= 0) return;
+      setTimeout(tick, 120);
+    }
+    setTimeout(tick, 0);
+  }
+
+  function wrapAfterLayout(){
+    const fn = window.afterLayoutRedraw;
+    if (typeof fn !== 'function' || fn.__editingWrapped) return;
+    function wrapped(...args){
+      const result = fn.apply(this, args);
+      scheduleMount(3);
+      return result;
+    }
+    wrapped.__editingWrapped = true;
+    window.afterLayoutRedraw = wrapped;
+  }
+
+  wrapAfterLayout();
+  scheduleMount(15); // 若 app.js 已完成初始化，立刻掛載編輯器
+  
   document.addEventListener('DOMContentLoaded', ()=>{
     setTimeout(()=>{
       observeMetaLock();     // 監測新角標自動上鎖
       patchBookMountOnce();  // 翻頁後召回角標+上鎖
-      mountEditors();        // 掛載編輯器並上鎖現有角標
+  wrapAfterLayout();     // 確保未來 afterLayout 會重掛編輯器
+      scheduleMount(15);     // DOM ready 後再試一次（兼容慢速載入）
     }, 0);
   });
+  
   // 外部在重繪後可再次掛載
   window.__mountEditors = mountEditors;
 })();
