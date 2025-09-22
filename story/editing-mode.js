@@ -129,13 +129,13 @@ function getMeasureBoxLike(area){
     document.body.appendChild(__measureBox);
   }
   const cs = getComputedStyle(area);
-  __measureBox.style.width     = area.clientWidth + 'px';
-  __measureBox.style.height    = area.clientHeight + 'px';
-  __measureBox.style.font      = cs.font;
-  __measureBox.style.lineHeight= cs.lineHeight;
-  __measureBox.style.padding   = cs.padding;
-  __measureBox.style.writingMode = cs.writingMode;
-  __measureBox.style.letterSpacing = cs.letterSpacing;
+  __measureBox.style.width        = area.clientWidth + 'px';
+  __measureBox.style.height       = area.clientHeight + 'px';
+  __measureBox.style.font         = cs.font;
+  __measureBox.style.lineHeight   = cs.lineHeight;
+  __measureBox.style.padding      = cs.padding;
+  __measureBox.style.writingMode  = cs.writingMode;
+  __measureBox.style.letterSpacing= cs.letterSpacing;
   __measureBox.style.textOrientation = cs.textOrientation;
   return __measureBox;
 }
@@ -148,24 +148,34 @@ function clipAreaByPlainLength(area, keepLen){
 
   function walk(node, outParent){
     if (remain <= 0) return;
+
     if (node.nodeType === Node.TEXT_NODE){
       const t = node.nodeValue || '';
       if (t.length <= remain){
         outParent.appendChild(document.createTextNode(t));
         remain -= t.length;
-      }else{
-        // ← 這行補上右括號
+      } else {
         outParent.appendChild(document.createTextNode(t.slice(0, remain)));
         remain = 0;
       }
-    } else if (node.nodeType === Node.ELEMENT_NODE){
+      return;
+    }
+
+    if (node.nodeType === Node.ELEMENT_NODE){
       const shell = node.cloneNode(false); // 不帶子孫
+      const before = outParent.childNodes.length;
       outParent.appendChild(shell);
       const children = node.childNodes;
       for (let i=0; i<children.length && remain>0; i++){
         walk(children[i], shell);
       }
-      if (!shell.textContent) outParent.removeChild(shell);
+      // 若剪完剛好沒有內容，移除空殼
+      if (!shell.textContent || shell.textContent.length === 0){
+        // 但若是語義標記（b/i/u/span）仍可保留外殼，只要剛好切在這層上會產生空
+        // 保守移除空殼，避免殘留空節點影響高度
+        if (outParent.childNodes.length > before) outParent.removeChild(shell);
+      }
+      return;
     }
     // 其他節點忽略
   }
@@ -183,7 +193,6 @@ function clipAreaByPlainLength(area, keepLen){
   const restPlain = fullPlain.slice(keepLen);
   return { keptPlain, restPlain };
 }
-
 
 /* 對有標記的 editor-area 做「能塞多少字」→ 回傳（保留到本頁、剩餘） */
 function fitMarkupArea(area){
