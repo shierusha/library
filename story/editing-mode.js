@@ -154,7 +154,8 @@ function clipAreaByPlainLength(area, keepLen){
         outParent.appendChild(document.createTextNode(t));
         remain -= t.length;
       }else{
-        outParent.appendChild(document.createTextNode(t.slice(0, remain));
+        // ← 這行補上右括號
+        outParent.appendChild(document.createTextNode(t.slice(0, remain)));
         remain = 0;
       }
     } else if (node.nodeType === Node.ELEMENT_NODE){
@@ -166,6 +167,7 @@ function clipAreaByPlainLength(area, keepLen){
       }
       if (!shell.textContent) outParent.removeChild(shell);
     }
+    // 其他節點忽略
   }
 
   for (const child of clone.childNodes){
@@ -181,6 +183,7 @@ function clipAreaByPlainLength(area, keepLen){
   const restPlain = fullPlain.slice(keepLen);
   return { keptPlain, restPlain };
 }
+
 
 /* 對有標記的 editor-area 做「能塞多少字」→ 回傳（保留到本頁、剩餘） */
 function fitMarkupArea(area){
