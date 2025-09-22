@@ -1,18 +1,10 @@
-/* editing-mode.js — 內頁輸入與自動分頁（穩定版）
- * 依賴 app.js 提供：
- *   - PAGES_DB, state, elBook, persistDraft()
- *   - applyLayout(), applyPageTypesNow(), renderMetaForAllPages(), updateCount(), afterLayoutRedraw()
- *   - buildPairsFromPages(), book (BookFlip)
- *
- * 功能：
- * - 只有 type==='novel' 可輸入；貼上純文字；Enter=換行；Ctrl+Z 用瀏覽器原生。
- * - 超出頁面自動向後分頁，遇圖片/不可輸入頁會跳過；頁數不夠自動插「紙」（兩頁）。
- * - 分頁為「往後推擠」：溢出的剩餘文字以「純文字」插到下一頁最前面。
- * - 翻頁/輸入後自動召回章節與頁碼角標。
- * - 左側工具：A+/A-（單層 zoom、連點直接調整 font-size）、B/I/U（僅本頁視覺；被推擠出去會轉純文字）。
+/* editing-mode.js — 可輸入穩定版（修：無法輸入、被翻頁手勢攔、重繪被蓋）
+ * 依賴 app.js 提供（已存在）：
+ *   PAGES_DB, state, elBook, persistDraft(), applyLayout(), applyPageTypesNow(),
+ *   renderMetaForAllPages(), updateCount(), afterLayoutRedraw(), buildPairsFromPages(), book (BookFlip)
  */
 
-/* ========== 0) 覆蓋 .book, .book * 的 user-select:none，開啟編輯 ========= */
+/* ========== 0) 覆蓋 user-select:none，讓 editor 可編輯 ========== */
 (function injectEditorCSS() {
   const css = `
   .book .editor-area[contenteditable="true"],
@@ -113,7 +105,7 @@ function getMeasureBoxLike(area){
   return __measureBox;
 }
 
-/* ========== 4) clip: 依「純文字長度」切出可留在本頁的 HTML 與剩餘純文字 ========== */
+/* ========== 4) clip：依「純文字長度」切回保留 HTML 與剩餘純文字 ========== */
 function clipAreaByPlainLength(area, keepLen){
   const clone = area.cloneNode(true);          // 不動原本 DOM
   let remain = keepLen;
@@ -164,7 +156,7 @@ function clipAreaByPlainLength(area, keepLen){
   return { keptPlain, restPlain };
 }
 
-/* ========== 5) fit: 計算本頁可容納的純文字數，保留 HTML，吐出剩餘純文字 ========== */
+/* ========== 5) fit：算本頁可容納的純文字數，保留 HTML，吐出剩餘純文字 ========== */
 function getPlainTextFromArea(area){ return (area && area.textContent) ? area.textContent : ''; }
 function setPlainTextToArea(area, plain){
   if (!area) return;
@@ -251,7 +243,7 @@ function safeRebuildAndRedraw(){
   }
 }
 
-/* ========== 7) 編輯殼：只保留 editor-area 與角標，清掉舊顯示內容 ========== */
+/* ========== 7) 編輯殼：只留 editor-area + 角標；阻擋翻頁手勢 ========== */
 function ensureEditorArea(pageEl){
   if (!pageEl) return null;
   let area = pageEl.querySelector(':scope > .editor-area');
@@ -259,6 +251,7 @@ function ensureEditorArea(pageEl){
 
   area = document.createElement('div');
   area.className = 'editor-area';
+  area.tabIndex = 0; // 讓點擊可聚焦
   Object.assign(area.style, {
     boxSizing: 'border-box',
     width: '100%',
@@ -274,9 +267,7 @@ function ensureEditorArea(pageEl){
 function cleanPageKeepEditorAndMeta(pageEl, area){
   const keep = new Set([area]);
   pageEl.querySelectorAll(':scope > .page-meta').forEach(n => keep.add(n));
-  Array.from(pageEl.childNodes).forEach(n => {
-    if (!keep.has(n)) pageEl.removeChild(n);
-  });
+  Array.from(pageEl.childNodes).forEach(n => { if (!keep.has(n)) pageEl.removeChild(n); });
 }
 function ensurePagePlainToJson(pageObj, plain){
   const html = (plain || '').split('\n')
@@ -285,6 +276,15 @@ function ensurePagePlainToJson(pageObj, plain){
   pageObj.content_json = pageObj.content_json || {};
   pageObj.content_json.text_plain = plain || '';
   pageObj.content_json.text_html  = html || '';
+}
+function bindEditorGuards(area){
+  if (area.__guarded) return;
+  ['pointerdown','mousedown','touchstart','click','dblclick'].forEach(ev=>{
+    area.addEventListener(ev, (e)=>{ e.stopPropagation(); }, true); // 捕獲階段阻擋 BookFlip
+  });
+  area.addEventListener('keydown', (e)=>{ e.stopPropagation(); }, true);
+  area.addEventListener('mousedown', ()=>{ if (document.activeElement !== area) area.focus({preventScroll:true}); });
+  area.__guarded = true;
 }
 function ensureEditableShell(dbIndex){
   const pageEl = getPageElByDbIndex(dbIndex);
@@ -299,6 +299,7 @@ function ensureEditableShell(dbIndex){
   pageEl.setAttribute('data-editor', '1');
   area.setAttribute('contenteditable', 'true');
 
+  // 內容進 editor
   const pj = p.content_json || {};
   const basePlain = pj.text_plain || (() => {
     const tmp = document.createElement('div');
@@ -307,23 +308,23 @@ function ensureEditableShell(dbIndex){
   })();
   setPlainTextToArea(area, basePlain);
 
+  // 清掉舊顯示區塊（只留 editor + 角標）
   cleanPageKeepEditorAndMeta(pageEl, area);
 
-  if (!area.__bound){
-    bindInputEvents(area, dbIndex);
-    area.__bound = true;
-  }
+  // 綁定輸入與防翻頁
+  bindEditorGuards(area);
+  if (!area.__bound){ bindInputEvents(area, dbIndex); area.__bound = true; }
+
   return area;
 }
 
-/* ========== 8) 分流：往後推擠（跨頁的文字以純文字放入） ========== */
+/* ========== 8) 分流：往後推擠（跨頁純文字） ========== */
 function flowOverflowFrom(dbIndex){
   let curIdx = dbIndex;
 
   while (curIdx > 0 && curIdx <= PAGES_DB.length){
     const curPage = PAGES_DB[curIdx - 1];
 
-    // 不可寫：跳到下一個可寫頁或插紙
     if (!isWritablePage(curPage)) {
       let nextWritable = findNextWritableDbIndex(curIdx - 1);
       if (!nextWritable) nextWritable = insertBlankSheetAfterDbIndex(PAGES_DB.length);
@@ -342,7 +343,6 @@ function flowOverflowFrom(dbIndex){
       break;
     }
 
-    // 還有剩：下一個可寫頁，若沒有就插紙
     let nextIdx = findNextWritableDbIndex(curIdx);
     if (!nextIdx){
       const anchor = (curIdx % 2 === 0) ? curIdx : curIdx + 1;
@@ -352,7 +352,6 @@ function flowOverflowFrom(dbIndex){
     const nextArea = ensureEditableShell(nextIdx);
     const oldPlain = getPlainTextFromArea(nextArea);
 
-    // 往後推擠：剩餘內容以「純文字」放在下一頁最前面
     const merged = rest + oldPlain;
     setPlainTextToArea(nextArea, merged);
     ensurePagePlainToJson(PAGES_DB[nextIdx-1], merged);
@@ -367,7 +366,7 @@ function flowOverflowFrom(dbIndex){
 /* ========== 9) 事件：paste / input / Enter ========== */
 function bindInputEvents(areaEl, dbIndex){
 
-  // 僅允許純文字貼上（保留 \n）
+  // 貼上：只允許純文字
   areaEl.addEventListener('paste', (e)=>{
     e.preventDefault();
     const t = (e.clipboardData || window.clipboardData).getData('text/plain') || '';
@@ -376,17 +375,16 @@ function bindInputEvents(areaEl, dbIndex){
     setTimeout(()=>{ flowOverflowFrom(dbIndex); }, 0);
   });
 
-  // Enter -> 插入 \n（不產生 <div>/<p>）
+  // Enter -> \n
   areaEl.addEventListener('keydown', (e)=>{
     if (e.key === 'Enter'){
       e.preventDefault();
       document.execCommand('insertText', false, '\n');
       setTimeout(()=>{ flowOverflowFrom(dbIndex); }, 0);
     }
-    // Ctrl+Z：交給瀏覽器原生
   });
 
-  // 任意輸入：更新本頁；若溢出才向後分流；不回捲
+  // 任意輸入：更新 / 判斷是否溢出
   areaEl.addEventListener('input', ()=>{
     const curPage = PAGES_DB[dbIndex - 1];
     ensurePagePlainToJson(curPage, getPlainTextFromArea(areaEl));
@@ -400,7 +398,7 @@ function bindInputEvents(areaEl, dbIndex){
   });
 }
 
-/* ========== 10) 插入/刪除紙張（配合 dock 按鈕） ========== */
+/* ========== 10) 插入/刪除紙張（配合 dock） ========== */
 const btnInsert = document.getElementById('btnInsertPage');
 const btnDelete = document.getElementById('btnDeleteBlank');
 
@@ -540,7 +538,7 @@ btnBold     ?.addEventListener('click', ()=> applyExec('bold'));
 btnItalic   ?.addEventListener('click', ()=> applyExec('italic'));
 btnUnderline?.addEventListener('click', ()=> applyExec('underline'));
 
-/* ========== 12) 掛載/召回編輯器 ========== */
+/* ========== 12) 掛載／召回編輯器（重繪保險） ========== */
 function mountEditors(){
   for (let i=1; i<=PAGES_DB.length; i++){
     if (!isWritablePage(PAGES_DB[i-1])) continue;
@@ -549,17 +547,27 @@ function mountEditors(){
   recallMeta();
 }
 
+// 包裝 afterLayoutRedraw：每次重繪後把編輯器補回去
 (function wrapAfterLayoutRedraw(){
-  if (!window.afterLayoutRedraw || window.afterLayoutRedraw.__wrapped) return;
-  const orig = window.afterLayoutRedraw;
-  window.afterLayoutRedraw = function(){
-    const r = orig.apply(this, arguments);
-    try {
-      if (typeof window.__mountEditors === 'function') window.__mountEditors();
-    } catch(e) { /* no-op */ }
-    return r;
-  };
-  window.afterLayoutRedraw.__wrapped = true;
+  function wrap(){
+    if (!window.afterLayoutRedraw || window.afterLayoutRedraw.__wrapped) return;
+    const orig = window.afterLayoutRedraw;
+    window.afterLayoutRedraw = function(){
+      const r = orig.apply(this, arguments);
+      try { mountEditors(); } catch(e) {}
+      return r;
+    };
+    window.afterLayoutRedraw.__wrapped = true;
+  }
+  // 若尚未定義，等一等（避免載入順序問題）
+  if (window.afterLayoutRedraw) wrap();
+  else {
+    let tries = 0;
+    const t = setInterval(()=>{
+      if (window.afterLayoutRedraw){ wrap(); clearInterval(t); }
+      if (++tries > 40) clearInterval(t);
+    }, 50);
+  }
 })();
 
 /* ========== 13) 啟動 ========== */
@@ -570,5 +578,5 @@ function mountEditors(){
       mountEditors();
     }, 0);
   });
-  window.__mountEditors = mountEditors; // 外部重繪後可再掛
+  window.__mountEditors = mountEditors;
 })();
