@@ -30,7 +30,6 @@ function getEditorElForDbIndex(dbIndex){
 
 function getPlainTextFrom(el){ return (el && el.textContent) ? el.textContent : ''; }
 
-// —— 保守量測：確保呈現&量測一致
 function setPlainTextTo(el, plain){
   if (!el) return;
   el.textContent = plain || '';
@@ -38,7 +37,6 @@ function setPlainTextTo(el, plain){
   el.style.wordBreak  = 'break-word';
   el.style.overflow   = 'hidden';
   el.style.display    = 'block';
-  // 這裡強制開啟可選取（即使全域 CSS 設定 user-select:none）
   el.style.userSelect = 'text';
   el.style.webkitUserSelect = 'text';
   el.style.msUserSelect = 'text';
@@ -55,7 +53,7 @@ function ensurePagePlainToJson(pageObj, plain){
   pageObj.content_json.text_html  = html || '';
 }
 
-/* ========== 角標上鎖（contenteditable="false" + pointer-events:none） ========== */
+/* ========== 角標上鎖 ========== */
 function lockMetaEditabilityIn(root){
   (root || document).querySelectorAll('.page-meta').forEach(m=>{
     m.setAttribute('contenteditable', 'false');
@@ -224,7 +222,6 @@ function ensureEditableShell(dbIndex){
   pageNode.style.wordBreak  = 'break-word';
   pageNode.style.overflow   = 'hidden';
   pageNode.style.display    = 'block';
-  // ★ 這四行確保能選取和輸入
   pageNode.style.userSelect = 'text';
   pageNode.style.webkitUserSelect = 'text';
   pageNode.style.msUserSelect = 'text';
@@ -234,7 +231,14 @@ function ensureEditableShell(dbIndex){
 
   // 初始化：把既有內容轉成純文字顯示
   const pj = p.content_json || {};
-  const basePlain = pj.text_plain || (()=>{ const tmp=document.createElement('div'); tmp.innerHTML = pj.text_html || ''; return tmp.textContent || ''; })();
+  let basePlain = '';
+  if (typeof pj.text_plain === 'string' && pj.text_plain.length > 0) {
+    basePlain = pj.text_plain;
+  } else if (typeof pj.text_html === 'string' && pj.text_html.length > 0) {
+    const tmp = document.createElement('div'); tmp.innerHTML = pj.text_html; basePlain = tmp.textContent || '';
+  } else {
+    basePlain = '';
+  }
   setPlainTextTo(pageNode, basePlain);
   return pageNode;
 }
