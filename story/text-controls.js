@@ -1,7 +1,6 @@
 /* text-controls.js
- * 針對目前「反白的文字」做 B / I / U / 字級 ±0.2em
- * - 僅作用於 .story 內選區
- * - 操作後維持反白（不取消選取）
+ * 只作用於 .story 內「反白的文字」：B / I / U / 字級 ±0.2em
+ * 套用後維持反白，不取消選取
  */
 
 (function(){
@@ -26,7 +25,7 @@
 
   function applyExec(cmd){
     const ctx = getCtx(); if (!ctx) return;
-    if (ctx.range.collapsed) return; // 沒反白不處理
+    if (ctx.range.collapsed) return;
     const keep = saveSelection();
     ctx.story.focus();
     document.execCommand(cmd, false, null);
@@ -41,7 +40,6 @@
     const { sel, range, story, db } = ctx;
     if (range.collapsed) return;
 
-    // 找共同祖先是否 fs-span
     let node = range.commonAncestorContainer.nodeType===1 ? range.commonAncestorContainer : range.commonAncestorContainer.parentNode;
     while (node && node !== story){
       if (node.classList?.contains(FS_CLASS)) break;
@@ -57,7 +55,6 @@
       span.className = FS_CLASS;
       span.style.fontSize = clamp(1 + delta, FS_MIN, FS_MAX) + 'em';
       const frag = range.cloneContents();
-      // 保證只一層：去掉裡面舊的 fs-span
       Array.from(frag.querySelectorAll ? frag.querySelectorAll('.'+FS_CLASS) : []).forEach(s=>{
         while(s.firstChild) s.parentNode.insertBefore(s.firstChild, s);
         s.parentNode.removeChild(s);
