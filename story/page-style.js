@@ -1,6 +1,7 @@
 /* page-style.js
- * 下方 Dock 頁型切換（novel / divider-light / divider-dark / illustration）
- * 圖片頁雙擊可改網址（空值→轉回一般文本）
+ * 頁型切換（novel / divider-light / divider-dark / illustration）
+ * - 只改本地資料＋輕量重畫（不重建 BookFlip）→ 不會壞翻頁
+ * - 圖片頁雙擊可改網址（空值→回一般文本）
  */
 
 (function(){
@@ -9,6 +10,14 @@
   function getFocusedPage(){
     const db = EditorCore.getFocusedDbIndex();
     return { db, page: PAGES_DB[db - 1] };
+  }
+
+  function redrawLight(){
+    applyPageTypesNow();
+    renderMetaForAllPages();
+    EditorCore.hookAllStories();
+    bindImageEditors();
+    try{ updateCount && updateCount(); }catch(_){}
   }
 
   function switchTo(style){
@@ -45,20 +54,20 @@
       }
     }
 
-    SheetOps.rebuildAndRedrawPreserveCursor(db);
+    redrawLight();
     try{ persistDraft && persistDraft(); }catch(_){}
-    setTimeout(()=>{ try{ afterLayoutRedraw(); EditorCore.hookAllStories(); bindImageEditors(); }catch(e){} }, 0);
   }
 
+  // 圖片頁雙擊：改網址；空值→回一般文本
   function bindImageEditors(){
     const list = EditorCore.getDomPagesList();
     for (let i=0;i<list.length;i++){
       const dbIndex = EditorCore.domIndexToDbIndex(i+1);
       if (dbIndex <= 0) continue;
       const p = PAGES_DB[dbIndex - 1];
-      if (!EditorCore.isImagePage(p)) continue;
       const pageEl = list[i];
 
+      if (!EditorCore.isImagePage(p)) { pageEl.__imgEditBound = false; continue; }
       if (pageEl.__imgEditBound) continue;
       pageEl.__imgEditBound = true;
 
@@ -68,12 +77,11 @@
           p.type = 'novel';
           p.image_url = '';
           p.content_json = { text_plain:'', text_html:'' };
-        }else{
+        } else {
           p.image_url = u.trim();
         }
-        SheetOps.rebuildAndRedrawPreserveCursor(dbIndex);
+        redrawLight();
         try{ persistDraft && persistDraft(); }catch(_){}
-        setTimeout(()=>{ try{ afterLayoutRedraw(); EditorCore.hookAllStories(); bindImageEditors(); }catch(e){} }, 0);
       });
     }
   }
