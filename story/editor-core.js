@@ -1,8 +1,9 @@
 /* editor-core.js
  * 共用工具 + hookAllStories()
- * novel / divider(白/黑) 會補 .story[contenteditable]（圖片頁不編輯）
- * 修正：初次掛 story 會先讀取頁面既有文字，避免重整後文本消失
- * 修正：用 MutationObserver 確保 BookFlip 渲染後再掛，避免首進入不可編輯
+ * - novel / divider(白/黑) 會補 .story[contenteditable]（圖片頁不編輯）
+ * - 初次掛 .story 會保留原頁文字（避免重整後文本消失）
+ * - 角標鎖不可編輯
+ * - MutationObserver：BookFlip 渲染後自動掛 .story
  */
 
 (function(){
@@ -41,10 +42,10 @@
 
   function persist(){ try{ persistDraft && persistDraft(); }catch(_){} }
 
-  function textContentOfNodes(nodes){
+  function textOf(nodes){
     let s = '';
     nodes.forEach(n => { s += (n.textContent || ''); });
-    return s.replace(/\u00a0/g, ' '); // nbsp -> space
+    return s.replace(/\u00a0/g, ' ');
   }
 
   function updatePageJsonFromStory(dbIndex, storyEl){
@@ -61,12 +62,11 @@
 
     let story = pageEl.querySelector('.story');
     if (!story){
-      // 先抓舊內容（非角標）
+      // 蒐集原有非角標內容
       const metas = new Set(Array.from(pageEl.querySelectorAll('.page-meta')));
       const olds = Array.from(pageEl.childNodes).filter(n => !(n.nodeType===1 && metas.has(n)));
-      const oldPlain = textContentOfNodes(olds).trim();
+      const oldPlain = textOf(olds).trim();
 
-      // 建立 .story
       story = document.createElement('div');
       story.className = 'page-content story';
       story.setAttribute('contenteditable','true');
@@ -94,12 +94,10 @@
         });
       }
 
-      // 插入在最前面，保留角標
       pageEl.insertBefore(story, pageEl.firstChild);
-      // 移除舊內容
       olds.forEach(n=> n.parentNode && n.parentNode.removeChild(n));
 
-      // 初始化純文字：優先 DB.text_plain；若空則用舊 DOM 文字
+      // 初始化：DB 為主，沒資料時用舊 DOM 文字
       const plainInit = (p.content_json?.text_plain ?? '').trim() || oldPlain;
       if (plainInit) {
         story.textContent = plainInit;
@@ -109,7 +107,7 @@
       }
     }
 
-    // 綁貼上/輸入事件
+    // 綁貼上/輸入
     if (window.PasteFlow && typeof window.PasteFlow.bindTo === 'function' && !story.__pfBound){
       story.__pfBound = true; window.PasteFlow.bindTo(story);
     }
@@ -146,25 +144,24 @@
     try { window.PageStyle?.bindImageEditors?.(); } catch(_){}
   }
 
-  // 用 MutationObserver 確保 BookFlip 渲染後我們再掛 story
+  // 觀察 BookFlip DOM 完成後再掛 .story
   let mo;
   function observeBook(){
     if (mo) mo.disconnect();
     mo = new MutationObserver(()=> {
-      // debounce 一下
       clearTimeout(observeBook._t);
       observeBook._t = setTimeout(()=>{ try{ hookAllStories(); }catch(e){} }, 30);
     });
     mo.observe(document.getElementById('bookCanvas'), { childList:true, subtree:true });
   }
 
+  // export
   window.EditorCore = {
     getDomPagesList, domIndexToDbIndex, dbIndexToDomIndex,
     isImagePage, isDividerPage, isNovelPage, isEditablePage,
     lockMeta, ensureStoryOnPageEl, getStoryByDbIndex,
     getFocusedDbIndex, updatePageJsonFromStory, hookAllStories
   };
-
   window.EditorFlow = { hookAllStories };
 
   document.addEventListener('DOMContentLoaded', ()=>{
