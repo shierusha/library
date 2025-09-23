@@ -1,6 +1,8 @@
 /* editor-core.js
  * 共用工具 + hookAllStories()
- * 讓 novel / divider(白/黑) 都有 .story[contenteditable]（圖片頁不編輯）
+ * novel / divider(白/黑) 會補 .story[contenteditable]（圖片頁不編輯）
+ * 修正：初次掛 story 會先讀取頁面既有文字，避免重整後文本消失
+ * 修正：用 MutationObserver 確保 BookFlip 渲染後再掛，避免首進入不可編輯
  */
 
 (function(){
@@ -39,6 +41,12 @@
 
   function persist(){ try{ persistDraft && persistDraft(); }catch(_){} }
 
+  function textContentOfNodes(nodes){
+    let s = '';
+    nodes.forEach(n => { s += (n.textContent || ''); });
+    return s.replace(/\u00a0/g, ' '); // nbsp -> space
+  }
+
   function updatePageJsonFromStory(dbIndex, storyEl){
     const p = PAGES_DB[dbIndex - 1]; if (!p) return;
     p.content_json = p.content_json || {};
@@ -53,19 +61,17 @@
 
     let story = pageEl.querySelector('.story');
     if (!story){
-      // 保留角標，清掉舊內容（非角標）
+      // 先抓舊內容（非角標）
       const metas = new Set(Array.from(pageEl.querySelectorAll('.page-meta')));
-      Array.from(pageEl.childNodes).forEach(n=>{
-        if (n.nodeType===1 && metas.has(n)) return;
-        pageEl.removeChild(n);
-      });
+      const olds = Array.from(pageEl.childNodes).filter(n => !(n.nodeType===1 && metas.has(n)));
+      const oldPlain = textContentOfNodes(olds).trim();
 
+      // 建立 .story
       story = document.createElement('div');
       story.className = 'page-content story';
       story.setAttribute('contenteditable','true');
       story.dataset.dbIndex = String(dbIndex);
 
-      // 基本輸入＋空白可點
       story.style.whiteSpace='pre-wrap';
       story.style.wordBreak='break-word';
       story.style.overflow='hidden';
@@ -82,18 +88,26 @@
         story.style.boxSizing='border-box';
       } else {
         story.style.minHeight='1.2em';
-        // 整頁點擊也能進入輸入
         pageEl.addEventListener('mousedown', (e)=>{
           if (e.target.closest('.page-meta')) return;
           story.focus();
         });
       }
-      pageEl.insertBefore(story, pageEl.firstChild);
-    }
 
-    // 初始化純文字
-    const plain = (p.content_json?.text_plain) || '';
-    if (story.textContent !== plain) story.textContent = plain;
+      // 插入在最前面，保留角標
+      pageEl.insertBefore(story, pageEl.firstChild);
+      // 移除舊內容
+      olds.forEach(n=> n.parentNode && n.parentNode.removeChild(n));
+
+      // 初始化純文字：優先 DB.text_plain；若空則用舊 DOM 文字
+      const plainInit = (p.content_json?.text_plain ?? '').trim() || oldPlain;
+      if (plainInit) {
+        story.textContent = plainInit;
+        p.content_json = p.content_json || {};
+        if (!p.content_json.text_plain) p.content_json.text_plain = plainInit;
+        if (!p.content_json.text_html)  p.content_json.text_html  = plainInit.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/\n/g,'<br>');
+      }
+    }
 
     // 綁貼上/輸入事件
     if (window.PasteFlow && typeof window.PasteFlow.bindTo === 'function' && !story.__pfBound){
@@ -129,8 +143,19 @@
       ensureStoryOnPageEl(list[i], dbIndex);
     }
     lockMeta();
-    // 圖片頁雙擊可改網址
     try { window.PageStyle?.bindImageEditors?.(); } catch(_){}
+  }
+
+  // 用 MutationObserver 確保 BookFlip 渲染後我們再掛 story
+  let mo;
+  function observeBook(){
+    if (mo) mo.disconnect();
+    mo = new MutationObserver(()=> {
+      // debounce 一下
+      clearTimeout(observeBook._t);
+      observeBook._t = setTimeout(()=>{ try{ hookAllStories(); }catch(e){} }, 30);
+    });
+    mo.observe(document.getElementById('bookCanvas'), { childList:true, subtree:true });
   }
 
   window.EditorCore = {
@@ -140,8 +165,10 @@
     getFocusedDbIndex, updatePageJsonFromStory, hookAllStories
   };
 
-  // 讓 app.js 既有呼叫可用
   window.EditorFlow = { hookAllStories };
 
-  document.addEventListener('DOMContentLoaded', ()=> setTimeout(hookAllStories, 0));
+  document.addEventListener('DOMContentLoaded', ()=>{
+    observeBook();
+    setTimeout(hookAllStories, 0);
+  });
 })();
