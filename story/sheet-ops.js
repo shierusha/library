@@ -1,10 +1,12 @@
 /* sheet-ops.js
- * 插入/刪除白紙（兩頁 novel），重建 BookFlip 並把游標定位到預期頁
- * 修正：插入後定位新 front，並呼叫 ensureSwipeBinding（若存在），不再卡第一頁
+ * 插入/刪除白紙（兩頁 novel），重建 BookFlip 並正確定位游標
+ * - 插入回傳新 front 的 dbIndex（供大量貼上繼續流向）
  */
 
 (function(){
   function persist(){ try{ persistDraft && persistDraft(); }catch(_){} }
+  function genLocalId(){ return 'local_' + Math.random().toString(36).slice(2,9); }
+  function getSheetStart(dbIndex){ return (dbIndex % 2 === 0) ? dbIndex - 1 : dbIndex; }
 
   function rebuildAndRedrawPreserveCursor(preferDbIndex){
     try{
@@ -30,19 +32,18 @@
           return r;
         };
       }
+      book._cursorPage = Math.max(0, EditorCore.dbIndexToDomIndex(startDb) - 1);
+      if (typeof book._mountCurrent === 'function') book._mountCurrent();
+
       applyLayout(); afterLayoutRedraw(); EditorCore.hookAllStories();
-      // 重新綁 Swipe（若 app.js 有提供）
-      if (typeof window.ensureSwipeBinding === 'function') window.ensureSwipeBinding();
+      if (typeof window.ensureSwipeBinding === 'function') ensureSwipeBinding();
     }catch(e){ console.warn('rebuild failed:', e); }
   }
 
-  function genLocalId(){ return 'local_' + Math.random().toString(36).slice(2,9); }
-  function getSheetStart(dbIndex){ return (dbIndex % 2 === 0) ? dbIndex - 1 : dbIndex; }
-
   function insertBlankSheetAfterCurrentSheet(){
     const focusBefore = EditorCore.getFocusedDbIndex();
-    const sheetStart = getSheetStart(focusBefore);
-    const insertAt = sheetStart + 2; // 下一張紙的 front
+    const sheetStart  = getSheetStart(focusBefore);
+    const insertAt    = sheetStart + 2; // 下一張紙的 front
 
     const front = { id: genLocalId(), page_index: insertAt,   type:'novel', image_url:'', content_json:{text_plain:'', text_html:''} };
     const back  = { id: genLocalId(), page_index: insertAt+1, type:'novel', image_url:'', content_json:{text_plain:'', text_html:''} };
@@ -51,7 +52,7 @@
     PAGES_DB.push(front, back);
     PAGES_DB.sort((a,b)=>a.page_index - b.page_index);
 
-    rebuildAndRedrawPreserveCursor(insertAt); // 直接跳到新 front
+    rebuildAndRedrawPreserveCursor(insertAt);
     persist();
     return insertAt;
   }
@@ -80,6 +81,7 @@
     persist();
   }
 
+  // 綁定按鈕
   document.getElementById('btnInsertPage')?.addEventListener('click', insertBlankSheetAfterCurrentSheet);
   document.getElementById('btnDeleteBlank')?.addEventListener('click', deleteBlankSheetIfPossible);
 
