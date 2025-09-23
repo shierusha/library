@@ -1,5 +1,6 @@
 /* sheet-ops.js
- * 插入/刪除白紙（兩頁 novel），以及重建並保留/定位游標
+ * 插入/刪除白紙（兩頁 novel），重建 BookFlip 並把游標定位到預期頁
+ * 修正：插入後定位新 front，並呼叫 ensureSwipeBinding（若存在），不再卡第一頁
  */
 
 (function(){
@@ -7,7 +8,6 @@
 
   function rebuildAndRedrawPreserveCursor(preferDbIndex){
     try{
-      // 如果有明確目標就用，否則用目前游標頁
       const startDb = preferDbIndex || EditorCore.getFocusedDbIndex() || 1;
       const pairs = buildPairsFromPages();
 
@@ -31,14 +31,14 @@
         };
       }
       applyLayout(); afterLayoutRedraw(); EditorCore.hookAllStories();
+      // 重新綁 Swipe（若 app.js 有提供）
+      if (typeof window.ensureSwipeBinding === 'function') window.ensureSwipeBinding();
     }catch(e){ console.warn('rebuild failed:', e); }
   }
 
   function genLocalId(){ return 'local_' + Math.random().toString(36).slice(2,9); }
-
   function getSheetStart(dbIndex){ return (dbIndex % 2 === 0) ? dbIndex - 1 : dbIndex; }
 
-  // 插入白紙：在「當前紙張的下一張」插入；回傳新 front 的 dbIndex
   function insertBlankSheetAfterCurrentSheet(){
     const focusBefore = EditorCore.getFocusedDbIndex();
     const sheetStart = getSheetStart(focusBefore);
@@ -47,13 +47,11 @@
     const front = { id: genLocalId(), page_index: insertAt,   type:'novel', image_url:'', content_json:{text_plain:'', text_html:''} };
     const back  = { id: genLocalId(), page_index: insertAt+1, type:'novel', image_url:'', content_json:{text_plain:'', text_html:''} };
 
-    // insertAt（含）之後 +2
     for (const p of PAGES_DB){ if (p.page_index >= insertAt) p.page_index += 2; }
     PAGES_DB.push(front, back);
     PAGES_DB.sort((a,b)=>a.page_index - b.page_index);
 
-    // 重建並把游標定位到新插入的 front，避免回到封面
-    rebuildAndRedrawPreserveCursor(insertAt);
+    rebuildAndRedrawPreserveCursor(insertAt); // 直接跳到新 front
     persist();
     return insertAt;
   }
@@ -63,6 +61,7 @@
     const sheetStart = getSheetStart(db);
     const a = PAGES_DB[sheetStart - 1];
     const b = PAGES_DB[sheetStart];
+
     function isBlankNovel(p){
       if (!p || String(p.type).toLowerCase().replace(/-/g,'_') !== 'novel') return false;
       return ((p.content_json?.text_plain || '').trim().length === 0);
@@ -75,13 +74,12 @@
     PAGES_DB = PAGES_DB.filter(x => x !== a && x !== b);
     for (const p of PAGES_DB){ if (p.page_index > sheetStart+1) p.page_index -= 2; }
     PAGES_DB.sort((x,y)=>x.page_index - y.page_index);
-    // 刪掉後把游標放到被刪紙前一頁（若有）
+
     const target = Math.max(1, sheetStart - 1);
     rebuildAndRedrawPreserveCursor(target);
     persist();
   }
 
-  // 綁定按鈕
   document.getElementById('btnInsertPage')?.addEventListener('click', insertBlankSheetAfterCurrentSheet);
   document.getElementById('btnDeleteBlank')?.addEventListener('click', deleteBlankSheetIfPossible);
 
