@@ -1,6 +1,6 @@
 /* paste-flow.js
  * 貼上純文字 / Enter / 鍵入 → 自動分頁到「一般文本」頁
- * 遇到圖片/黑白頁會先把本頁截滿，剩餘往下一個 novel；若沒有 novel 就插入白紙（用新的回傳 insertAt）
+ * 遇到圖片/黑白頁會先把本頁截滿，剩餘往下一個 novel；沒有就插紙（拿到新 front index）
  */
 
 (function(){
@@ -87,11 +87,11 @@
 
       if (!restPlain || restPlain.length === 0) break;
 
-      // 找下一個 novel；沒有就插紙（這裡會回傳新 front index）
+      // 找下一個 novel；沒有就插紙（取得新 front index）
       let nextIdx = findNextNovel(curIdx);
       if (!nextIdx){
         nextIdx = SheetOps.insertBlankSheetAfterCurrentSheet();
-        // 插入後 DB 已重建，確保從當前之後找第一個 novel（理論上 nextIdx 就是新插入的）
+        // 若理論外情況沒指到 novel，補一層搜尋
         if (!EditorCore.isNovelPage(PAGES_DB[nextIdx-1])){
           for (let k=curIdx+1;k<=PAGES_DB.length;k++){
             if (EditorCore.isNovelPage(PAGES_DB[k-1])) { nextIdx = k; break; }
@@ -133,7 +133,7 @@
     storyEl.addEventListener('input', ()=>{
       EditorCore.updatePageJsonFromStory(dbIndex, storyEl);
       setTimeout(()=>{
-        if (isOverflow(storyEl)) flowOverflowFrom(dbIndex);
+        if (storyEl && isOverflow(storyEl)) flowOverflowFrom(dbIndex);
         else { try{ renderMetaForAllPages(); EditorCore.lockMeta(); }catch(e){} }
       }, 0);
     });
