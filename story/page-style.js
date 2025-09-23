@@ -1,6 +1,6 @@
 /* page-style.js
- * 下方 Dock 的頁型切換（novel / divider-light / divider-dark / illustration）
- * 並支援：圖片頁雙擊可改網址（空值→轉回一般文本）
+ * 下方 Dock 頁型切換（novel / divider-light / divider-dark / illustration）
+ * 圖片頁雙擊可改網址（空值→轉回一般文本）
  */
 
 (function(){
@@ -35,7 +35,6 @@
       }
       const u = prompt('輸入圖片網址（留空=取消）', page.image_url || '');
       if (!u || !u.trim()){
-        // 取消 → 回一般文本
         page.type = 'novel';
         page.image_url = '';
         page.content_json = { text_plain:'', text_html:'' };
@@ -51,7 +50,6 @@
     setTimeout(()=>{ try{ afterLayoutRedraw(); EditorCore.hookAllStories(); bindImageEditors(); }catch(e){} }, 0);
   }
 
-  // 綁定圖片頁雙擊：改網址；空值→轉回一般文本
   function bindImageEditors(){
     const list = EditorCore.getDomPagesList();
     for (let i=0;i<list.length;i++){
@@ -67,7 +65,6 @@
       pageEl.addEventListener('dblclick', ()=>{
         const u = prompt('輸入圖片網址（留空=改回一般頁）', p.image_url || '');
         if (!u || !u.trim()){
-          // 回一般頁
           p.type = 'novel';
           p.image_url = '';
           p.content_json = { text_plain:'', text_html:'' };
