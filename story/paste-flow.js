@@ -1,15 +1,23 @@
 /* paste-flow.js
- * 貼上純文字 / Enter / 鍵入 → 自動分頁到「一般文本」頁
- * 遇到圖片/黑白頁會先把本頁截滿，剩餘往下一個 novel；沒有就插紙（拿到新 front index）
+ * 貼上純文字 / Enter / 輸入 → 視覺溢出自動分頁到下一個 novel 頁
+ * - 溢出判斷依 writing-mode 決定：直排看寬、橫排看高
+ * - 沒有可寫頁就插入一張白紙（兩頁），並繼續流向新 front
  */
 
 (function(){
-  function isOverflow(el){
-    if (!el) return false;
-    if (el.clientHeight <= 0) return false;
-    return (el.scrollHeight - el.clientHeight) > 1;
+  function isVerticalFlow(storyEl){
+    const page = storyEl.closest('.page, .single-page') || storyEl;
+    const wm = (page && getComputedStyle(page).writingMode) || '';
+    return wm.indexOf('vertical') === 0; // vertical-rl / vertical-lr
+  }
+  function isOverflow(storyEl){
+    if (!storyEl) return false;
+    const v = isVerticalFlow(storyEl);
+    if (v) { return (storyEl.scrollWidth  - storyEl.clientWidth ) > 0.5; }
+    else   { return (storyEl.scrollHeight - storyEl.clientHeight) > 0.5; }
   }
 
+  // 保留格式的子樹截斷（用視覺溢出判斷二分）
   function truncateHTMLPreserve(firstHTML, nChars){
     if (nChars <= 0) return '';
     const tmp = document.createElement('div'); tmp.innerHTML = firstHTML;
@@ -41,9 +49,10 @@
   }
 
   function fitKeepWithFormat(storyEl){
-    const fullHTML = storyEl.innerHTML;
+    const fullHTML  = storyEl.innerHTML;
     const fullPlain = storyEl.textContent || '';
     let lo=0, hi=fullPlain.length, fit=0;
+
     while (lo <= hi){
       const mid = (lo + hi) >> 1;
       storyEl.innerHTML = truncateHTMLPreserve(fullHTML, mid);
@@ -51,9 +60,9 @@
     }
     storyEl.innerHTML = truncateHTMLPreserve(fullHTML, fit);
     if (isOverflow(storyEl)){
-      const before = storyEl.textContent || '';
-      const lastNL = before.lastIndexOf('\n');
-      const target = (lastNL >= 0) ? lastNL : Math.max(0, before.length - 1);
+      const before  = storyEl.textContent || '';
+      const lastNL  = before.lastIndexOf('\n');
+      const target  = (lastNL >= 0) ? lastNL : Math.max(0, before.length - 1);
       storyEl.innerHTML = truncateHTMLPreserve(fullHTML, target);
       fit = target;
     }
@@ -87,11 +96,10 @@
 
       if (!restPlain || restPlain.length === 0) break;
 
-      // 找下一個 novel；沒有就插紙（取得新 front index）
+      // 下一個 novel；沒有就插一張白紙，拿新 front index
       let nextIdx = findNextNovel(curIdx);
       if (!nextIdx){
         nextIdx = SheetOps.insertBlankSheetAfterCurrentSheet();
-        // 若理論外情況沒指到 novel，補一層搜尋
         if (!EditorCore.isNovelPage(PAGES_DB[nextIdx-1])){
           for (let k=curIdx+1;k<=PAGES_DB.length;k++){
             if (EditorCore.isNovelPage(PAGES_DB[k-1])) { nextIdx = k; break; }
@@ -133,11 +141,12 @@
     storyEl.addEventListener('input', ()=>{
       EditorCore.updatePageJsonFromStory(dbIndex, storyEl);
       setTimeout(()=>{
-        if (storyEl && isOverflow(storyEl)) flowOverflowFrom(dbIndex);
+        if (isOverflow(storyEl)) flowOverflowFrom(dbIndex);
         else { try{ renderMetaForAllPages(); EditorCore.lockMeta(); }catch(e){} }
       }, 0);
     });
   }
 
+  // 提供給文字控制呼叫（放大/縮小/粗斜底線後也檢查是否需要往後分頁）
   window.PasteFlow = { bindTo, flowOverflowFrom };
 })();
