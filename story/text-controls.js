@@ -1,6 +1,7 @@
 /* text-controls.js
  * 只作用於 .story 內「反白的文字」：B / I / U / 字級 ±0.2em
- * 套用後維持反白，不取消選取
+ * - 套用後維持反白（不取消選取）
+ * - A+/A- 後呼叫 PasteFlow.flowOverflowFrom(db) → 放大字把溢出文本推到下一頁
  */
 
 (function(){
@@ -31,6 +32,8 @@
     document.execCommand(cmd, false, null);
     EditorCore.updatePageJsonFromStory(ctx.db, ctx.story);
     restoreSelection(keep);
+    // 粗斜底線也可能影響折行，保守觸發一次分頁檢查
+    setTimeout(()=>{ try{ PasteFlow.flowOverflowFrom(ctx.db); }catch(_){ } }, 0);
   }
 
   function parseEm(str){ const m=/([\d.]+)em/i.exec(str||''); return m?parseFloat(m[1]):NaN; }
@@ -65,6 +68,8 @@
       sel.removeAllRanges(); const r=document.createRange(); r.selectNodeContents(span); sel.addRange(r);
     }
     EditorCore.updatePageJsonFromStory(db, story);
+    // 字級變更後用視覺檢測觸發分頁
+    setTimeout(()=>{ try{ PasteFlow.flowOverflowFrom(db); }catch(_){ } }, 0);
   }
 
   document.getElementById('btnBold')?.addEventListener('click', ()=>applyExec('bold'));
