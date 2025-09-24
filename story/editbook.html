@@ -191,7 +191,7 @@ body::-webkit-scrollbar { width:0; height:0; }
 
   <!-- 右側工具列 -->
   <div class="side right">
-    <button class="btn ghost" id="btnToggleDir">文字方向</button>
+   <button class="btn ghost" id="btnToggleDir">文字方向</button>
     <button class="btn ghost" id="btnToggleBind">長/短邊</button>
     <button class="btn ghost" id="btnToggleView">單/雙頁</button>
   </div>
@@ -244,13 +244,17 @@ body::-webkit-scrollbar { width:0; height:0; }
 
   <!-- 外掛：不注入 CSS，含 mounted 事件 -->
   <script src="book-flip.js"></script>
-  <!-- 應用層（底線＋TOC＋單頁封面修正） -->
-<script src="app.js"></script>
-<script src="editor-core.js"></script>
+  <!-- 應用層（底線＋TOC＋單頁封面修正）
+ <script src="editor-core.js"></script>
 <script src="sheet-ops.js"></script>
 <script src="paste-flow.js"></script>
 <script src="text-controls.js"></script>
 <script src="page-style.js"></script>
+
+<script src="app.js"></script>
+
+-->
+<script src="editing-mode.js"></script>
 
 </body>
 </html>
