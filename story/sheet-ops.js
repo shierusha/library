@@ -1,65 +1,44 @@
-/* sheet-ops.js
- * 插入/刪除白紙（兩頁 novel），重建 BookFlip 並正確定位游標
- * - 插入回傳新 front 的 dbIndex（供大量貼上繼續流向）
- */
-
+/* sheet-ops.js — 插入/刪除白紙（兩頁） v2 */
 (function(){
   function persist(){ try{ persistDraft && persistDraft(); }catch(_){} }
   function genLocalId(){ return 'local_' + Math.random().toString(36).slice(2,9); }
-  function getSheetStart(dbIndex){ return (dbIndex % 2 === 0) ? dbIndex - 1 : dbIndex; }
 
   function rebuildAndRedrawPreserveCursor(preferDbIndex){
+    const currentDom = (window.book?._cursorPage || 0) + 1;
+    const currentDb  = EditorCore.domIndexToDbIndex(currentDom) || 1;
+    const startDb    = Math.max(1, preferDbIndex || currentDb);
+    rebuildTo(startDb);
     try{
-      const startDb = preferDbIndex || EditorCore.getFocusedDbIndex() || 1;
-      const pairs = buildPairsFromPages();
-
-      window.book = new BookFlip('#bookCanvas', {
-        mode: state.mode,
-        direction: state.direction,
-        speed: 450,
-        singleSpeed: 300,
-        perspective: 2000,
-        data: { pairs },
-        startPageIndex: Math.max(0, EditorCore.dbIndexToDomIndex(startDb) - 1),
-        coverPapers: 1
-      });
-
-      const orig = book._mountCurrent?.bind(book);
-      if (orig){
-        book._mountCurrent = function(){
-          const r = orig();
-          setTimeout(()=>{ try{ afterLayoutRedraw(); EditorCore.hookAllStories(); }catch(e){} }, 0);
-          return r;
-        };
-      }
-      book._cursorPage = Math.max(0, EditorCore.dbIndexToDomIndex(startDb) - 1);
-      if (typeof book._mountCurrent === 'function') book._mountCurrent();
-
-      applyLayout(); afterLayoutRedraw(); EditorCore.hookAllStories();
-      if (typeof window.ensureSwipeBinding === 'function') ensureSwipeBinding();
-    }catch(e){ console.warn('rebuild failed:', e); }
+      const backDom = Math.max(0, currentDom - 1);
+      window.book._cursorPage = backDom;
+      window.book._mountCurrent();
+    }catch(_){}
   }
 
   function insertBlankSheetAfterCurrentSheet(){
-    const focusBefore = EditorCore.getFocusedDbIndex();
-    const sheetStart  = getSheetStart(focusBefore);
-    const insertAt    = sheetStart + 2; // 下一張紙的 front
+    syncAllStoriesToDB();
+
+    const insertAt = (PAGES_DB.length > 0)
+      ? (PAGES_DB[PAGES_DB.length - 1].page_index + 1)
+      : 1;
 
     const front = { id: genLocalId(), page_index: insertAt,   type:'novel', image_url:'', content_json:{text_plain:'', text_html:''} };
     const back  = { id: genLocalId(), page_index: insertAt+1, type:'novel', image_url:'', content_json:{text_plain:'', text_html:''} };
 
-    for (const p of PAGES_DB){ if (p.page_index >= insertAt) p.page_index += 2; }
     PAGES_DB.push(front, back);
     PAGES_DB.sort((a,b)=>a.page_index - b.page_index);
 
-    rebuildAndRedrawPreserveCursor(insertAt);
+    rebuildAndRedrawPreserveCursor();
     persist();
     return insertAt;
   }
 
   function deleteBlankSheetIfPossible(){
-    const db = EditorCore.getFocusedDbIndex();
-    const sheetStart = getSheetStart(db);
+    syncAllStoriesToDB();
+
+    const currentDom = (window.book?._cursorPage || 0) + 1;
+    const db = EditorCore.domIndexToDbIndex(currentDom) || 1;
+    const sheetStart = (db % 2 === 0) ? db - 1 : db;
     const a = PAGES_DB[sheetStart - 1];
     const b = PAGES_DB[sheetStart];
 
@@ -73,22 +52,13 @@
     }
 
     PAGES_DB = PAGES_DB.filter(x => x !== a && x !== b);
-    for (const p of PAGES_DB){ if (p.page_index > sheetStart+1) p.page_index -= 2; }
-    PAGES_DB.sort((x,y)=>x.page_index - y.page_index);
 
-    const target = Math.max(1, sheetStart - 1);
-    rebuildAndRedrawPreserveCursor(target);
+    rebuildAndRedrawPreserveCursor(Math.max(1, sheetStart - 1));
     persist();
   }
 
-  // 綁定按鈕
   document.getElementById('btnInsertPage')?.addEventListener('click', insertBlankSheetAfterCurrentSheet);
   document.getElementById('btnDeleteBlank')?.addEventListener('click', deleteBlankSheetIfPossible);
 
-  window.SheetOps = {
-    rebuildAndRedrawPreserveCursor,
-    insertBlankSheetAfterCurrentSheet,
-    deleteBlankSheetIfPossible,
-    getSheetStart
-  };
+  window.SheetOps = { rebuildAndRedrawPreserveCursor, insertBlankSheetAfterCurrentSheet, deleteBlankSheetIfPossible };
 })();
