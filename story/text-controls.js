@@ -1,4 +1,9 @@
-/* text-controls.js v2 */
+
+/* text-controls.js
+ * 只作用於 .story 內「反白的文字」：B / I / U / 字級 ±0.2em
+ * - 套用後維持反白（不取消選取）
+ * - A+/A- 後呼叫 PasteFlow.flowOverflowFrom(db) → 放大字把溢出文本推到下一頁
+ */
 (function(){
   const FS_CLASS = 'fs-span';
   const FS_MIN = 0.6, FS_MAX = 3.0;
@@ -26,8 +31,8 @@
     ctx.story.focus();
     document.execCommand(cmd, false, null);
     EditorCore.updatePageJsonFromStory(ctx.db, ctx.story);
-    if (!PasteFlow.isOverflow(ctx.story)) restoreSelection(keep);
-    setTimeout(()=>{ if (PasteFlow.isOverflow(ctx.story)) PasteFlow.flowOverflowFrom(ctx.db); }, 0);
+    restoreSelection(keep);
+    setTimeout(()=>{ try{ PasteFlow.flowOverflowFrom(ctx.db); }catch(_){ } }, 0);
   }
 
   function parseEm(str){ const m=/([\d.]+)em/i.exec(str||''); return m?parseFloat(m[1]):NaN; }
@@ -43,11 +48,10 @@
       node = node.parentNode;
     }
 
-    let targetSpan = node?.classList?.contains(FS_CLASS) ? node : null;
-    if (targetSpan){
-      const cur = parseEm(targetSpan.style.fontSize); const base = isNaN(cur) ? 1 : cur;
-      targetSpan.style.fontSize = clamp(+(base + delta).toFixed(2), FS_MIN, FS_MAX) + 'em';
-      sel.removeAllRanges(); const r=document.createRange(); r.selectNodeContents(targetSpan); sel.addRange(r);
+    if (node?.classList?.contains(FS_CLASS)){
+      const cur = parseEm(node.style.fontSize); const base = isNaN(cur) ? 1 : cur;
+      node.style.fontSize = clamp(+(base + delta).toFixed(2), FS_MIN, FS_MAX) + 'em';
+      sel.removeAllRanges(); const r=document.createRange(); r.selectNodeContents(node); sel.addRange(r);
     } else {
       const span = document.createElement('span');
       span.className = FS_CLASS;
@@ -61,14 +65,9 @@
       span.appendChild(frag);
       range.insertNode(span);
       sel.removeAllRanges(); const r=document.createRange(); r.selectNodeContents(span); sel.addRange(r);
-      targetSpan = span;
     }
     EditorCore.updatePageJsonFromStory(db, story);
-    if (!PasteFlow.isOverflow(story)){
-      // keep selection
-    } else {
-      setTimeout(()=>{ try{ PasteFlow.flowOverflowFrom(db); }catch(_){ } }, 0);
-    }
+    setTimeout(()=>{ try{ PasteFlow.flowOverflowFrom(db); }catch(_){ } }, 0);
   }
 
   document.getElementById('btnBold')?.addEventListener('click', ()=>applyExec('bold'));
