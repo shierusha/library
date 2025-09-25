@@ -1,24 +1,18 @@
-/* app.js — 本地化穩定版（僅此檔）
- * 功能：
- * - 以 ?bookid=UUID 讀 DB（books/pages/chapters）→ 寫入 localStorage；之後以本地為主
- * - TOC（目錄）恢復：從 CHAPTERS_DB 產生清單、可跳頁
- * - 插入章節：在當前頁新增章節（DB 頁直接寫 DB；local_ 頁先本地暫存）
- * - 封面：書名同步、雙擊可改封面圖（空值=移除）
- * - 不改你其他檔、也不改 CSS；文字流動/面積判斷請維持原有檔案
+/* app.js — 在地化編輯 + 保留原本 TOC + 封面同步/雙擊 + 面積縮放字級
+ * 讀取：?bookid=<UUID>
+ * 資料流：首次（若 LS 無資料）從 Supabase 抓 → 寫入 localStorage → 後續都走本地
+ * 封面：左上書名同步；封面雙擊可輸入圖片網址（空=移除）
+ * TOC：只顯示書名、去封面、章節列表可點跳頁（不含任何新增/修改章節的按鈕）
  */
 
-/* ===== DOM ===== */
-const elStage  = document.getElementById('scaler');
-const elBook   = document.getElementById('bookCanvas');
-const lblCount = document.getElementById('lblCount');
-const elTitle  = document.getElementById('bookTitle');
-const tocModal = document.getElementById('tocModal');
-const tocBody  = document.getElementById('tocBody');
-const btnTOC   = document.getElementById('btnTOC');
-const btnInsertChapter = document.getElementById('btnInsertChapter');
+/* ===== 全域 DOM ===== */
+window.elStage  = document.getElementById('scaler');
+window.elBook   = document.getElementById('bookCanvas');
+const lblCount  = document.getElementById('lblCount');
+const elTitle   = document.getElementById('bookTitle');
 
 /* ===== 狀態 ===== */
-const state = {
+window.state = {
   mode: 'spread',        // 'spread' | 'single'
   direction: 'ltr',      // 'ltr' | 'rtl'
   bind: 'short',         // 'short' | 'long'
@@ -26,33 +20,35 @@ const state = {
   aspectLong:  7/5
 };
 
-/* ===== 變數 ===== */
-let ACTIVE_BOOK = null;
-let PAGES_DB = [];        // [{id,page_index,type,image_url,content_json}]
-let CHAPTERS_DB = [];     // [{id,title,page_id,page_index,local?}]
-let book = null;
-let detachSpreadSwipe = null;
-
-/* ===== URL / LS key ===== */
+/* ===== 查詢參數 / LOCAL KEY ===== */
 const urlq = new URLSearchParams(location.search);
 const BOOK_ID_Q = (urlq.get('bookid') || '').trim();
-const LS_KEY_BOOK   = id => `book:${id}`;
-const LS_KEY_PAGES  = id => `pages:${id}`;
-const LS_KEY_CHAP   = id => `chapters:${id}`;
+const LS_KEY_BOOK   = (id)=>`book:${id}`;
+const LS_KEY_PAGES  = (id)=>`pages:${id}`;
+const LS_KEY_CHAP   = (id)=>`chapters:${id}`;
 
-/* ===== Utils ===== */
+/* ===== 資料 ===== */
+window.ACTIVE_BOOK = null;
+window.PAGES_DB = [];        // [{id,page_index,type,image_url,content_json:{text_plain,text_html}}]
+window.CHAPTERS_DB = [];     // [{title,page_index}]
+window.book = null;          // BookFlip 實例
+
+/* ===== 工具 ===== */
 function escapeHTML(str){ return String(str || '').replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s])); }
 function normalizeType(t) {
   const x = String(t || '').trim().toLowerCase().replace(/-/g, '_');
   if (x === 'divider_black') return 'divider_dark';
   if (x === 'divider_white') return 'divider_light';
-  if (x === 'image')         return 'illustration';
+  if (x === 'image')        return 'illustration';
   if (x === 'novel' || x === 'divider_light' || x === 'divider_dark' || x === 'illustration') return x;
   return 'novel';
 }
-function toHTMLFromPlain(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/\n/g,'<br>'); }
-function readLS(key, fallback=null){ try{ const s = localStorage.getItem(key); return s? JSON.parse(s): fallback; }catch(_){ return fallback; } }
-function writeLS(key, val){ try{ localStorage.setItem(key, JSON.stringify(val)); }catch(_){} }
+function readLS(key, fallback=null){
+  try{ const s = localStorage.getItem(key); return s ? JSON.parse(s) : fallback; }catch(_){ return fallback; }
+}
+function writeLS(key, val){
+  try{ localStorage.setItem(key, JSON.stringify(val)); }catch(_){}
+}
 
 /* ===== 封面 ===== */
 function applyCoverFromBook() {
@@ -79,6 +75,7 @@ function applyCoverFromBook() {
     }
     if (coverBack) coverBack.style.background = '#fff';
   } else {
+    // 單頁模式：第 1、2 頁為封面正反
     const sp = elBook.querySelectorAll('.single-page');
     const front = sp[0], back = sp[1];
     if (!front) return;
@@ -102,13 +99,15 @@ function applyCoverFromBook() {
   const titleNode = document.getElementById('bookTitle');
   if (titleNode) titleNode.textContent = title;
 }
+// 封面雙擊：輸入封面 URL，空=移除
 function bindCoverEdit(){
-  // 只綁一次
   const target = (state.mode === 'spread')
     ? elBook.querySelector('.paper .page.front')
     : elBook.querySelectorAll('.single-page')[0];
-  if (!target || target.__coverBound) return;
+  if (!target) return;
+  if (target.__coverBound) return;
   target.__coverBound = true;
+
   target.addEventListener('dblclick', ()=>{
     const u = prompt('輸入封面圖片網址（留空=移除封面圖片）', ACTIVE_BOOK?.cover_image || '');
     ACTIVE_BOOK.cover_image = (u && u.trim()) ? u.trim() : '';
@@ -122,11 +121,9 @@ function htmlFromPage(p) {
   if (!p) return '';
   const t = normalizeType(p.type);
   if (t === 'illustration') return ''; // 圖片頁改以背景顯示
-  return (p.content_json && p.content_json.text_html)
-    ? p.content_json.text_html
-    : (p.content_json?.text_plain || '');
+  return (p.content_json && p.content_json.text_html) ? p.content_json.text_html : (p.content_json?.text_plain || '');
 }
-function buildPairsFromPages() {
+window.buildPairsFromPages = function buildPairsFromPages(){
   const pairs = [];
   for (let i = 0; i < PAGES_DB.length; i += 2) {
     const pFront = PAGES_DB[i];
@@ -134,10 +131,10 @@ function buildPairsFromPages() {
     pairs.push({ frontHTML: htmlFromPage(pFront), backHTML: htmlFromPage(pBack) });
   }
   return pairs;
-}
+};
 
-/* ===== 版面（實寬高 + 字級比例） ===== */
-function applyLayout(){
+/* ===== 版面（實寬高 + 字級比例＝以面積算字級） ===== */
+window.applyLayout = function applyLayout(){
   const stageW   = elStage.clientWidth;
   const isSpread = state.mode === 'spread';
   const aspect   = (state.bind === 'short') ? state.aspectShort : state.aspectLong;
@@ -159,7 +156,7 @@ function applyLayout(){
 
   document.body.classList.toggle('mode-rtl', state.direction === 'rtl');
   document.body.classList.toggle('mode-ltr', state.direction === 'ltr');
-}
+};
 
 /* ===== 四種頁型（底線版） ===== */
 function setPageTypeOnElement(el, p){
@@ -178,7 +175,7 @@ function setPageTypeOnElement(el, p){
 
   } else if (t === 'illustration') {
     el.classList.add('page--illustration');
-    if (p.image_url && p.image_url.trim()) {
+    if (p.image_url && String(p.image_url).trim()) {
       el.style.backgroundImage = `url("${p.image_url}")`;
     } else {
       el.style.backgroundImage = 'linear-gradient(45deg,#fbb,#fdd)';
@@ -191,7 +188,7 @@ function setPageTypeOnElement(el, p){
     if (p.content_json?.text_html) el.innerHTML = p.content_json.text_html;
   }
 }
-function applyPageTypesNow(){
+window.applyPageTypesNow = function applyPageTypesNow(){
   if (!PAGES_DB.length) return;
 
   let domPages = [];
@@ -207,34 +204,22 @@ function applyPageTypesNow(){
   }
 
   for (const p of PAGES_DB) {
-    const domIdx = (p.page_index + 2) - 1; // DB.page_index 從 1 開；DOMIndex = DB.page_index + 2（封面佔 1、2）
+    const domIdx = (p.page_index + 2) - 1; // DB.page_index 從 1 開始；DOMIndex = DB.page_index + 2（封面佔 1、2）
     const el = domPages[domIdx];
     if (!el) continue;
     setPageTypeOnElement(el, p);
   }
-}
+};
 
-/* ===== 章節 / TOC ===== */
+/* ===== 頁碼／章節角標 ===== */
 function getChapterForDbIndex(dbIndex){
   let cur = null;
   for (const ch of CHAPTERS_DB){
-    if ((ch.page_index|0) <= dbIndex) cur = ch; else break;
+    if (ch.page_index <= dbIndex) cur = ch; else break;
   }
   return cur;
 }
-function reindexChaptersByPageId(){
-  const idToIndex = new Map(PAGES_DB.map(r => [String(r.id), r.page_index]));
-  let changed = false;
-  CHAPTERS_DB.forEach(ch=>{
-    if (ch.page_id && idToIndex.has(String(ch.page_id))){
-      const newIdx = idToIndex.get(String(ch.page_id));
-      if (newIdx && newIdx !== ch.page_index){ ch.page_index = newIdx; changed = true; }
-    }
-  });
-  if (changed) persistDraft();
-}
-
-function renderMetaForAllPages(){
+window.renderMetaForAllPages = function renderMetaForAllPages(){
   function renderMetaOnDomPage(node, pageDomIndex){
     node.querySelectorAll('.page-meta').forEach(m => m.remove());
     if (pageDomIndex <= 2) return; // 封面不顯
@@ -268,11 +253,15 @@ function renderMetaForAllPages(){
       metaChapter.className = `page-meta meta-chapter ${chapterCorner}`;
       metaChapter.textContent = chapter ? chapter.title : '';
       metaChapter.setAttribute('contenteditable','false');
+      metaChapter.style.pointerEvents='none';
+      metaChapter.style.userSelect='none';
 
       const metaPage = document.createElement('div');
       metaPage.className = `page-meta meta-page ${pageCorner}`;
       metaPage.textContent = String(displayNo);
       metaPage.setAttribute('contenteditable','false');
+      metaPage.style.pointerEvents='none';
+      metaPage.style.userSelect='none';
 
       node.appendChild(metaChapter);
       node.appendChild(metaPage);
@@ -291,16 +280,114 @@ function renderMetaForAllPages(){
   } else {
     elBook.querySelectorAll('.single-page').forEach((node, domIdx)=> renderMetaOnDomPage(node, domIdx + 1));
   }
-}
+};
 
 /* ===== 頁數顯示（封面不算，其他都算） ===== */
-function updateCount(){ lblCount.textContent = String(PAGES_DB.length); }
+window.updateCount = function updateCount(){
+  lblCount && (lblCount.textContent = String(PAGES_DB.length));
+};
 
-/* ===== TOC ===== */
-function openTOC(){ buildTOC(); tocModal.classList.add('show'); tocModal.setAttribute('aria-hidden','false'); }
-function closeTOC(){ tocModal.classList.remove('show'); tocModal.setAttribute('aria-hidden','true'); }
+/* ===== 輕量重繪（不動頁數） ===== */
+window.lightRedraw = function lightRedraw(){
+  applyPageTypesNow();
+  renderMetaForAllPages();
+  try { window.EditorCore && EditorCore.hookAllStories(); } catch(_){}
+  try { window.PageStyle && PageStyle.bindImageEditors(); } catch(_){}
+  updateCount();
+  applyCoverFromBook();
+  bindCoverEdit();
+};
+// 舊名相容：有模組可能呼叫 afterLayoutRedraw
+window.afterLayoutRedraw = window.lightRedraw;
+
+/* ===== 同步畫面到資料（重要） ===== */
+window.syncAllStoriesToDB = function syncAllStoriesToDB(){
+  if (!window.EditorCore) return;
+  const domList = EditorCore.getDomPagesList();
+  for (let i=0;i<domList.length;i++){
+    const dbIndex = EditorCore.domIndexToDbIndex(i+1);
+    if (dbIndex <= 0) continue;
+    const story = domList[i].querySelector('.story');
+    if (!story) continue;
+    EditorCore.updatePageJsonFromStory(dbIndex, story);
+  }
+};
+
+/* ===== 重建（動到頁數時） ===== */
+window.rebuildTo = function rebuildTo(targetDbIndex){
+  try{
+    const pairs = buildPairsFromPages();
+    window.book = new BookFlip('#bookCanvas', {
+      mode: state.mode,
+      direction: state.direction,
+      speed: 450,
+      singleSpeed: 300,
+      perspective: 2000,
+      data: { pairs },
+      startPageIndex: Math.max(0, (targetDbIndex + 2) - 1),
+      coverPapers: 1
+    });
+    const orig = book._mountCurrent?.bind(book);
+    if (orig){
+      book._mountCurrent = function(){
+        const r = orig();
+        setTimeout(()=>{ try{ lightRedraw(); }catch(e){} }, 0);
+        return r;
+      };
+    }
+    book._cursorPage = Math.max(0, (targetDbIndex + 2) - 1);
+    if (typeof book._mountCurrent === 'function') book._mountCurrent();
+    applyLayout(); lightRedraw();
+    if (typeof window.ensureSwipeBinding === 'function') ensureSwipeBinding();
+  }catch(e){ console.warn('rebuild failed:', e); }
+};
+
+/* ===== 左右鍵（原本邏輯） ===== */
+function goLeft(){
+  if (state.mode === 'single') book.prev();
+  else { if (state.direction === 'rtl') book.next(); else book.prev(); }
+}
+function goRight(){
+  if (state.mode === 'single') book.next();
+  else { if (state.direction === 'rtl') book.prev(); else book.next(); }
+}
+document.getElementById('btnleft') ?.addEventListener('click', goLeft);
+document.getElementById('btnright')?.addEventListener('click', goRight);
+
+/* ===== 三顆主控（原本邏輯） ===== */
+function toggleDir(){ state.direction = (state.direction === 'ltr') ? 'rtl' : 'ltr'; book.setDirection(state.direction); applyLayout(); lightRedraw(); }
+function toggleBind(){ state.bind = (state.bind === 'short') ? 'long' : 'short'; applyLayout(); lightRedraw(); }
+function toggleView(){ state.mode = (state.mode === 'spread') ? 'single' : 'spread'; book.setMode(state.mode); applyLayout(); ensureSwipeBinding(); lightRedraw(); }
+document.getElementById('btnToggleDir') .addEventListener('click', toggleDir);
+document.getElementById('btnToggleBind').addEventListener('click', toggleBind);
+document.getElementById('btnToggleView').addEventListener('click', toggleView);
+
+/* ===== 雙頁手勢（單頁由插件內建） ===== */
+window.ensureSwipeBinding = function ensureSwipeBinding(){
+  if (state.mode !== 'spread') { if (window.__detachSwipe) { window.__detachSwipe(); window.__detachSwipe=null; } return; }
+  const THRESH = 50; let startX = 0;
+  function onStart(e){ const t = e.touches && e.touches[0]; if (!t) return; startX = t.clientX; }
+  function onEnd(e){
+    const t = (e.changedTouches && e.changedTouches[0]) || null; if (!t) return;
+    const dx = t.clientX - startX; if (Math.abs(dx) < THRESH) return;
+    if (dx < 0) { if (state.direction === 'rtl') book.prev(); else book.next(); }
+    else       { if (state.direction === 'rtl') book.next(); else book.prev(); }
+  }
+  elBook.addEventListener('touchstart', onStart, { passive:true });
+  elBook.addEventListener('touchend',   onEnd,   { passive:true });
+  window.__detachSwipe = () => {
+    elBook.removeEventListener('touchstart', onStart);
+    elBook.removeEventListener('touchend',   onEnd);
+  };
+};
+
+/* ===== TOC（目錄：只書名＋去封面＋章節點擊跳頁；不加任何其他按鈕） ===== */
+const tocModal = document.getElementById('tocModal');
+const tocBody  = document.getElementById('tocBody');
+function openTOC(){ buildTOC(); tocModal?.classList.add('show'); tocModal?.setAttribute('aria-hidden','false'); }
+function closeTOC(){ tocModal?.classList.remove('show'); tocModal?.setAttribute('aria-hidden','true'); }
 tocModal?.addEventListener('click', (e)=>{ if (e.target === tocModal) closeTOC(); });
-btnTOC?.addEventListener('click', openTOC);
+document.getElementById('btnTOC')?.addEventListener('click', openTOC);
 
 function buildTOC(){
   if (!tocBody) return;
@@ -308,20 +395,20 @@ function buildTOC(){
 
   const head = document.createElement('div');
   head.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin:2px 0 10px 0;';
-  head.innerHTML = `<div style="font-weight:700;width: 11em;letter-spacing:1px">${escapeHTML(title)}</div>
-                    <button class="btn ghost" style="padding:2px 8px;border-color: #ffffff33; background: #ffffff00; color: #FFF;" id="tocGotoCover">去封面</button>`;
+  head.innerHTML = `
+    <div style="font-weight:700;width: 11em;letter-spacing:1px">${escapeHTML(title)}</div>
+    <button class="btn ghost" id="tocGotoCover" style="padding:2px 8px;border-color:#ffffff33;background:#ffffff00;color:#FFF;">去封面</button>`;
   tocBody.innerHTML = '';
   tocBody.appendChild(head);
 
-  const list = [...CHAPTERS_DB].sort((a,b)=> (a.page_index||0) - (b.page_index||0));
-  list.forEach(ch=>{
+  (CHAPTERS_DB || []).forEach(ch=>{
     const row = document.createElement('div');
     row.className = 'toc-row';
     row.innerHTML = `
       <div class="toc-title">${escapeHTML(ch.title)}</div>
-      <div class="toc-page">${ch.page_index||''}</div>`;
+      <div class="toc-page">${ch.page_index}</div>`;
     row.addEventListener('click', ()=>{
-      if (ch.page_index) gotoPageDomByDbIndex(ch.page_index);
+      gotoPageDomByDbIndex(ch.page_index);
       closeTOC();
     });
     tocBody.appendChild(row);
@@ -347,73 +434,36 @@ function gotoDomPage(domIndex){
   const clamped = Math.max(1, Math.min(totalDom, domIndex|0));
   book._cursorPage = clamped - 1;
   if (typeof book._mountCurrent === 'function') book._mountCurrent();
-  // 交還給既有編輯模組去掛 story；我們這邊只刷新角標/類型/封面
-  setTimeout(()=>{ try{ applyPageTypesNow(); renderMetaForAllPages(); }catch(e){} }, 0);
-}
-
-/* ===== 左右鍵（保留你的邏輯） ===== */
-function goLeft(){
-  if (state.mode === 'single') book.prev();
-  else { if (state.direction === 'rtl') book.next(); else book.prev(); }
-}
-function goRight(){
-  if (state.mode === 'single') book.next();
-  else { if (state.direction === 'rtl') book.prev(); else book.next(); }
-}
-document.getElementById('btnleft') ?.addEventListener('click', goLeft);
-document.getElementById('btnright')?.addEventListener('click', goRight);
-
-/* ===== 三顆主控 ===== */
-function toggleDir(){ state.direction = (state.direction === 'ltr') ? 'rtl' : 'ltr'; book.setDirection(state.direction); applyLayout(); afterLayoutRedraw(); }
-function toggleBind(){ state.bind = (state.bind === 'short') ? 'long' : 'short'; applyLayout(); afterLayoutRedraw(); }
-function toggleView(){ state.mode = (state.mode === 'spread') ? 'single' : 'spread'; book.setMode(state.mode); applyLayout(); ensureSwipeBinding(); afterLayoutRedraw(); }
-document.getElementById('btnToggleDir') .addEventListener('click', toggleDir);
-document.getElementById('btnToggleBind').addEventListener('click', toggleBind);
-document.getElementById('btnToggleView').addEventListener('click', toggleView);
-
-/* ===== 雙頁手勢（單頁由插件內建） ===== */
-function attachSpreadSwipe() {
-  const THRESH = 50;
-  let startX = 0;
-  function onStart(e){ const t = e.touches && e.touches[0]; if (!t) return; startX = t.clientX; }
-  function onEnd(e){
-    const t = (e.changedTouches && e.changedTouches[0]) || null; if (!t) return;
-    const dx = t.clientX - startX; if (Math.abs(dx) < THRESH) return;
-    if (dx < 0) { if (state.direction === 'rtl') book.prev(); else book.next(); }
-    else       { if (state.direction === 'rtl') book.next(); else book.prev(); }
-  }
-  elBook.addEventListener('touchstart', onStart, { passive:true });
-  elBook.addEventListener('touchend',   onEnd,   { passive:true });
-  detachSpreadSwipe = () => {
-    elBook.removeEventListener('touchstart', onStart);
-    elBook.removeEventListener('touchend',   onEnd);
-    detachSpreadSwipe = null;
-  };
-}
-function ensureSwipeBinding(){
-  if (state.mode === 'spread') { if (!detachSpreadSwipe) attachSpreadSwipe(); }
-  else { if (detachSpreadSwipe) detachSpreadSwipe(); }
-}
-
-/* ===== 共同重繪 ===== */
-function afterLayoutRedraw(){
-  reindexChaptersByPageId();
-  applyCoverFromBook();
-  applyPageTypesNow();
-  renderMetaForAllPages();
-  updateCount();
-  bindCoverEdit();
+  try { (window.afterLayoutRedraw || window.lightRedraw)?.(); } catch(_){}
 }
 
 /* ===== Draft 持久化（LOCAL） ===== */
-function persistDraft(){
+window.persistDraft = function persistDraft(){
   if (!ACTIVE_BOOK?.id) return;
   writeLS(LS_KEY_BOOK(ACTIVE_BOOK.id), ACTIVE_BOOK);
   writeLS(LS_KEY_PAGES(ACTIVE_BOOK.id), PAGES_DB);
   writeLS(LS_KEY_CHAP(ACTIVE_BOOK.id), CHAPTERS_DB);
+};
+
+/* ===== 章節：首次從 DB 取（若 LS 沒有），page_id→page_index 對照 ===== */
+async function fetchChaptersSimple(bookId){
+  try{
+    if (!window.SB) return [];
+    const idToIndex = new Map(PAGES_DB.map(r => [r.id, r.page_index]));
+    const { data, error } = await SB
+      .from('chapters')
+      .select('title,page_id,created_at')
+      .eq('book_id', bookId)
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    return (data || []).map(r => ({
+      title: r.title,
+      page_index: idToIndex.get(r.page_id) || 1
+    })).sort((a,b)=>a.page_index - b.page_index);
+  }catch(e){ console.warn('fetchChaptersSimple failed:', e?.message||e); return []; }
 }
 
-/* ===== 初始化資料：先 local，再 DB ===== */
+/* ===== 初始化：讀取 book & pages（LOCAL 優先，否則打 DB 一次） ===== */
 async function fetchFromSupabase(bookId){
   const { data:bookData, error:err1 } = await SB
     .from('books')
@@ -428,96 +478,57 @@ async function fetchFromSupabase(bookId){
     .order('page_index', { ascending: true });
   if (err2) throw err2;
 
-  const { data:chapters, error:err3 } = await SB
-    .from('chapters')
-    .select('id,title,page_id,created_at')
-    .eq('book_id', bookId)
-    .order('created_at', { ascending: true });
-  if (err3) throw err3;
-
-  return { bookData, pages, chapters };
+  return { bookData, pages };
 }
+
 function loadFromLocal(bookId){
   const book = readLS(LS_KEY_BOOK(bookId));
   const pages = readLS(LS_KEY_PAGES(bookId));
-  const chaps = readLS(LS_KEY_CHAP(bookId));
+  const chaps = readLS(LS_KEY_CHAP(bookId)) || [];
   if (!book || !pages) return null;
-  return { bookData:book, pages, chapters: chaps || [] };
+  return { bookData:book, pages, chaps };
 }
 
-/* ===== 插入章節 ===== */
-async function insertChapterHere(){
-  // 取目前頁：若有 EditorCore 就用；否則用游標頁估算
-  let dbIndex = 1;
-  if (window.EditorCore?.getFocusedDbIndex) dbIndex = EditorCore.getFocusedDbIndex();
-  else {
-    const curDom = (window.book?._cursorPage || 0) + 1;
-    dbIndex = Math.max(1, curDom - 2);
+async function initData(){
+  if (!BOOK_ID_Q) { alert('缺少 ?bookid= 參數'); return; }
+
+  let local = loadFromLocal(BOOK_ID_Q);
+  if (local){
+    ACTIVE_BOOK = local.bookData;
+    PAGES_DB = local.pages;
+    CHAPTERS_DB = local.chaps || [];
+  }else{
+    // 首次：打 DB 取回 → 寫入 LS
+    const { bookData, pages } = await fetchFromSupabase(BOOK_ID_Q);
+    ACTIVE_BOOK = bookData;
+    PAGES_DB = pages || [];
+    // 章節：只有第一次從 DB 抓，之後都走 LOCAL
+    CHAPTERS_DB = await fetchChaptersSimple(ACTIVE_BOOK.id);
+    persistDraft();
   }
-  const page = PAGES_DB[dbIndex - 1];
-  if (!page){ alert('找不到當前頁。'); return; }
 
-  const title = prompt('輸入章節標題（必填）', '');
-  if (!title || !title.trim()) return;
+  // 套用方向/裝訂
+  if (ACTIVE_BOOK.direction === 'rtl' || ACTIVE_BOOK.direction === 'ltr') state.direction = ACTIVE_BOOK.direction;
+  if (ACTIVE_BOOK.binding === 'long'  || ACTIVE_BOOK.binding === 'short') state.bind = ACTIVE_BOOK.binding;
+  document.body.classList.toggle('mode-rtl', state.direction === 'rtl');
+  document.body.classList.toggle('mode-ltr', state.direction === 'ltr');
+}
 
-  const record = { id: null, title: title.trim(), page_id: page.id || null, page_index: page.page_index || dbIndex };
-
-  // DB：只有當 page_id 存在且不是 local_ 時才能寫入，否則先本地暫存
-  let savedToDB = false;
-  if (record.page_id && !String(record.page_id).startsWith('local_')){
-    try{
-      const { data, error } = await SB
-        .from('chapters')
-        .insert({ book_id: ACTIVE_BOOK.id, page_id: record.page_id, title: record.title })
-        .select('id,title,page_id,created_at')
-        .single();
-      if (!error && data){
-        record.id = data.id;
-        savedToDB = true;
-      }
-    }catch(_){ /* 網路失敗 → 掉到本地 */ }
-  }
-  if (!savedToDB){ record.local = true; }
-
-  CHAPTERS_DB.push(record);
-  CHAPTERS_DB.sort((a,b)=> (a.page_index||0) - (b.page_index||0));
+/* ===== 封面 Title 同步 ===== */
+elTitle?.addEventListener('input', ()=>{
+  ACTIVE_BOOK.title = elTitle.textContent || '未命名書籍';
+  applyCoverFromBook();
   persistDraft();
-  renderMetaForAllPages();
-}
-btnInsertChapter?.addEventListener('click', insertChapterHere);
+});
 
-/* ===== 初始化 ===== */
-(async function init(){
+/* ===== init ===== */
+async function init(){
   try {
-    if (!BOOK_ID_Q) { alert('缺少 ?bookid= 參數'); return; }
-
-    // 嘗試先讀本地
-    const local = loadFromLocal(BOOK_ID_Q);
-    if (local){
-      ACTIVE_BOOK = local.bookData;
-      PAGES_DB    = local.pages;
-      CHAPTERS_DB = local.chapters || [];
-    } else {
-      // 首次：打 DB 取回 → 寫入 LS
-      const { bookData, pages, chapters } = await fetchFromSupabase(BOOK_ID_Q);
-      ACTIVE_BOOK = bookData;
-      PAGES_DB    = pages || [];
-      const idToIndex = new Map(PAGES_DB.map(r => [String(r.id), r.page_index]));
-      CHAPTERS_DB = (chapters||[]).map(c => ({
-        id: c.id, title: c.title, page_id: c.page_id, page_index: idToIndex.get(String(c.page_id)) || 1
-      }));
-      persistDraft();
-    }
-
-    // 套用方向/裝訂
-    if (ACTIVE_BOOK.direction === 'rtl' || ACTIVE_BOOK.direction === 'ltr') state.direction = ACTIVE_BOOK.direction;
-    if (ACTIVE_BOOK.binding === 'long'  || ACTIVE_BOOK.binding === 'short') state.bind = ACTIVE_BOOK.binding;
-    document.body.classList.toggle('mode-rtl', state.direction === 'rtl');
-    document.body.classList.toggle('mode-ltr', state.direction === 'ltr');
+    await initData();
 
     // 初始化 BookFlip（封面保留 1 張 .paper）
     const pairs = buildPairsFromPages();
-    book = new BookFlip('#bookCanvas', {
+    window.book = new BookFlip('#bookCanvas', {
       mode: state.mode,
       direction: state.direction,
       speed: 450,
@@ -528,20 +539,24 @@ btnInsertChapter?.addEventListener('click', insertChapterHere);
       coverPapers: 1
     });
 
-    window.addEventListener('resize', ()=>{ applyLayout(); afterLayoutRedraw(); });
+    // 覆寫 _mountCurrent：每次掛載後做輕量重繪，避免角標或 .story 消失
+    const orig = book._mountCurrent?.bind(book);
+    if (orig){
+      book._mountCurrent = function(){
+        const r = orig();
+        setTimeout(()=>{ try{ lightRedraw(); }catch(e){} }, 0);
+        return r;
+      };
+    }
+
+    window.addEventListener('resize', ()=>{ applyLayout(); lightRedraw(); });
     applyLayout();
     ensureSwipeBinding();
-    afterLayoutRedraw();
-
-    // 事件：Title 同步封面
-    elTitle?.addEventListener('input', ()=>{
-      ACTIVE_BOOK.title = elTitle.textContent || '未命名書籍';
-      applyCoverFromBook();
-      persistDraft();
-    });
-
+    lightRedraw(); // 單頁封面也立即處理
+    bindCoverEdit();
   } catch (e) {
     console.error(e);
     alert('載入書籍資料失敗：' + (e?.message || e));
   }
-})();
+}
+document.addEventListener('DOMContentLoaded', init);
