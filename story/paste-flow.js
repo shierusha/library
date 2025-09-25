@@ -1,15 +1,14 @@
-/* paste-flow.js
- * Word-like 輸入 + 面積分頁（含提前觸發安全邊界）
- * - Enter：插入 \n；只有溢出才把「尾端」往後頁推
- * - Tab/Shift+Tab：段首縮排/反縮排（全形空格×2），不包 span、不破壞 Undo
- * - 貼上：純文字；大量貼上會持續分頁、遇黑白/圖片頁跳過；頁數不夠自動補頁
- * - 溢出：橫排用高度、直排用寬度；加入 GUARD_EM（預留 0.4em）提早切
+/* paste-flow.js — Word-like typing + robust auto pagination
+ * 重點：
+ * 1) Enter 插入 \n、Tab/Shift+Tab 以全形空格做（反）縮排，保留原生 Undo
+ * 2) 貼上：純文字，分頁時只把「尾端超出」往後推；遇圖片頁跳過
+ * 3) 分頁採「離線量測」：用隱形 clone 依故事區尺寸二分找最大可容納 offset
+ * 4) 推擠直接改 PAGES_DB（即使下一頁 DOM 還沒掛上也能運作）
+ * 5) 需要新增頁時只標記並「延遲重建一次」，避免在打字中破壞輸入手感
  */
 
 (function(){
-  // 提早分頁用的「安全邊界」，單位 em（可依感覺調 0.3~0.6）
-  const GUARD_EM = 0.4;
-
+  /* ===== 對外 ===== */
   function bindTo(story){
     if (story.__pfBound) return;
     story.__pfBound = true;
@@ -17,24 +16,25 @@
     story.addEventListener('keydown', onKeyDown);
     story.addEventListener('input',   onInput);
     story.addEventListener('paste',   onPaste);
-    story.addEventListener('blur',    syncToDB);
+    story.addEventListener('blur',    syncFocusedToDB);
   }
 
-  /* ---------------- 事件 ---------------- */
-
+  /* ===== 事件 ===== */
   function onKeyDown(e){
-    const el = e.currentTarget;
+    const story = e.currentTarget;
 
     if (e.key === 'Tab'){
       e.preventDefault();
-      handleTab(el, e.shiftKey);
-      maybeFlow(el, 'tab');
+      handleTab(story, e.shiftKey);
+      // Tab 不會觸發 input，主動檢查一次
+      maybeFlow(story, 'tab');
       return;
     }
+
     if (e.key === 'Enter'){
       e.preventDefault();
       insertTextAtSelection('\n');
-      maybeFlow(el, 'enter');
+      maybeFlow(story, 'enter');
       return;
     }
   }
@@ -44,216 +44,288 @@
   }
 
   function onPaste(e){
-    const el = e.currentTarget;
+    const story = e.currentTarget;
     e.preventDefault();
-    const text = (e.clipboardData || window.clipboardData).getData('text/plain') || '';
-    if (!text) return;
+    const txt = (e.clipboardData || window.clipboardData).getData('text/plain') || '';
+    if (!txt) return;
 
-    insertTextAtSelection(text.replace(/\r\n?/g, '\n'));
+    insertTextAtSelection(txt.replace(/\r\n?/g, '\n'));
 
-    // 持續分頁直到放得下（用「無硬上限＋進度檢查」避免卡死）
-    let lastLen = getText(el).length;
-    while (isOverflow(el)) {
-      if (!flowTailToNextPage(el)) break;
-      const nowLen = getText(el).length;
-      if (nowLen >= lastLen) break; // 沒進度就跳出
-      lastLen = nowLen;
+    // 大量貼上：持續把尾端分走直到不溢出
+    let guard = 0;
+    while (isOverflow(story) && guard++ < 200){
+      flowTailChain(story);
     }
-    syncToDB();
+    // 超防護：極端長文
+    if (guard >= 200){
+      flowTailChain(story);
+    }
+
+    syncFocusedToDB();
   }
 
-  /* -------------- Tab 段首縮排 -------------- */
-
+  /* ===== Tab 縮排 ===== */
   function handleTab(story, isShift){
-    const { lineStartNode, lineStartOffset } = getLineStartPos(story);
-    if (!lineStartNode) return;
-
     const INDENT = '\u3000\u3000'; // 全形空格×2
-    const preview = extractTextRange(lineStartNode, lineStartOffset, 2);
+    const { node, offset } = lineStartPos(story);
+    if (!node) return;
 
+    const two = peekText(node, offset, 2);
     if (isShift){
-      if (preview === INDENT){
-        deleteRange(lineStartNode, lineStartOffset, 2);
-      }
-    } else {
-      insertTextAt(lineStartNode, lineStartOffset, INDENT);
+      if (two === INDENT) deleteRange(node, offset, 2);
+    }else{
+      insertTextAt(node, offset, INDENT);
     }
   }
 
-  /* -------------- 溢出與分頁 -------------- */
-
+  /* ===== 溢出與分頁 ===== */
   function maybeFlow(story){
     if (!isOverflow(story)) return;
-    // 把超出的「尾端」往後頁推；不拉回
-    flowTailToNextPage(story);
-    // 再安全檢一次，避免邊界
-    if (isOverflow(story)) flowTailToNextPage(story);
-    syncToDB();
+    flowTailChain(story);
+    syncFocusedToDB();
   }
 
-  function isVertical(story){
-    const wm = getComputedStyle(story).writingMode || '';
-    return /vertical-rl|vertical-lr/i.test(wm);
-  }
-
-  function guardPx(story){
-    const fs = parseFloat(getComputedStyle(story).fontSize) || 16;
-    return GUARD_EM * fs;
-  }
-
+  // 只以「可視高度 vs 內容高度」判定（你的 CSS 已 pre-wrap & overflow:hidden）
   function isOverflow(story){
-    // 橫排看高度；直排看寬度；加入「安全邊界」讓分頁提早觸發
-    const g = guardPx(story);
-    if (isVertical(story)){
-      return story.scrollWidth > (story.clientWidth - g);
-    }
-    return story.scrollHeight > (story.clientHeight - g);
+    return story.scrollHeight - story.clientHeight > 1;
   }
 
-  function flowTailToNextPage(story){
-    const total = getText(story).length;
-    if (total === 0) return false;
+  // 連鎖把本頁尾端 → 下一可編輯頁 → 再檢查下一頁是否溢出……
+  function flowTailChain(story){
+    const curIdx = dbIndexOf(story);
+    if (curIdx <= 0) return;
 
-    // 找到本頁可容納的最大 offset（用測量盒 + 邊界）
-    const fit = findLargestFitOffsetByMeasureBox(story, 0, total);
-    if (fit >= total) return false;
+    // 以離線量測找出當前頁可容納的最大 offset
+    const s = getText(story);
+    const fit = largestFitOffsetOffline(story, s);
+    if (fit >= s.length) return;
 
-    const tailText = sliceText(story, fit, total);
-    truncateText(story, fit);
+    const head = s.slice(0, fit);
+    const tail = s.slice(fit);
 
-    // 找下一個可編輯頁（跳過圖片/黑白），不足自動加
-    const curDb = getDbIndex(story);
-    const nextDb = ensureNextEditablePage(curDb);
+    // 寫回本頁（DOM + DB）
+    setText(story, head);
+    writePageText(curIdx, head);
 
-    let nextStory = EditorCore.getStoryByDbIndex(nextDb);
-    if (!nextStory){
-      try { EditorCore.hookAllStories(); } catch(_){}
-      nextStory = EditorCore.getStoryByDbIndex(nextDb);
-      if (!nextStory) return false;
+    // 把 tail 推到下一個可編輯頁（跳過圖片）
+    let push = tail;
+    let nextIdx = nextEditableIndex(curIdx);
+    while (push && nextIdx > 0){
+      const nextText = readPageText(nextIdx);
+      const merged = push + nextText; // 前插，符合「往後擠」規則
+      writePageText(nextIdx, merged);
+
+      // 若下一頁有 DOM，就同步 DOM；沒有也沒關係，等翻到那頁時 EditorCore 會帶出
+      const nextStory = getStory(nextIdx);
+      if (nextStory) setText(nextStory, merged);
+
+      // 量測下一頁是否仍溢出（離線）
+      const dimsRef = nextStory || story; // 用相同尺寸做量測
+      const nextFit = largestFitOffsetOffline(dimsRef, merged);
+
+      if (nextFit >= merged.length){
+        push = ''; // 已吃得下，結束
+      }else{
+        // 再切一段到下一個可編輯頁
+        const keep = merged.slice(0, nextFit);
+        push = merged.slice(nextFit);
+        writePageText(nextIdx, keep);
+        if (nextStory) setText(nextStory, keep);
+
+        // 取得下一個可編輯頁，必要時自動新增頁
+        nextIdx = nextEditableIndex(nextIdx, /*allowCreate*/true);
+      }
     }
-
-    // 前插尾段，往後推擠
-    setText(nextStory, tailText + getText(nextStory));
-
-    // 若下一頁仍溢出，連鎖往後推（無硬上限＋進度檢查）
-    let prev = getText(nextStory).length;
-    while (isOverflow(nextStory)) {
-      if (!flowTailToNextPage(nextStory)) break;
-      const cur = getText(nextStory).length;
-      if (cur >= prev) break;
-      prev = cur;
-    }
-    return true;
   }
 
-  /* ------------ 測量盒：橫/直排皆可用的二分量測 ------------ */
+  /* ===== 離線量測：用隱形 clone 求最大可容納 offset ===== */
+  function largestFitOffsetOffline(dimRefStory, fullText){
+    if (!fullText) return 0;
+    const { w, h, styleToken } = measureDims(dimRefStory);
+    const probe = getProbe(styleToken, w, h);
+    let lo = 0, hi = fullText.length, best = 0;
 
-  function findLargestFitOffsetByMeasureBox(story, lo, hi){
-    const box = getMeasureBox(story);
-    const text = getText(story);
-    const g = guardPx(story);
-
-    // 以「可視尺寸 - 邊界」作為實際可用尺寸
-    const availW = Math.max(0, story.clientWidth  - g);
-    const availH = Math.max(0, story.clientHeight - g);
-
-    let best = lo;
     while (lo <= hi){
       const mid = (lo + hi) >> 1;
-      box.textContent = text.slice(0, mid);
-
-      const usedW = box.scrollWidth;
-      const usedH = box.scrollHeight;
-
-      const overflow = isVertical(story)
-        ? (usedW > availW)
-        : (usedH > availH);
-
-      if (!overflow){ best = mid; lo = mid + 1; }
-      else { hi = mid - 1; }
+      probe.textContent = fullText.slice(0, mid);
+      if (probe.scrollHeight <= probe.clientHeight){
+        best = mid; lo = mid + 1;
+      } else {
+        hi = mid - 1;
+      }
     }
     return best;
   }
 
-  function getMeasureBox(story){
-    let box = story.__measureBox;
+  function measureDims(story){
     const cs = getComputedStyle(story);
+    const w = story.clientWidth;
+    const h = story.clientHeight;
+    // 以 writing-mode / font / line-height 等當作樣式 token（不同 token 共用不同量測節點）
+    const styleToken = [
+      cs.writingMode, cs.fontFamily, cs.fontSize, cs.lineHeight,
+      cs.whiteSpace, cs.wordBreak, cs.letterSpacing
+    ].join('|');
+    return { w, h, styleToken };
+  }
 
-    if (!box){
-      box = document.createElement('div');
-      box.style.position = 'absolute';
-      box.style.left = '-99999px';
-      box.style.top  = '0';
-      box.style.visibility = 'hidden';
-      box.style.overflow = 'auto';
-      box.style.whiteSpace = 'pre-wrap';
-      box.style.wordBreak  = 'break-word';
-      box.style.boxSizing  = 'border-box';
-      document.body.appendChild(box);
-      story.__measureBox = box;
+  const PROBES = new Map(); // key: token|w|h
+  function getProbe(styleToken, w, h){
+    const key = styleToken + '|' + w + '|' + h;
+    if (PROBES.has(key)) return PROBES.get(key);
+    const el = document.createElement('div');
+    el.style.cssText = `
+      position:fixed; left:-99999px; top:0; visibility:hidden;
+      white-space:pre-wrap; word-break:break-word; overflow:hidden;
+      width:${w}px; height:${h}px; padding:0; border:0; margin:0;
+    `;
+    document.body.appendChild(el);
+    PROBES.set(key, el);
+    return el;
+  }
+
+  /* ===== Page 級讀寫（DB 為主，DOM 可選同步） ===== */
+  function dbIndexOf(story){ return Number(story.dataset.dbIndex||'0')|0; }
+
+  function readPageText(dbIndex){
+    const p = PAGES_DB[dbIndex - 1];
+    return (p?.content_json?.text_plain) || '';
+    // （text_html 會在 persist 或其它流程同步產生）
+  }
+
+  function writePageText(dbIndex, text){
+    const p = PAGES_DB[dbIndex - 1]; if (!p) return;
+    p.content_json = p.content_json || {};
+    p.content_json.text_plain = text;
+    // 最小轉換：html 僅將 \n → <br>，不包多餘元素
+    p.content_json.text_html  = escapeHTML(text).replace(/\n/g,'<br>');
+    persistDraft?.();
+  }
+
+  function getStory(dbIndex){
+    try { return EditorCore.getStoryByDbIndex(dbIndex); } catch(_) { return null; }
+  }
+
+  /* ===== 取得下一個可編輯頁（跳過圖片）；必要時在尾端新增 ===== */
+  function nextEditableIndex(cur, allowCreate){
+    for (let i = cur + 1; i <= PAGES_DB.length; i++){
+      const p = PAGES_DB[i - 1];
+      if (!isIllustration(p)) return i; // novel / divider_* 都算可編輯
     }
+    if (!allowCreate) return -1;
 
-    // 同步尺寸與排版屬性
-    box.style.width  = story.clientWidth  + 'px';
-    box.style.height = story.clientHeight + 'px';
-
-    // 字體相關
-    box.style.font = cs.font; // 包含 style/weight/size/line-height/family
-    box.style.letterSpacing   = cs.letterSpacing;
-    box.style.textOrientation = cs.textOrientation;
-    box.style.writingMode     = cs.writingMode;
-
-    // 其他排版屬性
-    box.style.padding = cs.padding;   // 若 .story 設了 padding，也一併反映
-    box.style.border  = '0';
-    box.style.margin  = '0';
-
-    return box;
+    // 需要更多頁：加一張紙（兩頁 novel）
+    appendTwoNovelPages();
+    // 延遲重建一次（避免打字中卡頓或重置游標）
+    scheduleLazyRebuild(cur);
+    return cur + 1;
   }
 
-  /* ----------- DOM <-> 文本 ----------- */
-
-  function getDbIndex(story){
-    return Number(story.dataset.dbIndex || '0')|0;
+  function isIllustration(p){
+    const t = String(p?.type||'').toLowerCase().replace(/-/g,'_');
+    return t === 'illustration' || t === 'image';
   }
+
+  function appendTwoNovelPages(){
+    const base = PAGES_DB.length;
+    const mk = (idx)=>({
+      id: `local_${Math.random().toString(36).slice(2,10)}`,
+      page_index: idx,
+      type: 'novel',
+      image_url: null,
+      content_json: { text_plain:'', text_html:'' }
+    });
+    PAGES_DB.push(mk(base+1), mk(base+2));
+    for (let i=0;i<PAGES_DB.length;i++) PAGES_DB[i].page_index = i+1;
+    persistDraft?.();
+  }
+
+  let __rebuildTimer = null;
+  function scheduleLazyRebuild(keepDbIndex){
+    if (__rebuildTimer) return;
+    __rebuildTimer = setTimeout(()=>{
+      __rebuildTimer = null;
+      try { rebuildTo?.(keepDbIndex); } catch(_){}
+    }, 60); // 稍等一下，避免在輸入節流內頻繁重建
+  }
+
+  /* ===== DOM 純文字操作（不创建 span，不破壞 Undo） ===== */
   function getText(story){
-    return (story.textContent || '').replace(/\u00a0/g, ' ');
+    return (story.textContent || '').replace(/\u00a0/g,' ');
   }
   function setText(story, s){
+    // 直接改 textContent；caret 會在瀏覽器內部續接於末端，符合一般編輯習慣
     story.textContent = s;
-  }
-  function sliceText(story, from, to){
-    const s = getText(story);
-    return s.slice(from, to);
-  }
-  function truncateText(story, len){
-    const s = getText(story);
-    setText(story, s.slice(0, len));
   }
 
   function insertTextAtSelection(text){
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0) return;
-    const range = sel.getRangeAt(0);
-    range.deleteContents();
-    range.insertNode(document.createTextNode(text));
-    range.collapse(false);
-    sel.removeAllRanges();
-    sel.addRange(range);
+    const r = sel.getRangeAt(0);
+    r.deleteContents();
+    r.insertNode(document.createTextNode(text));
+    r.collapse(false);
+    sel.removeAllRanges(); sel.addRange(r);
   }
 
-  /* ------- 行首/選區輔助（給 Tab 用） ------- */
+  function insertTextAt(node, offset, text){
+    const r = document.createRange();
+    r.setStart(node, offset); r.setEnd(node, offset);
+    r.insertNode(document.createTextNode(text));
+  }
 
-  function getLineStartPos(story){
+  function deleteRange(node, offset, len){
     const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0) return {};
-    const text = getText(story);
-    const caretIdx = caretOffsetIn(story);
-    let i = caretIdx - 1;
-    while (i >= 0 && text[i] !== '\n') i--;
-    const offset = Math.max(0, i + 1);
-    const pos = nodeFromOffset(story, offset);
-    return { lineStartNode: pos?.node || null, lineStartOffset: pos?.offset || 0 };
+    const r = document.createRange();
+    r.setStart(node, offset);
+    const endPos = walkText(node, offset, len);
+    if (!endPos) return;
+    r.setEnd(endPos.node, endPos.offset);
+    r.deleteContents();
+    sel.removeAllRanges(); sel.addRange(r);
+  }
+
+  function peekText(node, offset, len){
+    const endPos = walkText(node, offset, len);
+    if (!endPos) return '';
+    const r = document.createRange();
+    r.setStart(node, offset); r.setEnd(endPos.node, endPos.offset);
+    return r.toString();
+  }
+
+  function walkText(startNode, startOffset, len){
+    const root = storyRoot(startNode);
+    const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+    // 導到起點
+    let node = startNode, offset = startOffset;
+    if (node.nodeType !== 3){
+      node = nextText(root, true); offset = 0;
+    } else {
+      // 將 walker 定位在當前 text
+      w.currentNode = node;
+    }
+    let remain = len;
+    while (node && remain > 0){
+      const can = node.nodeValue.length - offset;
+      const take = Math.min(can, remain);
+      remain -= take;
+      offset += take;
+      if (remain === 0) return { node, offset };
+      node = w.nextNode(); offset = 0;
+    }
+    return null;
+  }
+
+  function storyRoot(el){
+    let n = el;
+    while (n && !(n.classList && n.classList.contains('story'))) n = n.parentNode;
+    return n || el;
+  }
+
+  function nextText(root, includeSelf){
+    const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+    if (!includeSelf) w.nextNode();
+    return w.nextNode();
   }
 
   function caretOffsetIn(story){
@@ -264,117 +336,42 @@
     return r.toString().length;
   }
 
-  function nodeFromOffset(story, target){
-    if (target <= 0){
-      const first = nextText(story, true);
-      return first ? { node:first, offset:0 } : null;
+  function nodeFromOffset(story, idx){
+    if (idx <= 0){
+      const t = nextText(story, true);
+      return t ? { node:t, offset:0 } : null;
     }
-    let walked = 0;
+    let walked = 0; let n;
     const it = document.createTreeWalker(story, NodeFilter.SHOW_TEXT, null);
-    let n;
     while ((n = it.nextNode())){
-      const len = n.nodeValue.length;
-      if (walked + len >= target){
-        return { node:n, offset: target - walked };
-      }
-      walked += len;
+      const L = n.nodeValue.length;
+      if (walked + L >= idx) return { node:n, offset: idx - walked };
+      walked += L;
     }
-    const last = lastText(story);
+    const last = (()=>{ let t=null, x; const w=document.createTreeWalker(story,NodeFilter.SHOW_TEXT,null); while((x=w.nextNode())) t=x; return t; })();
     return last ? { node:last, offset:last.nodeValue.length } : null;
   }
 
-  function nextText(root, includeSelf){
-    const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
-    if (!includeSelf) w.nextNode();
-    return w.nextNode();
-  }
-  function lastText(root){
-    const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
-    let last=null,n; while((n=w.nextNode())) last=n; return last;
-  }
-
-  function extractTextRange(node, offset, len){
-    const end = walkText(node, offset, len);
-    if (!end) return '';
-    const r = document.createRange();
-    r.setStart(node, offset);
-    r.setEnd(end.node, end.offset);
-    return r.toString();
-  }
-  function deleteRange(node, offset, len){
-    const end = walkText(node, offset, len);
-    if (!end) return;
-    const sel = window.getSelection();
-    const r = document.createRange();
-    r.setStart(node, offset);
-    r.setEnd(end.node, end.offset);
-    r.deleteContents();
-    sel.removeAllRanges(); sel.addRange(r);
-  }
-  function walkText(startNode, startOffset, len){
-    let node = startNode, offset = startOffset, remain = len;
-    const walker = document.createTreeWalker(getRoot(startNode), NodeFilter.SHOW_TEXT, null);
-    if (startNode.nodeType !== 3){
-      let first=null; while(walker.nextNode()){ first=walker.currentNode; break; }
-      if (!first) return null; node=first; offset=0;
-    } else {
-      walker.currentNode = startNode;
-    }
-    while (node && remain > 0){
-      const L = node.nodeValue.length;
-      const take = Math.min(remain, L - offset);
-      remain -= take; offset += take;
-      if (remain === 0) return { node, offset };
-      let nxt = walker.nextNode(); if (!nxt) break; node = nxt; offset = 0;
-    }
-    return null;
-  }
-  function getRoot(el){
-    let n = el;
-    while (n && !(n.classList && n.classList.contains('story'))) n = n.parentNode;
-    return n || el;
+  function lineStartPos(story){
+    const text = getText(story);
+    const caret = caretOffsetIn(story);
+    let i = caret - 1; while (i >= 0 && text[i] !== '\n') i--;
+    const start = Math.max(0, i + 1);
+    const pos = nodeFromOffset(story, start) || {};
+    return { node: pos.node || null, offset: pos.offset || 0 };
   }
 
-  /* --------- 後頁/新增頁 --------- */
-
-  function ensureNextEditablePage(curDbIndex){
-    for (let i = curDbIndex + 1; i <= PAGES_DB.length; i++){
-      const p = PAGES_DB[i - 1];
-      if (EditorCore.isEditablePage(p)) return i;
-    }
-    // 不足自動加一張紙（兩頁 novel）
-    if (window.SheetOps && typeof SheetOps.ensureTailSheets === 'function'){
-      SheetOps.ensureTailSheets(1);
-    } else {
-      const base = PAGES_DB.length;
-      const mk = (idx)=>({
-        id: `local_${(Math.random().toString(36).slice(2,10))}`,
-        page_index: idx,
-        type: 'novel',
-        image_url: null,
-        content_json: { text_plain:'', text_html:'' }
-      });
-      PAGES_DB.push(mk(base+1), mk(base+2));
-      for (let i=0;i<PAGES_DB.length;i++) PAGES_DB[i].page_index = i+1;
-      try { persistDraft(); } catch(_){}
-      try { rebuildTo(curDbIndex); } catch(_){}
-      try { EditorCore.hookAllStories(); } catch(_){}
-    }
-    return curDbIndex + 1;
-  }
-
-  /* --------- 同步 --------- */
-
-  function syncToDB(){
+  /* ===== DB 同步 ===== */
+  function syncFocusedToDB(){
     try{
       if (!window.EditorCore) return;
-      const dbIndex = EditorCore.getFocusedDbIndex?.() || 1;
-      const story = EditorCore.getStoryByDbIndex(dbIndex);
-      if (!story) return;
-      EditorCore.updatePageJsonFromStory(dbIndex, story);
-      persistDraft?.();
+      const idx = EditorCore.getFocusedDbIndex?.() || 1;
+      const st = EditorCore.getStoryByDbIndex(idx);
+      if (!st) return;
+      writePageText(idx, getText(st));
     }catch(_){}
   }
 
+  /* export */
   window.PasteFlow = { bindTo };
 })();
