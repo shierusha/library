@@ -160,6 +160,15 @@ body::-webkit-scrollbar { width:0; height:0; }
 .side.left {    top: 65px;}}
 
 
+    /* 編輯時不要出現巨大黑框/外框 */
+.story { outline: none !important; }
+.story:focus { outline: none !important; box-shadow: none !important; border: none !important; }
+/* 也一併避免點擊高亮 */
+.story { -webkit-tap-highlight-color: transparent; }
+/* 你本來就有 overflow:hidden；再保險一下不顯示滾動條 */
+.story::-webkit-scrollbar { width: 0; height: 0; }
+
+
   </style>
 </head>
 
