@@ -2,6 +2,7 @@
  * 貼上純文字 / Enter / 輸入 → 視覺溢出自動分頁到下一個 novel 頁
  * - 溢出判斷依 writing-mode 決定：直排看寬、橫排看高
  * - 沒有可寫頁就插入一張白紙（兩頁），並繼續流向新 front
+ * - 會跳過 divider/image 頁
  */
 (function(){
   function isVerticalFlow(storyEl){
@@ -70,14 +71,14 @@
   }
 
   function setStoryPlain(storyEl, plain){
+    if (!plain) { storyEl.innerHTML = ''; return; }
+    // 插入純文字 → 讓瀏覽器建立最精簡文本節點
     storyEl.textContent = plain || '';
-    if (!storyEl.style.minHeight) storyEl.style.minHeight = '1.2em';
   }
 
   function findNextNovel(fromDb){
     for (let i=fromDb+1; i<=PAGES_DB.length; i++){
-      const p = PAGES_DB[i-1];
-      const t = String(p?.type||'').toLowerCase().replace(/-/g,'_');
+      const t = String(PAGES_DB[i-1]?.type||'').toLowerCase().replace(/-/g,'_');
       if (t === 'novel') return i;
     }
     return 0;
@@ -127,15 +128,15 @@
     storyEl.addEventListener('paste', (e)=>{
       e.preventDefault();
       const t = (e.clipboardData || window.clipboardData).getData('text/plain') || '';
-      document.execCommand('insertText', false, t);
-      setTimeout(()=>{ flowOverflowFrom(dbIndex); }, 0);
+      document.execCommand('insertText', false, t); // 貼上純文字
+      setTimeout(()=>{ if (isOverflow(storyEl)) flowOverflowFrom(dbIndex); }, 0);
     });
 
     storyEl.addEventListener('keydown', (e)=>{
       if (e.key === 'Enter'){
         e.preventDefault();
         document.execCommand('insertText', false, '\n');
-        setTimeout(()=>{ flowOverflowFrom(dbIndex); }, 0);
+        setTimeout(()=>{ if (isOverflow(storyEl)) flowOverflowFrom(dbIndex); }, 0);
       }
     });
 
