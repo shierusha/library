@@ -1,10 +1,8 @@
-/* app.js — 本地化編輯模式 + 保留原本 TOC / 跳頁邏輯
- * 重點：
- * - 以 ?bookid=UUID 讀取一次資料（可用 Supabase），讀到後寫入 localStorage
- * - 之後操作皆以 PAGES_DB (LOCAL) 為主；persistDraft() 只寫 localStorage
- * - 封面：書名同步、雙擊可輸入封面圖片網址（空值=移除）
- * - 版面縮放以面積推字級（--scale），不動你的 CSS（＝你說的「文字用面積算」）
- * - 保留原本 TOC：openTOC / closeTOC / buildTOC / gotoPageDomByDbIndex / gotoDomPage
+/* app.js — 在地化編輯 + 保留原本 TOC + 封面同步/雙擊 + 面積縮放字級
+ * 讀取：?bookid=<UUID>
+ * 資料流：首次（若 LS 無資料）從 Supabase 抓 → 寫入 localStorage → 後續都走本地
+ * 封面：左上書名同步；封面雙擊可輸入圖片網址（空=移除）
+ * TOC：只顯示書名、去封面、章節列表可點跳頁（不含任何新增/修改章節的按鈕）
  */
 
 /* ===== 全域 DOM ===== */
@@ -255,11 +253,15 @@ window.renderMetaForAllPages = function renderMetaForAllPages(){
       metaChapter.className = `page-meta meta-chapter ${chapterCorner}`;
       metaChapter.textContent = chapter ? chapter.title : '';
       metaChapter.setAttribute('contenteditable','false');
+      metaChapter.style.pointerEvents='none';
+      metaChapter.style.userSelect='none';
 
       const metaPage = document.createElement('div');
       metaPage.className = `page-meta meta-page ${pageCorner}`;
       metaPage.textContent = String(displayNo);
       metaPage.setAttribute('contenteditable','false');
+      metaPage.style.pointerEvents='none';
+      metaPage.style.userSelect='none';
 
       node.appendChild(metaChapter);
       node.appendChild(metaPage);
@@ -322,7 +324,7 @@ window.rebuildTo = function rebuildTo(targetDbIndex){
       singleSpeed: 300,
       perspective: 2000,
       data: { pairs },
-      startPageIndex: Math.max(0, EditorCore.dbIndexToDomIndex(targetDbIndex) - 1),
+      startPageIndex: Math.max(0, (targetDbIndex + 2) - 1),
       coverPapers: 1
     });
     const orig = book._mountCurrent?.bind(book);
@@ -333,7 +335,7 @@ window.rebuildTo = function rebuildTo(targetDbIndex){
         return r;
       };
     }
-    book._cursorPage = Math.max(0, EditorCore.dbIndexToDomIndex(targetDbIndex) - 1);
+    book._cursorPage = Math.max(0, (targetDbIndex + 2) - 1);
     if (typeof book._mountCurrent === 'function') book._mountCurrent();
     applyLayout(); lightRedraw();
     if (typeof window.ensureSwipeBinding === 'function') ensureSwipeBinding();
@@ -379,7 +381,7 @@ window.ensureSwipeBinding = function ensureSwipeBinding(){
   };
 };
 
-/* ===== TOC（目錄：原本邏輯，完整搬回） ===== */
+/* ===== TOC（目錄：只書名＋去封面＋章節點擊跳頁；不加任何其他按鈕） ===== */
 const tocModal = document.getElementById('tocModal');
 const tocBody  = document.getElementById('tocBody');
 function openTOC(){ buildTOC(); tocModal?.classList.add('show'); tocModal?.setAttribute('aria-hidden','false'); }
@@ -391,20 +393,14 @@ function buildTOC(){
   if (!tocBody) return;
   const title = (ACTIVE_BOOK?.title || '未命名書籍').trim();
 
-  // header：書名 + 去封面
   const head = document.createElement('div');
   head.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin:2px 0 10px 0;';
   head.innerHTML = `
     <div style="font-weight:700;width: 11em;letter-spacing:1px">${escapeHTML(title)}</div>
-    <button class="btn ghost" id="tocGotoCover"
-      style="padding:2px 8px;border-color:#ffffff33;background:#ffffff00;color:#FFF;">
-      去封面
-    </button>`;
-
+    <button class="btn ghost" id="tocGotoCover" style="padding:2px 8px;border-color:#ffffff33;background:#ffffff00;color:#FFF;">去封面</button>`;
   tocBody.innerHTML = '';
   tocBody.appendChild(head);
 
-  // 章節列表（可點跳頁）
   (CHAPTERS_DB || []).forEach(ch=>{
     const row = document.createElement('div');
     row.className = 'toc-row';
@@ -418,13 +414,28 @@ function buildTOC(){
     tocBody.appendChild(row);
   });
 
-  // 去封面
   document.getElementById('tocGotoCover')?.addEventListener('click', ()=>{
     gotoDomPage(1);
     closeTOC();
   });
 }
 
+/* ===== 跳頁（TOC） ===== */
+function gotoPageDomByDbIndex(dbIndex){
+  const domIndex = dbIndex + 2; // 封面佔 1、2
+  gotoDomPage(domIndex);
+}
+function gotoDomPage(domIndex){
+  const isSpread = state.mode === 'spread';
+  const totalDom = isSpread
+    ? elBook.querySelectorAll('.paper').length * 2
+    : elBook.querySelectorAll('.single-page').length;
+
+  const clamped = Math.max(1, Math.min(totalDom, domIndex|0));
+  book._cursorPage = clamped - 1;
+  if (typeof book._mountCurrent === 'function') book._mountCurrent();
+  try { (window.afterLayoutRedraw || window.lightRedraw)?.(); } catch(_){}
+}
 
 /* ===== Draft 持久化（LOCAL） ===== */
 window.persistDraft = function persistDraft(){
@@ -527,6 +538,16 @@ async function init(){
       startPageIndex: 0,
       coverPapers: 1
     });
+
+    // 覆寫 _mountCurrent：每次掛載後做輕量重繪，避免角標或 .story 消失
+    const orig = book._mountCurrent?.bind(book);
+    if (orig){
+      book._mountCurrent = function(){
+        const r = orig();
+        setTimeout(()=>{ try{ lightRedraw(); }catch(e){} }, 0);
+        return r;
+      };
+    }
 
     window.addEventListener('resize', ()=>{ applyLayout(); lightRedraw(); });
     applyLayout();
