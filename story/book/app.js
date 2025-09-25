@@ -391,13 +391,20 @@ function buildTOC(){
   if (!tocBody) return;
   const title = (ACTIVE_BOOK?.title || '未命名書籍').trim();
 
+  // header：書名 + 去封面
   const head = document.createElement('div');
   head.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin:2px 0 10px 0;';
-  head.innerHTML = `<div style="font-weight:700;width: 11em;letter-spacing:1px">${escapeHTML(title)}</div>
-                    <button class="btn ghost" style="padding:2px 8px;border-color: #ffffff33; background: #ffffff00; color: #FFF;" id="tocGotoCover">去封面</button>`;
+  head.innerHTML = `
+    <div style="font-weight:700;width: 11em;letter-spacing:1px">${escapeHTML(title)}</div>
+    <button class="btn ghost" id="tocGotoCover"
+      style="padding:2px 8px;border-color:#ffffff33;background:#ffffff00;color:#FFF;">
+      去封面
+    </button>`;
+
   tocBody.innerHTML = '';
   tocBody.appendChild(head);
 
+  // 章節列表（可點跳頁）
   (CHAPTERS_DB || []).forEach(ch=>{
     const row = document.createElement('div');
     row.className = 'toc-row';
@@ -411,28 +418,13 @@ function buildTOC(){
     tocBody.appendChild(row);
   });
 
+  // 去封面
   document.getElementById('tocGotoCover')?.addEventListener('click', ()=>{
     gotoDomPage(1);
     closeTOC();
   });
 }
 
-/* ===== 跳頁（TOC） ===== */
-function gotoPageDomByDbIndex(dbIndex){
-  const domIndex = dbIndex + 2; // 封面佔 1、2
-  gotoDomPage(domIndex);
-}
-function gotoDomPage(domIndex){
-  const isSpread = state.mode === 'spread';
-  const totalDom = isSpread
-    ? elBook.querySelectorAll('.paper').length * 2
-    : elBook.querySelectorAll('.single-page').length;
-
-  const clamped = Math.max(1, Math.min(totalDom, domIndex|0));
-  book._cursorPage = clamped - 1;
-  if (typeof book._mountCurrent === 'function') book._mountCurrent();
-  try { (window.afterLayoutRedraw || window.lightRedraw)?.(); } catch(_){}
-}
 
 /* ===== Draft 持久化（LOCAL） ===== */
 window.persistDraft = function persistDraft(){
