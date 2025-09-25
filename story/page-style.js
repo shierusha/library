@@ -1,4 +1,3 @@
-
 /* page-style.js
  * 頁型切換（novel / divider-light / divider-dark / illustration）
  * - 只改本地資料＋輕量重畫（不重建 BookFlip）→ 不會壞翻頁
