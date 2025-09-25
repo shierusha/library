@@ -41,6 +41,7 @@
     const { sel, range, story, db } = ctx;
     if (range.collapsed) return;
 
+    // 尋找最近的 fs-span
     let node = range.commonAncestorContainer.nodeType===1 ? range.commonAncestorContainer : range.commonAncestorContainer.parentNode;
     while (node && node !== story){
       if (node.classList?.contains(FS_CLASS)) break;
@@ -56,6 +57,7 @@
       span.className = FS_CLASS;
       span.style.fontSize = clamp(1 + delta, FS_MIN, FS_MAX) + 'em';
       const frag = range.cloneContents();
+      // 去掉內層已存在的 fs-span（只包一層）
       Array.from(frag.querySelectorAll ? frag.querySelectorAll('.'+FS_CLASS) : []).forEach(s=>{
         while(s.firstChild) s.parentNode.insertBefore(s.firstChild, s);
         s.parentNode.removeChild(s);
