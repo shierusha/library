@@ -1,14 +1,9 @@
-/* paste-flow.js
- * 貼上純文字 / Enter / 輸入 → 視覺溢出自動分頁到下一個 novel 頁
- * - 溢出判斷依 writing-mode 決定：直排看寬、橫排看高
- * - 沒有可寫頁就插入一張白紙（兩頁），並繼續流向新 front
- */
-
+/* paste-flow.js v2 */
 (function(){
   function isVerticalFlow(storyEl){
     const page = storyEl.closest('.page, .single-page') || storyEl;
     const wm = (page && getComputedStyle(page).writingMode) || '';
-    return wm.indexOf('vertical') === 0; // vertical-rl / vertical-lr
+    return wm.indexOf('vertical') === 0;
   }
   function isOverflow(storyEl){
     if (!storyEl) return false;
@@ -17,7 +12,6 @@
     else   { return (storyEl.scrollHeight - storyEl.clientHeight) > 0.5; }
   }
 
-  // 保留格式的子樹截斷（用視覺溢出判斷二分）
   function truncateHTMLPreserve(firstHTML, nChars){
     if (nChars <= 0) return '';
     const tmp = document.createElement('div'); tmp.innerHTML = firstHTML;
@@ -33,7 +27,7 @@
         if (node.hasAttribute('class')) clone.setAttribute('class', node.getAttribute('class'));
         if (node.hasAttribute('style')) clone.setAttribute('style', node.getAttribute('style'));
         for (let i=0;i<node.childNodes.length;i++){
-          const cc = cloneNodeLimited(node.childNodes[i]); if (cc) clone.appendChild(cc);
+          const cc = cloneNodeLimited(node.childNodes[i]); if (cc) out.appendChild(cc);
           if (stop) break;
         }
         return clone;
@@ -77,7 +71,9 @@
 
   function findNextNovel(fromDb){
     for (let i=fromDb+1; i<=PAGES_DB.length; i++){
-      if (EditorCore.isNovelPage(PAGES_DB[i-1])) return i;
+      const p = PAGES_DB[i-1];
+      const t = String(p?.type||'').toLowerCase().replace(/-/g,'_');
+      if (t === 'novel') return i;
     }
     return 0;
   }
@@ -96,13 +92,12 @@
 
       if (!restPlain || restPlain.length === 0) break;
 
-      // 下一個 novel；沒有就插一張白紙，拿新 front index
       let nextIdx = findNextNovel(curIdx);
       if (!nextIdx){
         nextIdx = SheetOps.insertBlankSheetAfterCurrentSheet();
-        if (!EditorCore.isNovelPage(PAGES_DB[nextIdx-1])){
+        if (String(PAGES_DB[nextIdx-1]?.type||'').toLowerCase().replace(/-/g,'_') !== 'novel'){
           for (let k=curIdx+1;k<=PAGES_DB.length;k++){
-            if (EditorCore.isNovelPage(PAGES_DB[k-1])) { nextIdx = k; break; }
+            if (String(PAGES_DB[k-1]?.type||'').toLowerCase().replace(/-/g,'_') === 'novel') { nextIdx = k; break; }
           }
         }
       }
@@ -147,6 +142,5 @@
     });
   }
 
-  // 提供給文字控制呼叫（放大/縮小/粗斜底線後也檢查是否需要往後分頁）
-  window.PasteFlow = { bindTo, flowOverflowFrom };
+  window.PasteFlow = { bindTo, flowOverflowFrom, isOverflow };
 })();
