@@ -1,4 +1,11 @@
-/* editor-core.js */
+
+/* editor-core.js
+ * 共用工具 + hookAllStories()
+ * - novel / divider(白/黑) 會補 .story[contenteditable]（圖片頁不編輯）
+ * - 初次掛 .story 會保留原頁文字（避免重整後文本消失）
+ * - 角標鎖不可編輯
+ * - MutationObserver：BookFlip 渲染後自動掛 .story
+ */
 (function(){
   function getDomPagesList(){
     const list = [];
@@ -35,6 +42,12 @@
 
   function persist(){ try{ persistDraft && persistDraft(); }catch(_){} }
 
+  function textOf(nodes){
+    let s = '';
+    nodes.forEach(n => { s += (n.textContent || ''); });
+    return s.replace(/\u00a0/g, ' ');
+  }
+
   function updatePageJsonFromStory(dbIndex, storyEl){
     const p = PAGES_DB[dbIndex - 1]; if (!p) return;
     p.content_json = p.content_json || {};
@@ -49,9 +62,10 @@
 
     let story = pageEl.querySelector('.story');
     if (!story){
+      // 蒐集原有非角標內容
       const metas = new Set(Array.from(pageEl.querySelectorAll('.page-meta')));
       const olds = Array.from(pageEl.childNodes).filter(n => !(n.nodeType===1 && metas.has(n)));
-      const oldPlain = olds.map(n=>n.textContent||'').join('').trim();
+      const oldPlain = textOf(olds).trim();
 
       story = document.createElement('div');
       story.className = 'page-content story';
@@ -69,19 +83,23 @@
       story.style.boxSizing='border-box';
       story.style.minHeight = isNovelPage(p) ? '100%' : '1.2em';
 
-      const vertical = document.body.classList.contains('mode-rtl');
-      if (isDividerPage(p) && vertical){
-        story.style.width = 'auto';
-        story.style.inlineSize = 'auto';
-        story.style.maxWidth = '90%';
-        story.style.alignSelf = 'center';
-        story.style.margin = '0 auto';
-        story.style.textAlign = 'center';
+      // === 垂直書寫時，黑/白置中頁的可編輯層不要吃滿寬，才能左右置中 ===
+      if (isDividerPage(p)) {
+        const vertical = document.body.classList.contains('mode-rtl');
+        if (vertical) {
+          story.style.width = 'auto';
+          story.style.inlineSize = 'auto';
+          story.style.maxWidth = '90%';
+          story.style.alignSelf = 'center';
+          story.style.margin = '0 auto';
+          story.style.textAlign = 'center';
+        }
       }
 
       pageEl.insertBefore(story, pageEl.firstChild);
       olds.forEach(n=> n.parentNode && n.parentNode.removeChild(n));
 
+      // 初始化：DB 為主，沒資料時用舊 DOM 文字
       const plainInit = (p.content_json?.text_plain ?? '').trim() || oldPlain;
       if (plainInit) {
         story.textContent = plainInit;
@@ -91,6 +109,7 @@
       }
     }
 
+    // 綁貼上/輸入
     if (window.PasteFlow && typeof window.PasteFlow.bindTo === 'function' && !story.__pfBound){
       story.__pfBound = true; window.PasteFlow.bindTo(story);
     }
@@ -118,7 +137,7 @@
     const list = getDomPagesList();
     for (let i=0;i<list.length;i++){
       const dbIndex = domIndexToDbIndex(i+1);
-      if (dbIndex <= 0) continue;
+      if (dbIndex <= 0) continue; // 封面不編輯
       const p = PAGES_DB[dbIndex - 1];
       if (isImagePage(p)) continue;
       ensureStoryOnPageEl(list[i], dbIndex);
@@ -127,6 +146,7 @@
     try { window.PageStyle?.bindImageEditors?.(); } catch(_){}
   }
 
+  // 觀察 BookFlip DOM 完成後再掛 .story
   let mo;
   function observeBook(){
     if (mo) mo.disconnect();
@@ -137,6 +157,7 @@
     mo.observe(document.getElementById('bookCanvas'), { childList:true, subtree:true });
   }
 
+  // export
   window.EditorCore = {
     getDomPagesList, domIndexToDbIndex, dbIndexToDomIndex,
     isImagePage, isDividerPage, isNovelPage, isEditablePage,
