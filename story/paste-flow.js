@@ -1,9 +1,14 @@
-/* paste-flow.js v2 */
+
+/* paste-flow.js
+ * 貼上純文字 / Enter / 輸入 → 視覺溢出自動分頁到下一個 novel 頁
+ * - 溢出判斷依 writing-mode 決定：直排看寬、橫排看高
+ * - 沒有可寫頁就插入一張白紙（兩頁），並繼續流向新 front
+ */
 (function(){
   function isVerticalFlow(storyEl){
     const page = storyEl.closest('.page, .single-page') || storyEl;
     const wm = (page && getComputedStyle(page).writingMode) || '';
-    return wm.indexOf('vertical') === 0;
+    return wm.indexOf('vertical') === 0; // vertical-rl / vertical-lr
   }
   function isOverflow(storyEl){
     if (!storyEl) return false;
@@ -12,6 +17,7 @@
     else   { return (storyEl.scrollHeight - storyEl.clientHeight) > 0.5; }
   }
 
+  // 保留格式的子樹截斷（用視覺溢出判斷二分）
   function truncateHTMLPreserve(firstHTML, nChars){
     if (nChars <= 0) return '';
     const tmp = document.createElement('div'); tmp.innerHTML = firstHTML;
@@ -27,7 +33,7 @@
         if (node.hasAttribute('class')) clone.setAttribute('class', node.getAttribute('class'));
         if (node.hasAttribute('style')) clone.setAttribute('style', node.getAttribute('style'));
         for (let i=0;i<node.childNodes.length;i++){
-          const cc = cloneNodeLimited(node.childNodes[i]); if (cc) out.appendChild(cc);
+          const cc = cloneNodeLimited(node.childNodes[i]); if (cc) clone.appendChild(cc);
           if (stop) break;
         }
         return clone;
@@ -92,6 +98,7 @@
 
       if (!restPlain || restPlain.length === 0) break;
 
+      // 下一個 novel；沒有就插一張白紙，拿新 front index
       let nextIdx = findNextNovel(curIdx);
       if (!nextIdx){
         nextIdx = SheetOps.insertBlankSheetAfterCurrentSheet();
@@ -142,5 +149,5 @@
     });
   }
 
-  window.PasteFlow = { bindTo, flowOverflowFrom, isOverflow };
+  window.PasteFlow = { bindTo, flowOverflowFrom };
 })();
