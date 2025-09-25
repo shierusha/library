@@ -1,7 +1,6 @@
-
-/* app.js — 本地化編輯模式 + BookFlip 掛載
+/* app.js — 本地化編輯模式 + BookFlip 掛載（去除舊 TOC）
  * 重點：
- * - 以 ?bookid=UUID 讀取一次資料（可直接用 Supabase），讀到後寫入 localStorage
+ * - 用 ?bookid=UUID 讀取一次資料（可打 Supabase），讀到後寫入 localStorage
  * - 之後操作皆以 PAGES_DB (LOCAL) 為主；persistDraft() 只寫 localStorage
  * - 封面：書名同步、雙擊可輸入封面圖片網址（空值=移除）
  * - 版面縮放以面積推字級（--scale），不動你的 CSS
@@ -297,6 +296,7 @@
     renderMetaForAllPages();
     if (window.EditorCore) EditorCore.hookAllStories();
     if (window.PageStyle) PageStyle.bindImageEditors();
+    if (window.TOC) TOC.refresh?.();
     updateCount();
     applyCoverFromBook();
     bindCoverEdit();
