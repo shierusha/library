@@ -100,8 +100,13 @@
       if (back) back.style.background = '#fff';
     }
 
-    const titleNode = document.getElementById('bookTitle');
-    if (titleNode) titleNode.textContent = title;
+    // 保留這段（不用回寫 titleNode）
+elTitle?.addEventListener('input', ()=>{
+  ACTIVE_BOOK.title = elTitle.textContent || '未命名書籍';
+  applyCoverFromBook();   // 只更新封面，不回寫 #bookTitle
+  persistDraft();
+});
+
   }
 
   // 封面雙擊：輸入封面 URL，空=移除
