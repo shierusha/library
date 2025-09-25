@@ -1,34 +1,33 @@
-/* sheet-ops.js — 插入/刪除白紙（兩頁） v2 */
+
+/* sheet-ops.js (no-insert-button version)
+ * 插入/刪除白紙（兩頁 novel），重建 BookFlip 並正確定位游標
+ * - 手動插入按鈕綁定已移除（UI 不再觸發），但函式仍保留供 paste-flow 自動加頁使用
+ */
 (function(){
   function persist(){ try{ persistDraft && persistDraft(); }catch(_){} }
   function genLocalId(){ return 'local_' + Math.random().toString(36).slice(2,9); }
+  function getSheetStart(dbIndex){ return (dbIndex % 2 === 0) ? dbIndex - 1 : dbIndex; }
 
   function rebuildAndRedrawPreserveCursor(preferDbIndex){
-    const currentDom = (window.book?._cursorPage || 0) + 1;
-    const currentDb  = EditorCore.domIndexToDbIndex(currentDom) || 1;
-    const startDb    = Math.max(1, preferDbIndex || currentDb);
+    const startDb = Math.max(1, preferDbIndex || EditorCore.getFocusedDbIndex() || 1);
     rebuildTo(startDb);
-    try{
-      const backDom = Math.max(0, currentDom - 1);
-      window.book._cursorPage = backDom;
-      window.book._mountCurrent();
-    }catch(_){}
   }
 
   function insertBlankSheetAfterCurrentSheet(){
     syncAllStoriesToDB();
 
-    const insertAt = (PAGES_DB.length > 0)
-      ? (PAGES_DB[PAGES_DB.length - 1].page_index + 1)
-      : 1;
+    const focusBefore = EditorCore.getFocusedDbIndex();
+    const sheetStart  = getSheetStart(focusBefore);
+    const insertAt    = sheetStart + 2; // 下一張紙的 front
 
     const front = { id: genLocalId(), page_index: insertAt,   type:'novel', image_url:'', content_json:{text_plain:'', text_html:''} };
     const back  = { id: genLocalId(), page_index: insertAt+1, type:'novel', image_url:'', content_json:{text_plain:'', text_html:''} };
 
+    for (const p of PAGES_DB){ if (p.page_index >= insertAt) p.page_index += 2; }
     PAGES_DB.push(front, back);
     PAGES_DB.sort((a,b)=>a.page_index - b.page_index);
 
-    rebuildAndRedrawPreserveCursor();
+    rebuildAndRedrawPreserveCursor(insertAt);
     persist();
     return insertAt;
   }
@@ -36,9 +35,8 @@
   function deleteBlankSheetIfPossible(){
     syncAllStoriesToDB();
 
-    const currentDom = (window.book?._cursorPage || 0) + 1;
-    const db = EditorCore.domIndexToDbIndex(currentDom) || 1;
-    const sheetStart = (db % 2 === 0) ? db - 1 : db;
+    const db = EditorCore.getFocusedDbIndex();
+    const sheetStart = getSheetStart(db);
     const a = PAGES_DB[sheetStart - 1];
     const b = PAGES_DB[sheetStart];
 
@@ -52,13 +50,22 @@
     }
 
     PAGES_DB = PAGES_DB.filter(x => x !== a && x !== b);
+    for (const p of PAGES_DB){ if (p.page_index > sheetStart+1) p.page_index -= 2; }
+    PAGES_DB.sort((x,y)=>x.page_index - y.page_index);
 
-    rebuildAndRedrawPreserveCursor(Math.max(1, sheetStart - 1));
+    const target = Math.max(1, sheetStart - 1);
+    rebuildAndRedrawPreserveCursor(target);
     persist();
   }
 
-  document.getElementById('btnInsertPage')?.addEventListener('click', insertBlankSheetAfterCurrentSheet);
+  // 移除手動插入白紙的按鈕綁定（保留刪除空白紙功能）
+  // document.getElementById('btnInsertPage')?.addEventListener('click', insertBlankSheetAfterCurrentSheet);
   document.getElementById('btnDeleteBlank')?.addEventListener('click', deleteBlankSheetIfPossible);
 
-  window.SheetOps = { rebuildAndRedrawPreserveCursor, insertBlankSheetAfterCurrentSheet, deleteBlankSheetIfPossible };
+  window.SheetOps = {
+    rebuildAndRedrawPreserveCursor,
+    insertBlankSheetAfterCurrentSheet,  // 保留供 paste-flow 自動加頁
+    deleteBlankSheetIfPossible,
+    getSheetStart
+  };
 })();
