@@ -1,7 +1,7 @@
-
-/* sheet-ops.js (no-insert-button version)
+/* sheet-ops.js
  * 插入/刪除白紙（兩頁 novel），重建 BookFlip 並正確定位游標
- * - 手動插入按鈕綁定已移除（UI 不再觸發），但函式仍保留供 paste-flow 自動加頁使用
+ * - 插入回傳新 front 的 dbIndex（供大量貼上繼續流向）
+ * - 移除「手動插入白紙」按鈕綁定；保留內部插入 API 給 PasteFlow 自動使用
  */
 (function(){
   function persist(){ try{ persistDraft && persistDraft(); }catch(_){} }
@@ -58,13 +58,13 @@
     persist();
   }
 
-  // 移除手動插入白紙的按鈕綁定（保留刪除空白紙功能）
+  // ❌ 取消手動插入白紙按鈕（仍保留刪除白紙）
   // document.getElementById('btnInsertPage')?.addEventListener('click', insertBlankSheetAfterCurrentSheet);
   document.getElementById('btnDeleteBlank')?.addEventListener('click', deleteBlankSheetIfPossible);
 
   window.SheetOps = {
     rebuildAndRedrawPreserveCursor,
-    insertBlankSheetAfterCurrentSheet,  // 保留供 paste-flow 自動加頁
+    insertBlankSheetAfterCurrentSheet, // 提供給 PasteFlow 自動加頁
     deleteBlankSheetIfPossible,
     getSheetStart
   };
