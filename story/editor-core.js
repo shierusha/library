@@ -1,4 +1,3 @@
-
 /* editor-core.js
  * 共用工具 + hookAllStories()
  * - novel / divider(白/黑) 會補 .story[contenteditable]（圖片頁不編輯）
@@ -83,17 +82,14 @@
       story.style.boxSizing='border-box';
       story.style.minHeight = isNovelPage(p) ? '100%' : '1.2em';
 
-      // === 垂直書寫時，黑/白置中頁的可編輯層不要吃滿寬，才能左右置中 ===
-      if (isDividerPage(p)) {
-        const vertical = document.body.classList.contains('mode-rtl');
-        if (vertical) {
-          story.style.width = 'auto';
-          story.style.inlineSize = 'auto';
-          story.style.maxWidth = '90%';
-          story.style.alignSelf = 'center';
-          story.style.margin = '0 auto';
-          story.style.textAlign = 'center';
-        }
+      // ★ 垂直書寫的黑/白置中頁：讓 .story 不吃滿寬，才能真正左右置中
+      if (isDividerPage(p) && document.body.classList.contains('mode-rtl')) {
+        story.style.width = 'auto';
+        story.style.inlineSize = 'auto';
+        story.style.maxWidth = '90%';
+        story.style.alignSelf = 'center';
+        story.style.margin = '0 auto';
+        story.style.textAlign = 'center';
       }
 
       pageEl.insertBefore(story, pageEl.firstChild);
