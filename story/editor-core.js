@@ -1,11 +1,19 @@
 /* editor-core.js
  * 共用工具 + hookAllStories()
+ * - 保底 window.state，避免引用時未定義
  * - novel / divider(白/黑) 會補 .story[contenteditable]（圖片頁不編輯）
  * - 初次掛 .story 會保留原頁文字（避免重整後文本消失）
  * - 角標鎖不可編輯
  * - MutationObserver：BookFlip 渲染後自動掛 .story
  */
 (function(){
+  /** 保底全域參考 **/
+  window.state  = window.state  || { mode:'spread', direction:'ltr', bind:'short', aspectShort:5/7, aspectLong:7/5 };
+  window.elBook = window.elBook || document.getElementById('bookCanvas');
+
+  const state  = window.state;
+  const elBook = window.elBook;
+
   function getDomPagesList(){
     const list = [];
     if (state.mode === 'spread') {
@@ -23,12 +31,10 @@
   function domIndexToDbIndex(domIndex){ if (domIndex <= 2) return 0; return domIndex - 2; }
   function dbIndexToDomIndex(dbIndex){ return dbIndex + 2; }
 
-  function isImagePage(p){ return String(p?.type||'').toLowerCase().includes('image'); }
-  function isDividerPage(p){
-    const t = String(p?.type||'').toLowerCase().replace(/-/g,'_');
-    return t === 'divider_white' || t === 'divider_light' || t === 'divider_dark' || t === 'divider_black';
-  }
-  function isNovelPage(p){ return String(p?.type||'').toLowerCase().replace(/-/g,'_') === 'novel'; }
+  function normType(t){ return String(t||'').toLowerCase().replace(/-/g,'_'); }
+  function isImagePage(p){ return normType(p?.type||'') === 'image'; }
+  function isDividerPage(p){ const t = normType(p?.type||''); return t === 'divider_white' || t === 'divider_light' || t === 'divider_dark' || t === 'divider_black'; }
+  function isNovelPage(p){ return normType(p?.type||'') === 'novel'; }
   function isEditablePage(p){ return isNovelPage(p) || isDividerPage(p); }
 
   function lockMeta(){
@@ -39,19 +45,18 @@
     });
   }
 
-  function persist(){ try{ persistDraft && persistDraft(); }catch(_){} }
-
-  function textOf(nodes){
-    let s = '';
-    nodes.forEach(n => { s += (n.textContent || ''); });
-    return s.replace(/\u00a0/g, ' ');
+  function isVisuallyEmpty(el){
+    if (!el) return true;
+    const txt = (el.textContent || '').replace(/\u200B/g,'').replace(/\u00A0/g,' ').trim();
+    return txt.length === 0;
   }
+
+  function persist(){ try{ persistDraft && persistDraft(); }catch(_){} }
 
   function updatePageJsonFromStory(dbIndex, storyEl){
     const p = PAGES_DB[dbIndex - 1]; if (!p) return;
-    p.content_json = p.content_json || {};
-    p.content_json.text_plain = storyEl.textContent || '';
-    p.content_json.text_html  = storyEl.innerHTML || '';
+    const html = isVisuallyEmpty(storyEl) ? '' : (storyEl.innerHTML || '');
+    p.content_json = { text_html: html }; // 僅存 HTML
     persist();
   }
 
@@ -61,10 +66,9 @@
 
     let story = pageEl.querySelector('.story');
     if (!story){
-      // 蒐集原有非角標內容
+      // 收集原先非角標內容
       const metas = new Set(Array.from(pageEl.querySelectorAll('.page-meta')));
       const olds = Array.from(pageEl.childNodes).filter(n => !(n.nodeType===1 && metas.has(n)));
-      const oldPlain = textOf(olds).trim();
 
       story = document.createElement('div');
       story.className = 'page-content story';
@@ -82,7 +86,7 @@
       story.style.boxSizing='border-box';
       story.style.minHeight = isNovelPage(p) ? '100%' : '1.2em';
 
-      // ★ 垂直書寫的黑/白置中頁：讓 .story 不吃滿寬，才能真正左右置中
+      // 垂直黑/白置中：不要吃滿寬，視覺置中
       if (isDividerPage(p) && document.body.classList.contains('mode-rtl')) {
         story.style.width = 'auto';
         story.style.inlineSize = 'auto';
@@ -92,20 +96,26 @@
         story.style.textAlign = 'center';
       }
 
+      // 初始化：DB 為主；沒有時用舊 DOM 文本（轉為安全 HTML）
+      const htmlInit = (p.content_json?.text_html ?? '');
+      if (htmlInit) story.innerHTML = htmlInit;
+      else {
+        const tmp = document.createElement('div');
+        olds.forEach(n=> tmp.appendChild(n.cloneNode(true)));
+        const plain = (tmp.textContent || '').trim();
+        if (plain){
+          const safe = plain.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/\n/g,'<br>');
+          story.innerHTML = safe;
+          p.content_json = { text_html: safe };
+        }
+      }
+
+      // 清掉舊內容，插入 story
       pageEl.insertBefore(story, pageEl.firstChild);
       olds.forEach(n=> n.parentNode && n.parentNode.removeChild(n));
-
-      // 初始化：DB 為主，沒資料時用舊 DOM 文字
-      const plainInit = (p.content_json?.text_plain ?? '').trim() || oldPlain;
-      if (plainInit) {
-        story.textContent = plainInit;
-        p.content_json = p.content_json || {};
-        if (!p.content_json.text_plain) p.content_json.text_plain = plainInit;
-        if (!p.content_json.text_html)  p.content_json.text_html  = plainInit.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/\n/g,'<br>');
-      }
     }
 
-    // 綁貼上/輸入
+    // 綁貼上/輸入（去格式、溢出才分頁）
     if (window.PasteFlow && typeof window.PasteFlow.bindTo === 'function' && !story.__pfBound){
       story.__pfBound = true; window.PasteFlow.bindTo(story);
     }
