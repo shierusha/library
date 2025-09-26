@@ -38,11 +38,57 @@
     if (x === 'divider_black') return 'divider_dark';
     if (x === 'divider_white') return 'divider_light';
     if (x === 'image')        return 'illustration';
-    if (x === 'novel' || x === 'divider_light' || x === 'divider_dark' || x === 'illustration') return x;
+    if (x === 'illustration' || x === 'divider_dark' || x === 'divider_light') return x;
     return 'novel';
   }
   function toHTMLFromPlain(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/\n/g,'<br>'); }
+ function htmlToPlain(html){
+    if (!html) return '';
+    const div = document.createElement('div');
+    div.innerHTML = html;
+    return div.textContent || '';
+  }
 
+  function clampNumber(n, min, max){
+    const num = Number(n);
+    if (!Number.isFinite(num)) return min;
+    if (typeof min === 'number' && typeof max === 'number') return Math.max(min, Math.min(max, num));
+    if (typeof min === 'number') return Math.max(min, num);
+    if (typeof max === 'number') return Math.min(max, num);
+    return num;
+  }
+
+  function ensurePageSchema(raw, index){
+    const page = Object.assign({}, raw || {});
+    page.page_index = index + 1;
+    page.type = normalizeType(page.type);
+    page.image_url = (page.image_url || '').trim();
+    if (!page.content_json) page.content_json = {};
+    const html = page.content_json.text_html ?? page.html ?? '';
+    page.content_json.text_html = html || '';
+    if (!page.content_json.text_plain){
+      page.content_json.text_plain = htmlToPlain(html || '');
+    }
+    page.html = page.content_json.text_html;
+    return page;
+  }
+
+  function ensurePages(list){
+    const arr = Array.isArray(list) ? list.slice() : [];
+    return arr.map((p, idx) => ensurePageSchema(p, idx));
+  }
+
+  function ensureChapters(list){
+    const total = PAGES_DB?.length || 0;
+    const arr = Array.isArray(list) ? list : [];
+    return arr
+      .map(ch => ({
+        title: (ch && typeof ch.title === 'string') ? ch.title : '',
+        page_index: clampNumber(ch?.page_index ?? 1, 1, total) || 1
+      }))
+      .sort((a,b) => a.page_index - b.page_index);
+  }
+  
   const LS_KEY_BOOK  = (id)=>`book:${id}`;
   const LS_KEY_PAGES = (id)=>`pages:${id}`;
   const LS_KEY_CHAP  = (id)=>`chapters:${id}`;
@@ -61,7 +107,7 @@
   }
 
   /* ===== 封面 ===== */
-  function applyCoverFromBook() {
+  function applyCoverFromBook({ skipTitleNode = false } = {}) {
     const title = ACTIVE_BOOK?.title || '未命名書籍';
     const coverURL = (ACTIVE_BOOK?.cover_image || '').trim();
 
@@ -106,7 +152,7 @@
       if (back) back.style.background = '#fff';
     }
 
-    if (elTitle) elTitle.textContent = title;
+    if (!skipTitleNode && elTitle) elTitle.textContent = title;
   }
 
   /* ===== DB → pairs（封面之外的內容）===== */
@@ -125,6 +171,17 @@
     }
     return pairs;
   }
+
+    function rebuildBookFromPages(){
+    if (!book) return;
+    const cursor = Math.max(0, Number(book._cursorPage) || 0);
+    const pairs = buildPairsFromPages();
+    book.loadData({ pairs });
+    book._cursorPage = cursor;
+    if (typeof book._mountCurrent === 'function') book._mountCurrent();
+    setTimeout(()=>{ try{ lightRedraw(); }catch(_){} }, 0);
+  }
+  window.rebuildBookFromPages = rebuildBookFromPages;
 
   /* ===== 版面（實寬高 + 字級比例） ===== */
   function applyLayout(){
@@ -152,36 +209,46 @@
   }
 
   /* ===== 四種頁型（底線版） ===== */
+  /* ===== 四種頁型（底線版） ===== */
   function setPageTypeOnElement(el, p){
-    const t = normalizeType(p.type);
+    if (!el || !p) return;
+    const tRaw = normalizeType(p.type);
+    const hasImage = (p.image_url || '').trim().length > 0;
+    const t = (tRaw === 'illustration' && !hasImage) ? 'novel' : tRaw;
+    if (t !== tRaw) {
+      p.type = t;
+      p.image_url = hasImage ? p.image_url : '';
+    }
+
+    el.dataset.dbIndex = String(p.page_index || 0);
+    el.dataset.type = t;
     el.classList.remove('page--novel','page--divider_light','page--divider_dark','page--illustration');
     el.style.backgroundImage = '';
-    el.dataset.type = t;
+    el.style.backgroundColor = '';
+    el.innerHTML = '';
 
-    if (t === 'divider_light') {
-      el.classList.add('page--divider_light');
+    if (t === 'divider_light' || t === 'divider_dark') {
+      el.classList.add(t === 'divider_light' ? 'page--divider_light' : 'page--divider_dark');
       if (p.content_json?.text_html) el.innerHTML = p.content_json.text_html;
-
-    } else if (t === 'divider_dark') {
-      el.classList.add('page--divider_dark');
-      if (p.content_json?.text_html) el.innerHTML = p.content_json.text_html;
-
-    } else if (t === 'illustration') {
-      el.classList.add('page--illustration');
-      if (p.image_url && p.image_url.trim()) {
-        el.style.backgroundImage = `url("${p.image_url}")`;
-      } else {
-        el.style.backgroundImage = 'linear-gradient(45deg,#fbb,#fdd)';
-        el.innerHTML = '<div style="margin:auto;color:#900;font-weight:700">缺少 image_url</div>';
-      }
-      el.innerHTML = ''; // 圖片頁不顯文字
-
-    } else {
-      el.classList.add('page--novel');
-      if (p.content_json?.text_html) el.innerHTML = p.content_json.text_html;
+      return;
     }
-  }
 
+    if (t === 'illustration') {
+      el.classList.add('page--illustration');
+      if (hasImage) {
+        el.style.backgroundImage = `url("${p.image_url}")`;
+      }
+      return;
+    }
+
+    el.classList.add('page--novel');
+    const story = document.createElement('div');
+    story.className = 'story';
+    story.setAttribute('contenteditable','true');
+    story.setAttribute('spellcheck','false');
+    if (p.content_json?.text_html) story.innerHTML = p.content_json.text_html;
+    el.appendChild(story);
+  }
   function applyPageTypesNow(){
     if (!PAGES_DB.length) return;
 
@@ -321,7 +388,30 @@
     });
   }
 
-  /* ===== TOC（目錄）— 由 toc.js 負責 UI，這裡不處理 ===== */
+ function bindTitleEditor(){
+    if (!elTitle) return;
+    function sanitize(text){
+      return String(text || '').replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+    function commit(updateNode){
+      const sanitized = sanitize(elTitle.textContent || '');
+      if (!window.ACTIVE_BOOK) window.ACTIVE_BOOK = {};
+      window.ACTIVE_BOOK.title = sanitized || '未命名書籍';
+      try{ persistDraft(); }catch(_){}
+      applyCoverFromBook({ skipTitleNode: updateNode === false });
+      if (updateNode !== false) {
+        elTitle.textContent = window.ACTIVE_BOOK.title;
+      }
+    }
+    elTitle.addEventListener('keydown', (e)=>{
+      if (e.key === 'Enter') { e.preventDefault(); }
+    });
+    elTitle.addEventListener('input', ()=>{
+      commit(false);
+    });
+    elTitle.addEventListener('blur', ()=>{ commit(true); });
+  }
+
 
   /* ===== 版面切換 / 方向 / 手勢 ===== */
   function goLeft(){
@@ -392,6 +482,8 @@
         p.content_json = p.content_json || {};
         p.content_json.text_html = t;
         p.content_json.text_plain = (story?.innerText || '');
+                p.html = t;
+
       }
     }
   };
@@ -449,25 +541,25 @@
     let local = loadFromLocal(BOOK_ID_Q);
     if (local){
       ACTIVE_BOOK = local.bookData;
-      PAGES_DB = local.pages;
-      CHAPTERS_DB = local.chaps || [];
+      PAGES_DB = ensurePages(local.pages);
+      CHAPTERS_DB = ensureChapters(local.chaps || []);
 
       // 若本地沒有章節，補抓一次 DB 的章節並寫回本地
       if (!CHAPTERS_DB.length) {
         const idToIndex = new Map((PAGES_DB || []).map(r => [r.id, r.page_index]));
-        CHAPTERS_DB = await fetchChaptersSimple(BOOK_ID_Q, idToIndex);
+        CHAPTERS_DB = ensureChapters(await fetchChaptersSimple(BOOK_ID_Q, idToIndex));
         persistDraft();
       }
     }else{
       // 首次：打 DB 取回 → 同時取章節
       const { bookData, pages } = await fetchFromSupabase(BOOK_ID_Q);
       ACTIVE_BOOK = bookData;
-      PAGES_DB = pages || [];
+      PAGES_DB = ensurePages(pages || []);
       const idToIndex = new Map((PAGES_DB || []).map(r => [r.id, r.page_index]));
-      CHAPTERS_DB = await fetchChaptersSimple(BOOK_ID_Q, idToIndex);
+      CHAPTERS_DB = ensureChapters(await fetchChaptersSimple(BOOK_ID_Q, idToIndex));
       persistDraft();
     }
-
+    
     // 套用方向/裝訂
     if (ACTIVE_BOOK.direction === 'rtl' || ACTIVE_BOOK.direction === 'ltr') state.direction = ACTIVE_BOOK.direction;
     if (ACTIVE_BOOK.binding === 'long'  || ACTIVE_BOOK.binding === 'short') state.bind = ACTIVE_BOOK.binding;
@@ -506,6 +598,8 @@
       ensureSwipeBinding();
       lightRedraw(); // 單頁封面也立即處理
       bindCoverEdit();
+            bindTitleEditor();
+
     } catch (e) {
       console.error(e);
       alert('載入書籍資料失敗：' + (e?.message || e));
