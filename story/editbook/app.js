@@ -106,7 +106,7 @@
       if (back) back.style.background = '#fff';
     }
 
-    if (elTitle && document.activeElement !== elTitle) elTitle.textContent = title;
+    if (elTitle) elTitle.textContent = title;
   }
 
   /* ===== DB → pairs（封面之外的內容）===== */
@@ -475,53 +475,9 @@
     document.body.classList.toggle('mode-ltr', state.direction === 'ltr');
   }
 
-  /* ===== 書名同步（不破壞輸入游標） ===== */
-  function bindTitleEdit(){
-    if (!elTitle) return;
-    elTitle.addEventListener('keydown', (e)=>{
-      // 防止 Enter 產生 div；維持單行
-      if (e.key === 'Enter'){ e.preventDefault(); document.execCommand('insertLineBreak'); }
-    });
-    elTitle.addEventListener('input', ()=>{
-      const t = (elTitle.textContent || '').trim();
-      window.ACTIVE_BOOK = window.ACTIVE_BOOK || {};
-      ACTIVE_BOOK.title = t || '未命名書籍';
-      try{ persistDraft(); }catch(_){}
-      // 即時更新封面（內部已避免覆寫正在輸入的書名元素）
-      applyCoverFromBook();
-    });
-  }
-
-  /* ===== 插入/編輯章節（按鈕） ===== */
-  function bindInsertChapter(){
-    const btn = document.getElementById('btnInsertChapter');
-    if (!btn) return;
-    btn.addEventListener('click', ()=>{
-      try{ syncAllStoriesToDB && syncAllStoriesToDB(); }catch(_){}
-      const dbIndex = (window.EditorCore?.getFocusedDbIndex?.() || 1);
-      const exist = (window.CHAPTERS_DB || []).find(ch => ch.page_index === dbIndex) || null;
-      const tip = exist ? '編輯章節名稱（留空=取消/刪除章節）' : '插入章節名稱（留空=取消）';
-      const input = prompt(tip, exist?.title || '');
-      if (input === null) return;
-      const name = String(input).trim();
-      if (!name){
-        if (exist) window.CHAPTERS_DB = (window.CHAPTERS_DB || []).filter(x => x !== exist);
-      } else {
-        if (exist) exist.title = name;
-        else { (window.CHAPTERS_DB = window.CHAPTERS_DB || []).push({ title: name, page_index: dbIndex }); }
-        window.CHAPTERS_DB.sort((a,b)=> a.page_index - b.page_index);
-      }
-      try{ persistDraft(); }catch(_){}
-      try{ renderMetaForAllPages(); }catch(_){}
-      try{ window.TOC_API?.build?.(); }catch(_){}
-    });
-  }
-
   async function init(){
     try {
       await initData();
-      bindTitleEdit();
-      bindInsertChapter();
 
       // 初始化 BookFlip（封面保留 1 張 .paper）
       const pairs = buildPairsFromPages();
