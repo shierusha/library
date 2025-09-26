@@ -1,10 +1,5 @@
 /* 所有功能.js — 整合：
- * 1) editor-core.js
- * 2) sheet-ops.js
- * 3) paste-flow.js
- * 4) text-controls.js
- * 5) page-style.js
- * 6) toc.js
+
  * （保留原模組 IIFE 與全域名稱：EditorCore / SheetOps / PasteFlow / TextControls / PageStyle / TOC_API）
  */
 
