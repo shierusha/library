@@ -324,6 +324,13 @@
     const domIndex = dbIndex + 2;
     gotoDomPage(domIndex);
   };
+   // ★ 供外部在特殊情境（例如重建後）再次「硬鎖」到指定頁
+  window.lockToDbIndex = function lockToDbIndex(dbIndex){
+    if (!book) return;
+    const target = Number(dbIndex) || 0;
+    if (target <= 0) return;
+    gotoPageDomByDbIndex(target);
+  };
   window.gotoDomPage = function gotoDomPage(domIndex){
     const isSpread = state.mode === 'spread';
     const totalDom = isSpread
