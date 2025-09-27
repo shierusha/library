@@ -121,7 +121,16 @@
     // 把剩餘文字搬到 nextIdx 的開頭（或依你原本的策略放置）
     const nextEl = EditorCore.getDomPagesList()[EditorCore.dbIndexToDomIndex(nextIdx)-1];
     const nextStory = EditorCore.ensureStoryOnPageEl(nextEl, nextIdx);
-    nextStory.textContent = (restPlain + (nextStory.textContent || ''));
+  if (restPlain) {
+  // 只在開頭塞入一個文字節點，不會動到原本的標籤/樣式
+  if (typeof nextStory.insertAdjacentText === 'function') {
+    nextStory.insertAdjacentText('afterbegin', restPlain);
+  } else {
+    // 老舊瀏覽器 fallback：盡量保守仍保留既有內容
+    nextStory.textContent = restPlain + (nextStory.textContent || '');
+  }
+}
+
 
     // 繼續檢查下一頁是否還會再溢出
     curIdx = nextIdx;
