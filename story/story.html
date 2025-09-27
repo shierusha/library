@@ -436,37 +436,58 @@ async function runDiagnostics(){
 async function goToBookChest(e){
   if (e) e.preventDefault();
 
-  // 1) 拿 A 專案 access_token
-  const { data: { session } } = await client.auth.getSession();
-  if (!session?.access_token) { alert('請先登入才能管理書櫃'); return; }
+  // 先打開一個空白分頁，避免 await 之後被當作彈窗阻擋
+  const popup = window.open('about:blank', '_blank', 'noopener');
+
+  // 1) A 專案 access_token
+  const { data: sess, error: sErr } = await client.auth.getSession();
+  const accessToken = sess?.session?.access_token;
+  if (sErr || !accessToken){
+    popup?.close();
+    alert('請先登入才能管理書櫃');
+    return;
+  }
 
   try{
-    // 2) 用 fetch 直打 Edge Function（只送 content-type，避免 invoke() 自動多的 headers）
-    const resp = await fetch(EXCHANGE_URL, {
+    // 2) 呼叫 B 的 Edge Function 換長簽 JWT（用 fetch）
+    const resp = await fetch(`${BOOKS_URL}/functions/v1/exchange-token`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ token: session.access_token })
+      body: JSON.stringify({ token: accessToken })
     });
     const out = await resp.json().catch(()=>null);
-    if (!resp.ok || !out?.token) throw new Error(out?.error || out?.detail || 'exchange-token 失敗');
+    if (!resp.ok || !out?.token) {
+      throw new Error(out?.message || out?.error || '交換 token 失敗');
+    }
 
-    // 3) 存長簽，帶 owner_id / stuCode 去書櫃
-    localStorage.setItem('xer_b_jwt', out.token);
+    // 3) 組目的地網址（把 token/id/stu 一起帶上）
+    const url = new URL(BOOK_CHEST_URL, location.origin);
 
-    const params  = new URLSearchParams(location.search);
-    const stuCode = params.get('stu');
-    const qs = new URLSearchParams();
-    if (OWNER_PLAYER?.id) qs.set('id', OWNER_PLAYER.id);
-    if (stuCode) qs.set('stu', stuCode);
+    // ★ 書櫃頁有 getBearerFromUrlOrStorage()，看到 ?token= 會自動存 localStorage 並清掉網址
+    url.searchParams.set('token', out.token);
 
-    const base = BOOK_CHEST_URL.endsWith('/') ? BOOK_CHEST_URL : BOOK_CHEST_URL;
-    location.href = `${base}${qs.toString() ? ('?' + qs.toString()) : ''}`;
+    // id = 房主（owner_id）
+    const ownerId = OWNER_PLAYER?.id || sess.session.user.id;
+    if (ownerId) url.searchParams.set('id', ownerId);
 
-    // 若想改成透過網址帶 token（書櫃頁已有處理）：
-    // location.href = `${base}?token=${encodeURIComponent(out.token)}${OWNER_PLAYER?.id ? `&id=${encodeURIComponent(OWNER_PLAYER.id)}` : ''}${stuCode ? `&stu=${encodeURIComponent(stuCode)}` : ''}`;
+    // stu = 目前下拉選到的學生（用 student_code 預選），選「其他」就不要帶
+    const sel = document.getElementById('student-filter');
+    if (sel && sel.value && sel.value !== 'OTHER') {
+      const stu = (window.PLAYER_STUDENTS || []).find(s => String(s.student_id) === String(sel.value));
+      if (stu?.student_code) url.searchParams.set('stu', stu.student_code);
+    }
+
+    // 4) 導向新分頁
+    popup.location.href = url.toString();
+
+    // 若你不想把 token 放網址，也可以用這兩行替代上面 set('token', ...)
+    // localStorage.setItem('xer_b_jwt', out.token);
+    // popup.location.href = new URL(BOOK_CHEST_URL, location.origin) + `?id=${encodeURIComponent(ownerId)}${stu ? `&stu=${encodeURIComponent(stu.student_code)}` : ''}`;
+
   }catch(err){
     console.error('[exchange-token] failed', err);
-    alert('登入書櫃失敗：' + (err?.message || JSON.stringify(err)));
+    popup?.close();
+    alert('登入書櫃失敗：' + (err?.message || '未知錯誤'));
   }
 }
 
