@@ -115,40 +115,29 @@
 
     .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 
-
     /* 新增書籍：即時預覽 */
-.newbook-preview{
-  margin-top:8px; padding:10px 6px 4px;
-  border-top:1px solid #223057;
-}
-.page-pair{ display:flex;justify-content:center; align-items:center; }
-.page{
-  background:#fff; border:1px solid #e5e7eb; border-radius:4px;
-  position:relative; display:flex; align-items:center; justify-content:center;
-  box-shadow:0 2px 6px rgba(0,0,0,.15); overflow:hidden;
-}
-.page.portrait  { aspect-ratio:5/7; width:28%; }
-.page.landscape { aspect-ratio:7/5; width:28%; }
-.page .page-text {
-    position: absolute;
-    color: #111827;
-    font-weight: 700;
-    letter-spacing: .2em;
-    opacity: .9;
-    font-size: 0.1em;
-}
-.page .horiz {
-    left: 5%;
-    top: 2%;
-    white-space: nowrap;
-}
-.page .vert {
-    right: 2%;
-    top: 5%;
-    writing-mode: vertical-rl;
-}
-
-    
+    .newbook-preview{
+      margin-top:8px; padding:10px 6px 4px;
+      border-top:1px solid #223057;
+    }
+    .page-pair{ display:flex;justify-content:center; align-items:center; }
+    .page{
+      background:#fff; border:1px solid #e5e7eb; border-radius:4px;
+      position:relative; display:flex; align-items:center; justify-content:center;
+      box-shadow:0 2px 6px rgba(0,0,0,.15); overflow:hidden;
+    }
+    .page.portrait  { aspect-ratio:5/7; width:28%; }
+    .page.landscape { aspect-ratio:7/5; width:28%; }
+    .page .page-text {
+      position: absolute;
+      color: #111827;
+      font-weight: 700;
+      letter-spacing: .2em;
+      opacity: .9;
+      font-size: 0.1em;
+    }
+    .page .horiz { left: 5%; top: 2%; white-space: nowrap; }
+    .page .vert  { right: 2%; top: 5%; writing-mode: vertical-rl; }
   </style>
 </head>
 
@@ -156,13 +145,9 @@
 <!-- 頂端導覽 -->
 <div class="appbar">
   <div class="brand"><span class="dot"></span>
-    
     <a href="https://shierusha.github.io/library/story/story">
-      <span id="topTitle" style="color: #fff;">
-        謝爾夏｜書籍一覽
-      </span>
+      <span id="topTitle" style="color: #fff;">謝爾夏｜書籍一覽</span>
     </a>
-  
   </div>
   <div class="tools">
     <select id="roleSelect" class="select" title="選擇角色（學生 / 其他）">
@@ -196,19 +181,18 @@
         <option value="rtl">直式文本</option>
       </select>
     </div>
-      <!-- 即時預覽 -->
-  <div class="newbook-preview" id="newBookPreview">
-    <div class="page-pair">
-      <div class="page portrait" id="prevLeft">
-        <div class="page-text horiz" id="prevLeftText">文本內容</div>
-      </div>
-      <div class="page portrait" id="prevRight">
-        <div class="page-text vert" id="prevRightText">文本內容</div>
+
+    <!-- 即時預覽 -->
+    <div class="newbook-preview" id="newBookPreview">
+      <div class="page-pair">
+        <div class="page portrait" id="prevLeft">
+          <div class="page-text horiz" id="prevLeftText">文本內容</div>
+        </div>
+        <div class="page portrait" id="prevRight">
+          <div class="page-text vert" id="prevRightText">文本內容</div>
+        </div>
       </div>
     </div>
-  </div>
-
-  
   </form>
   <div class="modal-foot">
     <button class="btn" data-close value="cancel">取消</button>
@@ -239,7 +223,7 @@
       <div class="filter-inputs">
         <div class="form-row">
           <label>彩度</label>
-          <input id="f_sat" type="number" inputmode="numeric" min="0"  step="1" value="600" required>
+          <input id="f_sat" type="number" inputmode="numeric" min="0" step="1" value="600" required>
         </div>
         <div class="form-row compact">
           <label class="sr-only">彩度滑桿</label>
@@ -337,7 +321,7 @@ function decodeJwt(token){
 let SB = null;  // B 專案 client
 let AClient = null;
 let USER_ID = null;
-let OWNER_ID = null;
+let OWNER_ID = null;       // 這版固定 = USER_ID（不再看 ?id=）
 let PRESET_STU_CODE = null;
 
 /* ========= 狀態 ========= */
@@ -383,7 +367,7 @@ const Store = {
     const nextOrder = ((maxRow && maxRow.sort_order) || 0) + 1;
 
     const draft = {
-      owner_id: USER_ID,
+      owner_id: USER_ID,              // 固定寫入當前登入者
       student_id: CURRENT_STU_ID,
       title: meta.title || '未命名書籍',
       binding: meta.binding || 'short',
@@ -416,17 +400,29 @@ const Store = {
     const { error } = await SB.from('books').delete().eq('id', id);
     if(error) throw error;
   },
+
+  // ★★ 排序改為逐筆 UPDATE（避免 UPSERT 觸發 INSERT 的 RLS）
   async move(id, newIndex){
     const list = await this.list();
     const from = list.findIndex(x => x.id === id);
-    if(from < 0) return;
-    const to = clamp(newIndex, 0, list.length - 1);
+    if (from < 0) return;
+
+    const to = Math.max(0, Math.min(newIndex, list.length - 1));
     const arr = [...list];
     const [item] = arr.splice(from, 1);
     arr.splice(to, 0, item);
-    const updates = arr.map((b, i) => ({ id: b.id, sort_order: i + 1 }));
-    const { error } = await SB.from('books').upsert(updates, { onConflict: 'id' });
-    if(error) throw error;
+
+    // 逐筆更新，只更新有變動的那幾筆
+    for (let i = 0; i < arr.length; i++) {
+      const b = arr[i];
+      const desired = i + 1;
+      if ((b.sort_order ?? 0) !== desired) {
+        const { error } = await SB.from('books')
+          .update({ sort_order: desired })
+          .eq('id', b.id);
+        if (error) throw error;
+      }
+    }
   }
 };
 
@@ -477,7 +473,7 @@ function renderCardList(list){
     const img = card.querySelector('.corner-tools img');
     const editBtn = card.querySelector('.title-edit');
 
-    /* ★ 改 1：卡片「開啟」到 editbook/editbook?bookid=... */
+    /* 開啟 → editbook */
     card.querySelector('[data-act="open"]').onclick = ()=> {
       const url = `editbook/editbook?bookid=${encodeURIComponent(id)}`;
       window.location.href = url;
@@ -542,32 +538,25 @@ async function renderLibrary(){
 }
 
 /* ========= 新增 & 改名 ========= */
-$('#btnNew').addEventListener('click',()=>{ $('#formNew').reset(); $('#dlgNew').showModal(); });
-$('#btnCreate').addEventListener('click', async () => {
-  const titleEl     = document.querySelector('#f_title');
-  const bindingEl   = document.querySelector('#f_binding');
-  const directionEl = document.querySelector('#f_direction');
 
+$('#btnCreate').addEventListener('click', async ()=>{
+  const titleEl     = $('#f_title');
+  const bindingEl   = $('#f_binding');
+  const directionEl = $('#f_direction');
   if (!titleEl || !bindingEl || !directionEl) {
-    console.error('[Create] missing fields', { titleEl, bindingEl, directionEl });
-    alert('表單未載入完整，請重新整理頁面再試一次（Ctrl+F5）。');
+    alert('表單未載入完整，請重新整理後再試。');
     return;
   }
-
   const meta = {
     title:     (titleEl.value || '').trim() || '未命名書籍',
     binding:   bindingEl.value || 'short',
     direction: directionEl.value || 'ltr'
   };
-
-  try {
+  try{
     const book = await Store.create(meta);
-    if (book) {
-      document.querySelector('#dlgNew').close();
-      await renderLibrary();
-    }
-  } catch (e) {
-    alert('建立失敗：' + (e?.message || e));
+    if(book){ $('#dlgNew').close(); await renderLibrary(); }
+  }catch(e){
+    alert('建立失敗：' + (e?.message||e));
   }
 });
 
@@ -589,9 +578,11 @@ const pvImg = $('#filterPreviewImg');
 const hueRangeGlobal = $('#f_hue_range');
 const briRangeGlobal = $('#f_bri_range');
 const satRangeGlobal = $('#f_sat_range');
+
 function clampNum(v,min,max){ const n = parseInt(String(v||'').replace(/[^\d]/g,''),10); return isNaN(n)?min: Math.max(min, Math.min(max, n)); }
-function getVals(){ return { sat:clampNum(fSat.value,0,2000), hue:clampNum(fHue.value,0,360), bri:clampNum(fBri.value,0,300) }; }
+function getVals(){ return { sat:clampNum(fSat.value,0,2000), hue:clampNum(fHue.value,1,360), bri:clampNum(fBri.value,55,200) }; }
 function updatePreview(){ if(pvImg) pvImg.style.filter = toFilterValue(getVals()); }
+
 [fSat, fHue, fBri].forEach(inp => {
   inp.addEventListener('input', () => {
     inp.value = inp.value.replace(/[^\d]/g, '');
@@ -674,7 +665,7 @@ function renderRoleOptions(){
   roleSelect.value = (CURRENT_STU_ID === null) ? 'OTHER' : CURRENT_STU_ID;
 }
 
-/* ========= 書架渲染（含點擊） ========= */
+/* ========= 書架 / 書單（容器不存在就自動跳過） ========= */
 function renderShelves(books){
   const shelf1 = document.querySelector('.book1-12');
   const shelf2 = document.querySelector('.book13-24');
@@ -700,7 +691,6 @@ function renderShelves(books){
       const filterStr = (b?.cover_color || '').trim();
       if (/^filter:/.test(filterStr)) img.style.cssText += ';' + filterStr;
 
-      /* ★ 改 2：書架點書 → editbook/editbook?bookid=... */
       img.addEventListener('click', () => {
         window.location.href = `editbook/editbook?bookid=${encodeURIComponent(b.id)}`;
       });
@@ -711,8 +701,6 @@ function renderShelves(books){
   renderShelf(shelf1, books.slice(0, 12),  'https://shierusha.github.io/library/img/book1.png');
   renderShelf(shelf2, books.slice(12, 24), 'https://shierusha.github.io/library/img/book2.png');
 }
-
-/* ========= 書單（右側卡片的「前往閱讀」連結也改） ========= */
 function renderBookList(books){
   const box = $('#book-list');
   if (!box) return;
@@ -726,25 +714,21 @@ function renderBookList(books){
   books.forEach(b => {
     const card = document.createElement('div');
     card.className = 'book-card';
-
     const icon = document.createElement('div');
     icon.className = 'book-icon';
     const filterStr = (b?.cover_color || '').trim();
     icon.innerHTML = `<img draggable="false" alt="book" src="${BOOK_ICON}" style="${/^filter:/.test(filterStr) ? filterStr : ''}">`;
-
     const meta = document.createElement('div');
     meta.className = 'book-meta';
     meta.innerHTML = `
       <div class="book-title" title="${b.title}">${b.title}</div>
       <div class="book-sub">最後更新日：${fmtDate(b.updatedAt) || '—'}</div>
     `;
-
     const actions = document.createElement('div');
     actions.className = 'book-actions';
     const link = document.createElement('a');
     link.className = 'go-btn';
     link.innerHTML = '前往<br>閱讀';
-    /* ★ 改 3：列表連結 → editbook/editbook?bookid=... */
     link.href = `editbook/editbook?bookid=${encodeURIComponent(b.id)}`;
     actions.appendChild(link);
 
@@ -754,7 +738,7 @@ function renderBookList(books){
   box.appendChild(frag);
 }
 
-/* ========= 載入 & Realtime ========= */
+/* ========= Realtime ========= */
 let booksChannel = null;
 function setupRealtime(ownerId){
   if (booksChannel) { SB.removeChannel?.(booksChannel); booksChannel = null; }
@@ -763,17 +747,6 @@ function setupRealtime(ownerId){
     .on('postgres_changes', { event: '*', schema: 'public', table: 'books', filter: `owner_id=eq.${ownerId}` },
       () => { renderLibrary(); })
     .subscribe();
-}
-
-async function refreshBooks(){
-  try{
-    const list = await Store.list();
-    renderBookList(list);
-    renderShelves(list);
-  }catch(e){
-    console.warn('[refreshBooks] failed:', e);
-    renderBookList([]);
-  }
 }
 
 /* ========= 啟動 ========= */
@@ -788,10 +761,13 @@ async function boot(){
   USER_ID = payload?.sub || null;
   if(!USER_ID){ alert('無效憑證（缺少 sub）。'); return; }
 
-  const url = new URL(location.href);
-  OWNER_ID = url.searchParams.get('id') || USER_ID;
-  PRESET_STU_CODE = url.searchParams.get('stu') || null;
+  // 這版不再看 ?id=；OWNER_ID 永遠用當前登入者
+  OWNER_ID = USER_ID;
 
+  const url = new URL(location.href);
+  PRESET_STU_CODE = url.searchParams.get('stu') || null; // 仍支援用 stu 預選學生
+
+  // 角色（學生）下拉
   if (!AClient) AClient = supabase.createClient(A_URL, A_ANON, { auth:{ persistSession:false } });
   const stuList = await fetchOwnerStudents(OWNER_ID);
   ROLE_OPTIONS = [...stuList.map(s => ({ student_id: s.student_id, name: s.name, student_code: s.student_code }))];
@@ -812,8 +788,7 @@ async function boot(){
   });
 
   await renderLibrary();
-
-  if (OWNER_ID) setupRealtime(OWNER_ID);
+  setupRealtime(OWNER_ID);
 }
 boot();
 
@@ -832,7 +807,7 @@ function bindDialogCloseButtons() {
 }
 bindDialogCloseButtons();
 
-  /* === 新增書籍預覽 === */
+/* === 新增書籍預覽 === */
 function updateNewPreview(){
   const binding   = $('#f_binding')?.value || 'short'; // short=橫本(7:5) / long=直本(5:7)
   const direction = $('#f_direction')?.value || 'ltr'; // ltr=橫式 / rtl=直式
@@ -860,18 +835,15 @@ function updateNewPreview(){
 $('#f_binding')?.addEventListener('change', updateNewPreview);
 $('#f_direction')?.addEventListener('change', updateNewPreview);
 
-/* 打開「新增書籍」時重置並刷新預覽（把你原本的點擊事件改成下面這版） */
+/* 打開「新增書籍」時重置並刷新預覽（僅此一處綁定） */
 $('#btnNew').addEventListener('click',()=>{
   $('#formNew').reset();
-  // 依預設值套一次預覽
   updateNewPreview();
   $('#dlgNew').showModal();
 });
-
 </script>
 
-  <!-- 登出腳本 -->
-  <script src="https://shierusha.github.io/library/assets/js/logout.js"></script>
-
+<!-- 登出腳本 -->
+<script src="https://shierusha.github.io/library/assets/js/logout.js"></script>
 </body>
 </html>
