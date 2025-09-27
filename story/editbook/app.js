@@ -1,11 +1,8 @@
 /* app.js — 本地化編輯模式 + BookFlip 掛載（完整版，含 TOC、章節初始化、游標同步）
- * 重點：
- * - 以 ?bookid=UUID 讀一次 Supabase → 寫進 localStorage
- * - 後續操作都走 LOCAL（persistDraft() 只寫 localStorage）
- * - 封面：書名同步、雙擊可輸入封面圖片網址（空值=移除）
- * - 版面縮放以面積推字級（--scale），不動你的 CSS
- * - ★ 修正：章節載入 + TOC 綁定 + BookFlip 游標同步 + 書名輸入不重置游標
- * - ★ 重要：任何「重建/插頁/跳頁」都以『硬鎖當前 DB 頁』為準，不做四捨五入，不跳頁
+ * 要點（不跳頁版）：
+ * - rebuildTo() 不再用 controller.current 推算頁數，重建後「直接指定」到目標頁
+ * - 切換單/雙頁、翻頁操作，都不回算；若需要定位就呼叫 gotoPageDomByDbIndex(db)
+ * - 插入/刪除紙張後，只要呼叫 rebuildTo(原本的 dbIndex) → 畫面不跳頁
  */
 
 (function(){
@@ -50,7 +47,6 @@
     if (x === 'novel' || x === 'divider_light' || x === 'divider_dark' || x === 'illustration') return x;
     return 'novel';
   }
-  function toHTMLFromPlain(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/\n/g,'<br>'); }
 
   /* ===== 本地儲存 ===== */
   function readLS(key, fallback=null){
@@ -105,7 +101,7 @@
       if (back) back.style.background = '#fff';
     }
 
-    // ★ 修正：輸入期間不要回寫 #bookTitle，避免游標跳到第一字
+    // 輸入期間不要回寫 #bookTitle，避免游標跳到第一字
     if (!isFromTitleTyping) {
       const titleNode = document.getElementById('bookTitle');
       if (titleNode && titleNode.textContent !== title) {
@@ -119,8 +115,7 @@
     const target = (state.mode === 'spread')
       ? elBook.querySelector('.paper .page.front')
       : elBook.querySelectorAll('.single-page')[0];
-    if (!target) return;
-    if (target.__coverBound) return;
+    if (!target || target.__coverBound) return;
     target.__coverBound = true;
 
     target.addEventListener('dblclick', ()=>{
@@ -323,47 +318,35 @@
     }
   };
 
-  /* ===== ★ 核心：硬鎖到指定 DB 頁（不跳頁，不取整） ===== */
-  function lockToDbIndex(dbIndex){
-    if (!dbIndex || dbIndex < 1) dbIndex = 1;
-    const domIndex = dbIndex + 2;        // DB 1-based → DOM 1-based(含封面)
-    const domZero  = domIndex - 1;       // 0-based
-    if (book){
-      // 直接指定游標頁，再 mount 一次（不經任何換算）
-      book._cursorPage = domZero;
-      if (typeof book._mountCurrent === 'function') book._mountCurrent();
-    }
-    // 同步樣式區塊用的最後互動頁
-    if (window.EditorCore && typeof EditorCore.setLastDbIndex === 'function'){
-      EditorCore.setLastDbIndex(dbIndex);
-    }
-    lightRedraw();
-  }
-
-  /* ===== 跳頁（公開 API） ===== */
+  /* ===== 跳頁 ===== */
   window.gotoPageDomByDbIndex = function gotoPageDomByDbIndex(dbIndex){
-    lockToDbIndex(dbIndex);
+    // DB(1-based) → DOM(1-based, 封面佔 2) → _cursorPage(0-based)
+    const domIndex = dbIndex + 2;
+    gotoDomPage(domIndex);
   };
   window.gotoDomPage = function gotoDomPage(domIndex){
     const isSpread = state.mode === 'spread';
     const totalDom = isSpread
       ? elBook.querySelectorAll('.paper').length * 2
       : elBook.querySelectorAll('.single-page').length;
+
     const clamped = Math.max(1, Math.min(totalDom, domIndex|0));
-    const dbIndex = Math.max(1, clamped - 2);
-    lockToDbIndex(dbIndex);
+    if (book){
+      book._cursorPage = clamped - 1;        // ★ 直接指定到那一頁
+      if (typeof book._mountCurrent === 'function') book._mountCurrent();
+    }
+    // 同步最後互動頁給 EditorCore（只做映射，不「回算」）
+    if (window.EditorCore && typeof EditorCore.setLastDbIndex === 'function'){
+      const dom = (book?._cursorPage || 0) + 1;
+      const db  = EditorCore.domIndexToDbIndex(dom) || 1;
+      EditorCore.setLastDbIndex(db);
+    }
+    lightRedraw();
   };
 
-  /* ===== 重建（動到頁數時） =====
-   * 關鍵：new BookFlip 後，立刻把 _cursorPage 設成「我要的 DOM 索引」，再做一次同步
-   * 這樣第一次 rebuild 也不會被 spread pair 取整導致往前一頁。
-   */
+  /* ===== 重建（動到頁數時） ===== */
   window.rebuildTo = function rebuildTo(targetDbIndex){
     try{
-      if (!targetDbIndex || targetDbIndex < 1) targetDbIndex = 1;
-      const targetDomIdx = targetDbIndex + 2; // DOM 1-based(含封面)
-      const targetZero   = targetDomIdx - 1;  // 0-based
-
       const pairs = buildPairsFromPages();
       window.book = new BookFlip('#bookCanvas', {
         mode: state.mode,
@@ -372,58 +355,17 @@
         singleSpeed: 300,
         perspective: 2000,
         data: { pairs },
-        startPageIndex: targetZero,     // 先給正確的 0-based 起點
+        startPageIndex: 0,  // 先隨便給；等下我們自己硬指定 _cursorPage
         coverPapers: 1
       });
 
-      // 立刻以「我要的 side」覆寫游標（避免第一次被 round）
-      book._cursorPage = targetZero;
-
-      // 之後若 controller 更新，依照「當前 side」回推 _cursorPage（不變側別）
-      function totalDomPages(){
-        const isSpread = (book?.opts?.mode || state.mode) === 'spread';
-        return isSpread
-          ? elBook.querySelectorAll('.paper').length * 2
-          : elBook.querySelectorAll('.single-page').length;
-      }
-      function syncCursorFromController(){
-        if (!book) return;
-        const mode = book.opts?.mode || 'spread';
-        const total = Math.max(1, totalDomPages());
-        const ctrl  = book._controller;
-        const keepSide = (book?._cursorPage || 0) % 2; // 0=左/前, 1=右/後
-        if (ctrl && Number.isFinite(ctrl.current)){
-          if (mode === 'spread') {
-            // pair idx → dom page（保留 side，不跳）
-            book._cursorPage = Math.max(0, Math.min(total - 1, ctrl.current * 2 + keepSide));
-          } else {
-            book._cursorPage = Math.max(0, Math.min(total - 1, ctrl.current));
-          }
-        } else {
-          book._cursorPage = Math.max(0, Math.min(total - 1, book._cursorPage|0));
-        }
-      }
-
-      // 包 next / prev / setMode / _mountCurrent：每次掛完都回寫 _cursorPage（保留 side）
-      if (typeof book.next === 'function'){
-        const _next = book.next.bind(book);
-        book.next = ()=>{ _next(); setTimeout(()=>{ syncCursorFromController(); }, 0); };
-      }
-      if (typeof book.prev === 'function'){
-        const _prev = book.prev.bind(book);
-        book.prev = ()=>{ _prev(); setTimeout(()=>{ syncCursorFromController(); }, 0); };
-      }
-      if (typeof book.setMode === 'function'){
-        const _setMode = book.setMode.bind(book);
-        book.setMode = (m)=>{ _setMode(m); setTimeout(()=>{ syncCursorFromController(); }, 0); };
-      }
+      // mount 後只做視覺鉤子，不改游標
       if (typeof book._mountCurrent === 'function'){
         const _origMount = book._mountCurrent.bind(book);
         book._mountCurrent = function(){
           const r = _origMount();
           setTimeout(()=>{ 
-            syncCursorFromController();
-            // 同步最後互動頁
+            // 同步最後互動頁（單純映射，不用 controller）
             if (window.EditorCore && typeof EditorCore.setLastDbIndex === 'function'){
               const dom = (book?._cursorPage || 0) + 1;
               const db  = EditorCore.domIndexToDbIndex(dom) || 1;
@@ -435,31 +377,58 @@
         };
       }
 
-      // 立即 mount 一次（已經先把 _cursorPage 設成我要的）
+      // ★ 直接把游標定位到「指定的 DB 頁」
+      //     dbIndex → domIndex(含封面 2 頁) → 0-based
+      const domIndex = (targetDbIndex|0) + 2;
+      book._cursorPage = Math.max(0, domIndex - 1);
       if (typeof book._mountCurrent === 'function') book._mountCurrent();
 
-      applyLayout(); lightRedraw();
+      applyLayout(); 
       if (typeof window.ensureSwipeBinding === 'function') ensureSwipeBinding();
+      lightRedraw();
 
     }catch(e){ console.warn('rebuild failed:', e); }
   };
 
-  /* ===== 左右鍵 ===== */
+  /* ===== 左右鍵（不回算） ===== */
   function goLeft(){
+    if (!book) return;
     if (state.mode === 'single') book.prev();
     else { if (state.direction === 'rtl') book.next(); else book.prev(); }
   }
   function goRight(){
+    if (!book) return;
     if (state.mode === 'single') book.next();
     else { if (state.direction === 'rtl') book.prev(); else book.next(); }
   }
   document.getElementById('btnleft') ?.addEventListener('click', goLeft);
   document.getElementById('btnright')?.addEventListener('click', goRight);
 
-  /* ===== 三顆主控 ===== */
-  function toggleDir(){ state.direction = (state.direction === 'ltr') ? 'rtl' : 'ltr'; book.setDirection(state.direction); applyLayout(); lightRedraw(); }
-  function toggleBind(){ state.bind = (state.bind === 'short') ? 'long' : 'short'; applyLayout(); lightRedraw(); }
-  function toggleView(){ state.mode = (state.mode === 'spread') ? 'single' : 'spread'; book.setMode(state.mode); applyLayout(); ensureSwipeBinding(); lightRedraw(); }
+  /* ===== 三顆主控（切換後「直接指定回目前頁」） ===== */
+  function toggleDir(){ 
+    state.direction = (state.direction === 'ltr') ? 'rtl' : 'ltr'; 
+    book?.setDirection?.(state.direction); 
+    // 保持在目前頁
+    const db = (window.EditorCore?.getFocusedDbIndex?.() || 1);
+    gotoPageDomByDbIndex(db);
+    applyLayout(); lightRedraw(); 
+  }
+  function toggleBind(){ 
+    state.bind = (state.bind === 'short') ? 'long' : 'short'; 
+    // 保持在目前頁
+    const db = (window.EditorCore?.getFocusedDbIndex?.() || 1);
+    gotoPageDomByDbIndex(db);
+    applyLayout(); lightRedraw(); 
+  }
+  function toggleView(){
+    state.mode = (state.mode === 'spread') ? 'single' : 'spread';
+    const db = (window.EditorCore?.getFocusedDbIndex?.() || 1);
+    book?.setMode?.(state.mode);         // 讓 BookFlip 用新模式
+    gotoPageDomByDbIndex(db);            // ★ 切換後立刻硬指定回「目前 DB 頁」
+    applyLayout(); 
+    ensureSwipeBinding(); 
+    lightRedraw();
+  }
   document.getElementById('btnToggleDir') .addEventListener('click', toggleDir);
   document.getElementById('btnToggleBind').addEventListener('click', toggleBind);
   document.getElementById('btnToggleView').addEventListener('click', toggleView);
@@ -489,24 +458,18 @@
     const el = elTitle;
     if (!el) return;
 
-    let typing = false;
     function normTitle(t) {
       const s = String(t || '').replace(/\s+/g, ' ').trim();
       return s || '未命名書籍';
     }
 
-    el.addEventListener('focus', () => { typing = true; });
-
-    // 輸入時：更新 ACTIVE_BOOK.title 與封面（不回寫 el.textContent）
     el.addEventListener('input', () => {
-      typing = true;
       ACTIVE_BOOK = ACTIVE_BOOK || {};
       ACTIVE_BOOK.title = normTitle(el.textContent);
       applyCoverFromBook(true); // 來自輸入中 → 不回寫 #bookTitle
       try { window.persistDraft && window.persistDraft(); } catch(_) {}
     });
 
-    // Enter 行為：避免新段落導致怪異游標，改為插入換行
     el.addEventListener('keydown', (e)=>{
       if (e.key === 'Enter') {
         e.preventDefault();
@@ -514,11 +477,9 @@
       }
     });
 
-    // 離開欄位：最後再同步一次（允許回寫）
     el.addEventListener('blur', () => {
       ACTIVE_BOOK = ACTIVE_BOOK || {};
       ACTIVE_BOOK.title = normTitle(el.textContent);
-      typing = false;
       applyCoverFromBook(false);
       try { window.persistDraft && window.persistDraft(); } catch(_) {}
     });
@@ -663,18 +624,17 @@
   tocModal?.addEventListener('click', (e)=>{ if (e.target === tocModal) closeTOC(); });
   document.getElementById('btnTOC')?.addEventListener('click', openTOC);
 
-  /* ===== 初始化 ===== */
+  /* ===== 初始化（用 rebuildTo 保留當前頁） ===== */
   async function init(){
     try {
       await initData();
 
-      // 以「目前聚焦頁」為起點硬鎖（確保第一次就不跳）
       const focus = (window.EditorCore && typeof EditorCore.getFocusedDbIndex === 'function')
         ? (EditorCore.getFocusedDbIndex() || 1)
         : 1;
-      rebuildTo(focus);
+      rebuildTo(focus);  // ★ 直接指定到當前頁
 
-      // 初次也包一層 mount 後重繪
+      // mount 後重繪（不改游標）
       if (typeof book._mountCurrent === 'function'){
         const _origMount = book._mountCurrent.bind(book);
         book._mountCurrent = function(){
