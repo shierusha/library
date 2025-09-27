@@ -406,6 +406,7 @@ body::-webkit-scrollbar { width:0; height:0; }
     if (x==='image')         return 'illustration';
     return (['novel','divider_light','divider_dark','illustration'].includes(x) ? x : 'novel');
   };
+  const stripId = (obj)=>{ const { id, ...rest } = obj || {}; return rest; }; // <-- 關鍵：插入時移除 id
 
   async function saveAll({ navigateAfter = false } = {}) {
     if (!window.SB)      { alert('尚未登入或 SB 未建立'); return false; }
@@ -452,7 +453,7 @@ body::-webkit-scrollbar { width:0; height:0; }
       const dbPagesById = new Map(dbPages.map(r => [r.id, r]));
       const dbChapters = (dbChRes.data || []).map(r => ({ id:r.id, page_id:r.page_id, title:r.title, page_index:r.pages?.page_index||1 }));
 
-      // 3) 新狀態（你現在畫面上的頁）
+      // 3) 新狀態（畫面上的頁）
       const desiredPages = (window.PAGES_DB || []).map((p, i) => ({
         id: p.id || null,
         book_id: bookId,
@@ -462,9 +463,8 @@ body::-webkit-scrollbar { width:0; height:0; }
         content_json: p.content_json ? p.content_json : { text_plain:'', text_html:'' }
       }));
 
-      // 分三類：索引沒變 → toUpdate；新頁/換位 → toInsert；不在新清單 → toDelete
       const toUpdate = [];
-      const toInsert = [];
+      const toInsertRaw = [];
       const toDeleteIds = [];
       const desiredOldIds = new Set();
 
@@ -472,45 +472,46 @@ body::-webkit-scrollbar { width:0; height:0; }
         if (dp.id) {
           const old = dbPagesById.get(dp.id);
           if (!old) {
-            dp.id = null; // 本地有 id 但 DB 找不到 → 視為新頁
-            toInsert.push(dp);
+            // 本地有 id 但 DB 找不到 → 視為新頁（插入時移除 id）
+            toInsertRaw.push(stripId(dp));
           } else {
             desiredOldIds.add(dp.id);
             if ((old.page_index|0) === (dp.page_index|0)) {
-              toUpdate.push(dp); // 不換位 → 安全更新
+              toUpdate.push(dp); // 索引不變 → 直接 upsert
             } else {
-              // 換位：先插入新列（要新 id），等會把舊列刪掉，避開 unique(page_index) 撞鍵
-              toInsert.push({ ...dp, id: null });
+              // 換位：插入新列（不帶 id），稍後刪舊列
+              toInsertRaw.push(stripId(dp));
               toDeleteIds.push(old.id);
             }
           }
         } else {
-          toInsert.push(dp); // 全新
+          toInsertRaw.push(stripId(dp)); // 全新：不帶 id
         }
       });
+
       // DB 既有但不在 desired 的舊頁 → 刪
       dbPages.forEach(r => { if (!desiredOldIds.has(r.id)) toDeleteIds.push(r.id); });
 
-      // 4) 先更新索引不變的頁
+      // 4) 更新索引不變的頁
       if (toUpdate.length) {
         const r = await SB.from('pages').upsert(toUpdate, { onConflict: 'id' }).select('id');
         if (r.error) return die('upsert-pages(stable)', r.error);
       }
 
-      // 5) 插入新頁（含換位者的新列）
+      // 5) 插入新頁（絕不含 id 欄位，交給 DB 產生）
       let inserted = [];
-      if (toInsert.length) {
-        const r = await SB.from('pages').insert(toInsert).select('id,page_index');
+      if (toInsertRaw.length) {
+        const r = await SB.from('pages').insert(toInsertRaw).select('id,page_index');
         if (r.error) return die('insert-pages', r.error);
         inserted = r.data || [];
-        // 把新 id 寫回本地（避免下一次存時又被當成新頁）
+        // 把新 id 寫回本地
         inserted.forEach(row => {
           const p = window.PAGES_DB[row.page_index - 1];
           if (p) p.id = row.id;
         });
       }
 
-      // 6) 章節：先刪掉對應到「即將刪除的舊頁」的章節，避免外鍵擋住第 7 步
+      // 6) 章節：先刪掉指向「待刪舊頁」的章節，避免外鍵擋住下一步
       const existingByPid = new Map(dbChapters.map(c => [c.page_id, c]));
       const toDeleteChIds = [];
       toDeleteIds.forEach(pid => { const ch = existingByPid.get(pid); if (ch) toDeleteChIds.push(ch.id); });
@@ -519,15 +520,15 @@ body::-webkit-scrollbar { width:0; height:0; }
         if (r.error) return die('delete-chapters(for-old-pages)', r.error);
       }
 
-      // 7) 刪掉舊頁（含被換位替換掉的舊列）
+      // 7) 刪掉舊頁
       if (toDeleteIds.length) {
         const r = await SB.from('pages').delete().in('id', toDeleteIds);
         if (r.error) return die('delete-pages', r.error);
       }
 
-      // 8) 重建 page_index→page_id 對應
+      // 8) 重建 page_index → page_id 對應
       const pageIndexToId = new Map();
-      toUpdate.forEach(p => { if (p.id) pageIndexToId.set(p.page_index, p.id); });
+      desiredPages.forEach(p => { if (p.id) pageIndexToId.set(p.page_index, p.id); });
       inserted.forEach(row => { pageIndexToId.set(row.page_index, row.id); });
       if (pageIndexToId.size !== desiredPages.length) {
         const r = await SB.from('pages').select('id,page_index').eq('book_id', bookId);
@@ -539,19 +540,20 @@ body::-webkit-scrollbar { width:0; height:0; }
         .filter(ch => ch && ch.title && ch.page_index >= 1)
         .map(ch => {
           const pid = pageIndexToId.get(ch.page_index) || null;
-          return pid ? { page_id: pid, title: String(ch.title).trim() } : null;
+          return pid ? { page_id: pid, title: String(ch.title).trim(), book_id: bookId } : null;
         })
         .filter(Boolean);
 
       const wantByPid = new Map(wantList.map(c => [c.page_id, c]));
       const chToInsert = [];
       const chToUpdate = [];
-      // 需要 insert/update
+
       wantByPid.forEach((w, pid) => {
         const ex = existingByPid.get(pid);
         if (!ex) chToInsert.push({ book_id: bookId, page_id: pid, title: w.title });
         else if ((ex.title || '') !== w.title) chToUpdate.push({ id: ex.id, title: w.title });
       });
+
       if (chToInsert.length) {
         const r = await SB.from('chapters').insert(chToInsert).select('id');
         if (r.error) return die('insert-chapters', r.error);
@@ -614,6 +616,7 @@ body::-webkit-scrollbar { width:0; height:0; }
   });
 })();
 </script>
+
 <!-- A 站連動登出（玩家中心登出時，這頁自動跳回玩家中心） -->
 <script src="https://shierusha.github.io/library/assets/js/logout.js"></script>
 
