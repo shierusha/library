@@ -10,8 +10,15 @@
 
   function rebuildAndRedrawPreserveCursor(preferDbIndex){
     const startDb = Math.max(1, preferDbIndex || (window.EditorCore?.getFocusedDbIndex?.() || 1));
-    if (typeof window.rebuildTo === 'function') rebuildTo(startDb);
-  }
+    if (typeof window.rebuildTo === 'function') {
+      rebuildTo(startDb);
+      try {
+        if (window.EditorCore?.setLastDbIndex) EditorCore.setLastDbIndex(startDb);
+        if (typeof window.gotoPageDomByDbIndex === 'function') {
+          setTimeout(() => gotoPageDomByDbIndex(startDb), 0);
+        }
+      } catch (_) {}
+    }  }
 
   function shiftChaptersAfter(insertAt, delta){
     if (!Array.isArray(window.CHAPTERS_DB) || !CHAPTERS_DB.length) return;
