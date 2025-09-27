@@ -436,20 +436,20 @@ async function runDiagnostics(){
 async function goToBookChest(e){
   if (e) e.preventDefault();
 
-  // 先打開一個空白分頁，避免 await 之後被當作彈窗阻擋
+  // 先嘗試開一個空白分頁（有些瀏覽器會擋，擋了就會是 null）
   const popup = window.open('about:blank', '_blank', 'noopener');
 
-  // 1) A 專案 access_token
+  // 1) 取 A 專案 access_token
   const { data: sess, error: sErr } = await client.auth.getSession();
   const accessToken = sess?.session?.access_token;
   if (sErr || !accessToken){
-    popup?.close();
+    if (popup && !popup.closed) popup.close();
     alert('請先登入才能管理書櫃');
     return;
   }
 
   try{
-    // 2) 呼叫 B 的 Edge Function 換長簽 JWT（用 fetch）
+    // 2) 用 fetch 換 B 的長簽
     const resp = await fetch(`${BOOKS_URL}/functions/v1/exchange-token`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -460,37 +460,35 @@ async function goToBookChest(e){
       throw new Error(out?.message || out?.error || '交換 token 失敗');
     }
 
-    // 3) 組目的地網址（把 token/id/stu 一起帶上）
-    const url = new URL(BOOK_CHEST_URL, location.origin);
-
-    // ★ 書櫃頁有 getBearerFromUrlOrStorage()，看到 ?token= 會自動存 localStorage 並清掉網址
+    // 3) 組目的地網址（注意用 location.href 保持目前 /library/ 路徑）
+    const url = new URL(BOOK_CHEST_URL, location.href);
     url.searchParams.set('token', out.token);
 
-    // id = 房主（owner_id）
     const ownerId = OWNER_PLAYER?.id || sess.session.user.id;
     if (ownerId) url.searchParams.set('id', ownerId);
 
-    // stu = 目前下拉選到的學生（用 student_code 預選），選「其他」就不要帶
     const sel = document.getElementById('student-filter');
     if (sel && sel.value && sel.value !== 'OTHER') {
       const stu = (window.PLAYER_STUDENTS || []).find(s => String(s.student_id) === String(sel.value));
       if (stu?.student_code) url.searchParams.set('stu', stu.student_code);
     }
 
-    // 4) 導向新分頁
-    popup.location.href = url.toString();
+    const target = url.toString();
 
-    // 若你不想把 token 放網址，也可以用這兩行替代上面 set('token', ...)
-    // localStorage.setItem('xer_b_jwt', out.token);
-    // popup.location.href = new URL(BOOK_CHEST_URL, location.origin) + `?id=${encodeURIComponent(ownerId)}${stu ? `&stu=${encodeURIComponent(stu.student_code)}` : ''}`;
-
+    // 4) 有成功開到分頁就導向那分頁；被擋就同分頁開啟
+    if (popup && !popup.closed) {
+      popup.location.href = target;
+    } else {
+      // 被 popup blocker 擋了
+      alert('瀏覽器封鎖了新分頁，我們改用同分頁開啟。');
+      location.href = target;
+    }
   }catch(err){
     console.error('[exchange-token] failed', err);
-    popup?.close();
+    if (popup && !popup.closed) popup.close();
     alert('登入書櫃失敗：' + (err?.message || '未知錯誤'));
   }
 }
-
 /* ============ 初始化流程 ============ */
 async function init(){
   try{
