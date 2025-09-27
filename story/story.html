@@ -120,50 +120,46 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    flex-wrap: wrap;            /* 需要時允許換行；若想永遠單行可改為 nowrap */
+    flex-wrap: wrap;
   }
   .modal-header::after {
     content: "";
     display: block;
     height: 5px;
-    width: 100%;                /* 滿寬分界線 */
+    width: 100%;
     margin:.5rem 0 0;
     border-radius: 2px;
     background: linear-gradient(to right,#53e2ff99 65%,#53e2ff00 100%);
     pointer-events: none;
-    flex-basis: 100%;           /* 讓分界線獨佔一行 */
+    flex-basis: 100%;
   }
-.header-title{
-  flex: 1;
-  min-width: 0;
-  white-space: normal;      /* 允許換行 */
-  display: -webkit-box;
-  -webkit-line-clamp: 3;    /* 最多 2 行 */
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
+  .header-title{
+    flex: 1;
+    min-width: 0;
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
 
   .header-actions{
     display: flex;
     align-items: center;
     gap: 10px;
-    margin-left: auto;          /* 右側貼齊 */
+    margin-left: auto;
   }
 
-  /* === 讓標題/下拉/按鈕字級與高度隨寬度縮放（重點） === */
   .modal-content2 .modal-header{
-    /* 基準字級：最小14px、最大24px，隨視窗寬度流動 */
     font-size: clamp(14px, 2.2vw, 22px);
-    /* 控件高度也跟著縮放，避免字變小但高度過大 */
     --control-h: clamp(30px, 5.5vw, 42px);
   }
 
-  /* 等高：選單與按鈕高度一致；字級跟 header 繼承 */
   #student-filter{
     font-size: 1em;
     height: var(--control-h);
-    padding: 0 0.8em;               /* 用 em，隨字級縮放 */
+    padding: 0 0.8em;
     border-radius: .5rem;
     border: 1px solid var(--panel-stroke);
     background: #fff;
@@ -172,7 +168,7 @@
     display: inline-flex;
     align-items: center;
     height: var(--control-h);
-    padding: 0 1em;                 /* 用 em，隨字級縮放 */
+    padding: 0 1em;
     border-radius: .55rem;
     border: 1px solid #d1d5db;
     background: #f9fafb;
@@ -189,21 +185,18 @@
     font-size: 1em;
     overflow-y: auto;
     max-height: 60vh;
-
   }
   .modal-body::-webkit-scrollbar { display:none; }
 
   /* 書卡片 */
-  .book-list{
-    display:grid;
-  }
-.book-card {
+  .book-list{ display:grid; }
+  .book-card {
     display: grid;
     grid-template-columns: 15% 1fr 65px;
     gap: 10px;
     align-items: center;
     color: #111827;
-}
+  }
 
   .book-icon{
     width:100%;
@@ -239,35 +232,25 @@
     .book-list{grid-template-columns:1fr;}
   }
 
-
-/* 禁止所有 <img> 被拖移（含 Safari、行動裝置） */
-img {
-  -webkit-user-drag: none;
-  user-select: none;
-  -webkit-touch-callout: none; /* iOS 長按避免呼叫選單 */
-}
-
+  img {
+    -webkit-user-drag: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
 </style>
 
 </head>
 <body>
 
-  <!-- 旋轉提示（不可關閉）
-  <div id="orientation-modal" class="modal-overlay" style="display: flex;">
-    <div class="modal-content">
-      <div class="modal-header"style="color:#fff;text-shadow:0 1px 4px #000a;">請旋轉螢幕</div>
-      <div class="modal-body">為了最佳體驗，請將裝置轉成橫向模式</div>
-    </div>
-  </div>
- -->
-  <!-- 書櫃彈窗（預設開啟；id 修正為 library-modal） -->
+  <!-- 書櫃彈窗 -->
   <div id="library-modal" class="modal-overlay" style="display: flex;">
     <div class="modal-content2">
       <div class="modal-header">
         <div class="header-title">歡迎來到 <span id="owner-name">玩家</span> 的書櫃</div>
         <div class="header-actions">
           <select id="student-filter"></select>
-          <a id="manage-btn" class="manage-btn" href="book-chest" style="display:none;">管理</a>
+          <!-- href 改為 #，改由 JS 控制導向 -->
+          <a id="manage-btn" class="manage-btn" href="#" style="display:none;">管理</a>
         </div>
       </div>
       <div class="modal-body">
@@ -284,271 +267,210 @@ img {
     <div class="book book13-24" style="bottom: 64.2%;"></div>
 
     <!-- 蓋在書本上方的書櫃 -->
-<img draggable="false" style="position: absolute; height: 100%; width: 100%;" src="https://shierusha.github.io/library/img/ROOM-TOP.png" alt="bookshelf overlay">
+    <img draggable="false" style="position: absolute; height: 100%; width: 100%;" src="https://shierusha.github.io/library/img/ROOM-TOP.png" alt="bookshelf overlay">
 
     <!-- 可點擊的隱形大按鈕（打開彈窗） -->
     <button class="book-btn" aria-label="打開書櫃"></button>
   </div>
 
+<script>
+/* ============ 快捷選擇器 ============ */
+const $  = (s, r=document) => r.querySelector(s);
+const $$ = (s, r=document) => [...r.querySelectorAll(s)];
 
-  <script>
-  // ====== 快捷選擇器 ======
-  const $  = (s, r=document) => r.querySelector(s);
-  const $$ = (s, r=document) => [...r.querySelectorAll(s)];
+/* ============ Supabase：兩個專案 ============ */
+/* B（書櫃 / books） */
+const BOOKS_URL  = 'https://ogzpfrkwnqqaitytncla.supabase.co';
+const BOOKS_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nenBmcmt3bnFxYWl0eXRuY2xhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxODQzNzEsImV4cCI6MjA3MDc2MDM3MX0.Ls83xOXcKIW7FUcavr8_sOs37I18VGFWYNW3sNFRS24';
+const booksClient = window.supabase.createClient(BOOKS_URL, BOOKS_ANON);
 
-  // ====== 自動字級（若有 .auto-resize）======
-  function resizeAllTexts() {
-    $$('.auto-resize').forEach(el => {
-      const h = el.offsetHeight || el.getBoundingClientRect().height || 20;
-      el.style.fontSize = (h * 0.50) + 'px';
-    });
-  }
-  window.addEventListener('load', resizeAllTexts);
-  window.addEventListener('resize', resizeAllTexts);
+/* A（登入/角色 players/students） */
+const client = window.supabase.createClient(
+  'https://wfhwhvodgikpducrhgda.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmaHdodm9kZ2lrcGR1Y3JoZ2RhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgwMTAwNjEsImV4cCI6MjA2MzU4NjA2MX0.P6P-x4SxjiR4VdWH6VFgY_ktgMac_OzuI4Bl7HWskz8'
+);
 
-  // ====== 強制橫向（使用你的 Modal）======
- /* function isPortrait(){
-    return window.matchMedia('(orientation: portrait)').matches || window.innerHeight > window.innerWidth;
-  }
-  const orientationModal = document.getElementById('orientation-modal');
-  function enforceLandscape(){
-    const portrait = isPortrait();
-    if (orientationModal) orientationModal.style.display = portrait ? 'flex' : 'none';
-    document.body.style.overflow = portrait ? 'hidden' : '';
-  }
-  enforceLandscape();
-  window.addEventListener('resize', enforceLandscape);
-  window.addEventListener('orientationchange', enforceLandscape);
-  if (orientationModal) orientationModal.addEventListener('click', e => e.stopPropagation()); // 不可關閉，只阻止冒泡*/
+/* 電子書櫃頁路徑（可改你的實際路徑，例如 '/book-chest/index.html'） */
+const BOOK_CHEST_URL = 'book-chest/';
 
-  // =============================
-  // Supabase：兩個專案
-  // =============================
-  // 顯示「書」的專案（books）
-  const BOOKS_URL  = 'https://ogzpfrkwnqqaitytncla.supabase.co';
-  const BOOKS_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nenBmcmt3bnFxYWl0eXRuY2xhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxODQzNzEsImV4cCI6MjA3MDc2MDM3MX0.Ls83xOXcKIW7FUcavr8_sOs37I18VGFWYNW3sNFRS24';
-  const booksClient = window.supabase.createClient(BOOKS_URL, BOOKS_ANON);
+/* 其他常數 */
+const BOOK_ICON = 'https://shierusha.github.io/school-battle/images/book.png';
+const BOOK_SHELF_1_12  = 'https://shierusha.github.io/library/img/book1.png';
+const BOOK_SHELF_13_24 = 'https://shierusha.github.io/library/img/book2.png';
+const DEBUG = new URLSearchParams(location.search).get('debug') === '1';
 
-  // 登入/角色 專案（players/students）
-  const client = window.supabase.createClient(
-    'https://wfhwhvodgikpducrhgda.supabase.co',
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmaHdodm9kZ2lrcGR1Y3JoZ2RhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgwMTAwNjEsImV4cCI6MjA2MzU4NjA2MX0.P6P-x4SxjiR4VdWH6VFgY_ktgMac_OzuI4Bl7HWskz8'
-  );
+/* ============ 小工具 ============ */
+function fDate(x){
+  if(!x) return '';
+  const d = new Date(x);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('zh-TW', { year:'numeric', month:'2-digit', day:'2-digit' });
+}
+function bookImg(_b, fallback){ return fallback; }
 
-  // 常數：書 ICON（列表的預設封面）
-  const BOOK_ICON = 'https://shierusha.github.io/school-battle/images/book.png';
-  const BOOK_SHELF_1_12  = 'https://shierusha.github.io/library/img/book1.png';
-  const BOOK_SHELF_13_24 = 'https://shierusha.github.io/library/img/book2.png';
+/* ============ 主要狀態 ============ */
+let CURRENT_PLAYER = null;      // 目前登入者 { id, username }
+let OWNER_PLAYER   = null;      // 房間持有者 { id, username }
+let PLAYER_STUDENTS = [];       // 持有者的學生（有 student_code）
+let DEFAULT_STUDENT = null;
+let ALL_BOOKS = [];
 
-  // Debug 開關（網址加 ?debug=1 啟用）
-  const DEBUG = new URLSearchParams(location.search).get('debug') === '1';
-
-  // =============================
-  // 小工具
-  // =============================
-  function fDate(x){
-    if(!x) return '';
-    const d = new Date(x);
-    if (Number.isNaN(d.getTime())) return '';
-    return d.toLocaleDateString('zh-TW', { year:'numeric', month:'2-digit', day:'2-digit' });
-  }
-
-  // 永遠回傳 fallback（不讀 cover_image），但保留 cover_color 濾鏡的使用邏輯
-  function bookImg(_b, fallback){
-    return fallback;
-  }
-
-  // =============================
-  // 主要流程狀態
-  // =============================
-  let CURRENT_PLAYER = null;      // 目前登入者 { id, username }
-  let OWNER_PLAYER   = null;      // 房間持有者 { id, username }
-  let PLAYER_STUDENTS = [];       // 持有者的學生（有 student_code）
-  let DEFAULT_STUDENT = null;     // 由 ?stu 找到的學生 { student_id, name, student_code }
-  let ALL_BOOKS = [];
-
-  // =============================
-  // 讀取登入玩家 & 角色
-  // =============================
-  async function getCurrentPlayer(){
-    const res = await client.auth.getUser();
-    // 沒登入時 v2 會回 error=AuthSessionMissingError；把它當作未登入即可
-    if (res.error) {
-      if (res.error.name === 'AuthSessionMissingError' ||
-          /Auth session missing/i.test(res.error.message || '')) {
-        return null; // ✅ 關鍵：不要 throw
-      }
-      console.warn('[auth.getUser] unexpected error:', res.error);
-      return null; // 其他錯也別炸整個 init
+/* ============ A 專案：登入玩家 & 角色 ============ */
+async function getCurrentPlayer(){
+  const res = await client.auth.getUser();
+  if (res.error) {
+    if (res.error.name === 'AuthSessionMissingError' ||
+        /Auth session missing/i.test(res.error.message || '')) {
+      return null;
     }
-
-    const user = res.data?.user;
-    if (!user) return null;
-
-    // 讀 players 失敗也不致命
-    const { data: p, error: pErr } = await client
-      .from('players')
-      .select('player_id, username')
-      .eq('player_id', user.id)
-      .maybeSingle();
-
-    if (pErr) {
-      console.warn('[getCurrentPlayer] players query error:', pErr);
-      return { id: user.id, username: user.user_metadata?.name || '玩家' };
-    }
-
-    return {
-      id: user.id,
-      username: p?.username || user.user_metadata?.name || '玩家'
-    };
+    console.warn('[auth.getUser] unexpected error:', res.error);
+    return null;
   }
+  const user = res.data?.user;
+  if (!user) return null;
 
-  async function getStudentByCode(code){
-    if (!code) return null;
-    const { data, error } = await client
-      .from('students')
-      .select('student_id, name, student_code, player_id')
-      .eq('student_code', code)
-      .maybeSingle();
-    if (error) throw error;
-    return data || null;
+  const { data: p, error: pErr } = await client
+    .from('players')
+    .select('player_id, username')
+    .eq('player_id', user.id)
+    .maybeSingle();
+
+  if (pErr) {
+    console.warn('[getCurrentPlayer] players query error:', pErr);
+    return { id: user.id, username: user.user_metadata?.name || '玩家' };
   }
+  return { id: user.id, username: p?.username || user.user_metadata?.name || '玩家' };
+}
 
-  // ===== 用 RPC（不需登入）查玩家名稱 =====
-  async function getPlayerUsernameByRPC(playerId){
-    if (!playerId) return '玩家';
-    try{
-      const { data, error } = await client.rpc('get_player_username', { p_id: playerId });
-      if (error) {
-        console.warn('[getPlayerUsernameByRPC] error:', error);
-        return '玩家';
-      }
-      const name = (data && String(data).trim()) || '玩家';
-      return name;
-    }catch(e){
-      console.warn('[getPlayerUsernameByRPC] exception:', e);
+async function getStudentByCode(code){
+  if (!code) return null;
+  const { data, error } = await client
+    .from('students')
+    .select('student_id, name, student_code, player_id')
+    .eq('student_code', code)
+    .maybeSingle();
+  if (error) throw error;
+  return data || null;
+}
+
+/* 用 RPC 取玩家暱稱（未登入亦可） */
+async function getPlayerUsernameByRPC(playerId){
+  if (!playerId) return '玩家';
+  try{
+    const { data, error } = await client.rpc('get_player_username', { p_id: playerId });
+    if (error) {
+      console.warn('[getPlayerUsernameByRPC] error:', error);
       return '玩家';
     }
+    const name = (data && String(data).trim()) || '玩家';
+    return name;
+  }catch(e){
+    console.warn('[getPlayerUsernameByRPC] exception:', e);
+    return '玩家';
+  }
+}
+async function getPlayerProfile(playerId){
+  const username = await getPlayerUsernameByRPC(playerId);
+  return { id: playerId, username };
+}
+
+async function getOwnerStudents(playerId){
+  const { data, error } = await client
+    .from('students')
+    .select('student_id, name, student_code')
+    .eq('player_id', playerId)
+    .not('student_code', 'is', null)
+    .order('name', { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+/* ============ B 專案：讀書（公開 read） ============ */
+async function fetchBooksByFilter(ownerId, filterStudentId){
+  if (!ownerId) { if (DEBUG) console.warn('[books] missing ownerId'); return []; }
+
+  let q = booksClient
+    .from('books')
+    .select('id, title, cover_image, cover_color, updated_at, sort_order, student_id, owner_id')
+    .eq('owner_id', ownerId)
+    .order('sort_order', { ascending: true })
+    .order('updated_at', { ascending: false });
+
+  if (filterStudentId === 'OTHER'){
+    q = q.is('student_id', null);
+  } else if (filterStudentId){
+    q = q.eq('student_id', filterStudentId);
   }
 
-  // 以 RPC 取名（取代原本查 players 表的版本）
-  async function getPlayerProfile(playerId){
-    const username = await getPlayerUsernameByRPC(playerId);
-    return { id: playerId, username };
+  const { data, error } = await q;
+  if (error) throw error;
+  return data || [];
+}
+
+/* ============ UI：下拉 & 書單 & 書架 ============ */
+function renderFilterOptions(){
+  const sel = $('#student-filter');
+  if (!sel) return;
+  sel.innerHTML = '';
+
+  PLAYER_STUDENTS.forEach(s => {
+    sel.appendChild(new Option(s.name, s.student_id, false, false));
+  });
+  sel.appendChild(new Option('其他', 'OTHER', false, false));
+
+  if (DEFAULT_STUDENT){
+    sel.value = DEFAULT_STUDENT.student_id;
+  }else{
+    sel.value = PLAYER_STUDENTS[0]?.student_id || 'OTHER';
   }
+}
 
-  async function getOwnerStudents(playerId){
-    const { data, error } = await client
-      .from('students')
-      .select('student_id, name, student_code')
-      .eq('player_id', playerId)
-      .not('student_code', 'is', null)     // 只要有 student_code 的
-      .order('name', { ascending: true });
-    if (error) throw error;
-    return data || [];
+function renderBookList(books){
+  const box = $('#book-list');
+  if (!box) return;
+  box.innerHTML = '';
+  if (!books.length){
+    box.innerHTML = `<div style="padding:12px;color:#6b7280;">沒有找到符合的書籍。</div>`;
+    return;
   }
+  const frag = document.createDocumentFragment();
+  books.forEach(b => {
+    const card = document.createElement('div');
+    card.className = 'book-card';
 
-  // =============================
-  // 依分類抓書（books 專案）
-  // =============================
-  async function fetchBooksByFilter(ownerId, filterStudentId){
-    // 防呆：ownerId 缺失時不要組出 eq.undefined 造成 400
-    if (!ownerId) {
-      if (DEBUG) console.warn('[books] missing ownerId, skip querying');
-      return [];
-    }
+    const icon = document.createElement('div');
+    icon.className = 'book-icon';
+    const filterStr = (b?.cover_color || '').trim();
+    icon.innerHTML = `<img draggable="false" alt="book" src="${BOOK_ICON}" style="${/^filter:/.test(filterStr) ? filterStr : ''}">`;
 
-    let q = booksClient
-      .from('books')
-      .select('id, title, cover_image, cover_color, updated_at, sort_order, student_id, owner_id')
-      .eq('owner_id', ownerId)
-      .order('sort_order', { ascending: true })
-      .order('updated_at', { ascending: false });
+    const meta = document.createElement('div');
+    meta.className = 'book-meta';
+    meta.innerHTML = `
+      <div class="book-title" title="${b.title}">${b.title}</div>
+      <div class="book-sub">最後更新日：${fDate(b.updated_at) || '—'}</div>
+    `;
 
-    if (filterStudentId === 'OTHER'){
-      q = q.is('student_id', null);
-    } else if (filterStudentId){
-      q = q.eq('student_id', filterStudentId);
-    }
+    const actions = document.createElement('div');
+    actions.className = 'book-actions';
+    const link = document.createElement('a');
+    link.className = 'go-btn';
+    link.innerHTML = '前往<br>閱讀';
+    link.href = `./book?book=${encodeURIComponent(b.title)}`; // 依你原邏輯保留
+    actions.appendChild(link);
 
-    const { data, error } = await q;
-    if (error) throw error;
-    return data || [];
-  }
+    card.append(icon, meta, actions);
+    frag.appendChild(card);
+  });
+  box.appendChild(frag);
+}
 
-  // =============================
-  // UI：下拉 & 書單 & 書架
-  // =============================
-  function renderFilterOptions(){
-    const sel = $('#student-filter');
-    if (!sel) return;
-    sel.innerHTML = '';
-
-    // 只列出有 student_code 的學生
-    PLAYER_STUDENTS.forEach(s => {
-      const opt = new Option(s.name, s.student_id, false, false);
-      sel.appendChild(opt);
-    });
-
-    // 額外的「其他」（沒有綁學生）
-    sel.appendChild(new Option('其他', 'OTHER', false, false));
-
-    // 預設選到 ?stu 的學生；沒有就選第一個或「其他」
-    if (DEFAULT_STUDENT){
-      sel.value = DEFAULT_STUDENT.student_id;
-    }else{
-      sel.value = PLAYER_STUDENTS[0]?.student_id || 'OTHER';
-    }
-  }
-
-  function renderBookList(books){
-    const box = $('#book-list');
-    if (!box) return;
-    box.innerHTML = '';
-    if (!books.length){
-      box.innerHTML = `<div style="padding:12px;color:#6b7280;">沒有找到符合的書籍。</div>`;
-      return;
-    }
-    const frag = document.createDocumentFragment();
-    books.forEach(b => {
-      const card = document.createElement('div');
-      card.className = 'book-card';
-
-      // 列表封面：固定用 BOOK_ICON，但保留 cover_color 的 filter
-      const icon = document.createElement('div');
-      icon.className = 'book-icon';
-      const filterStr = (b?.cover_color || '').trim();
-      icon.innerHTML = `<img draggable="false" alt="book" src="${BOOK_ICON}" style="${/^filter:/.test(filterStr) ? filterStr : ''}">`;
-
-      const meta = document.createElement('div');
-      meta.className = 'book-meta';
-      meta.innerHTML = `
-        <div class="book-title" title="${b.title}">${b.title}</div>
-        <div class="book-sub">最後更新日：${fDate(b.updated_at) || '—'}</div>
-      `;
-
-      const actions = document.createElement('div');
-      actions.className = 'book-actions';
-      const link = document.createElement('a');
-      link.className = 'go-btn';
-      link.innerHTML = '前往<br>閱讀';        // 兩行顯示
-link.href = `./book?book=${encodeURIComponent(b.title)}`;
-      actions.appendChild(link);
-
-      card.append(icon, meta, actions);
-      frag.appendChild(card);
-    });
-    box.appendChild(frag);
-  }
-
-  // 把最多 24 本書渲染到兩層書架上
- function renderShelves(books){
+function renderShelves(books){
   const shelf1 = document.querySelector('.book1-12');
   const shelf2 = document.querySelector('.book13-24');
   if (!shelf1 || !shelf2) return;
 
-  const leftStart = 3;    // 第一本 left%
-  const delta = 6;        // 每本 +6%
+  const leftStart = 3;
+  const delta = 6;
   const heights = [75,80,85,90,95,100];
 
   function renderShelf(el, slice, fallbackUrl){
@@ -558,19 +480,14 @@ link.href = `./book?book=${encodeURIComponent(b.title)}`;
       img.draggable = false;
       const left = leftStart + i*delta;
       const h = heights[Math.floor(Math.random()*heights.length)];
-
-      // ✅ 無條件使用該層的 fallback 圖（不讀 cover_image）
       img.src = bookImg(b, fallbackUrl);
-
       img.style.left = left + '%';
       img.style.height = h + '%';
       img.title = b.title;
       img.style.cursor = 'pointer';
 
-      // ✅ 仍保留 cover_color 的 CSS 渲染（例如 filter: saturate(120%) hue-rotate(30deg)）
       const filterStr = (b?.cover_color || '').trim();
       if (/^filter:/.test(filterStr)) {
-        // 用 cssText 附掛，不覆蓋既有樣式
         img.style.cssText += ';' + filterStr;
       }
 
@@ -581,192 +498,192 @@ link.href = `./book?book=${encodeURIComponent(b.title)}`;
     });
   }
 
-  // 第一層（1~12）：book1.png；第二層（13~24）：book2.png
   renderShelf(shelf1, books.slice(0, 12),  BOOK_SHELF_1_12);
   renderShelf(shelf2, books.slice(12, 24), BOOK_SHELF_13_24);
 }
 
-  async function refreshBooks(){
-    if (!OWNER_PLAYER?.id) {
-      if (DEBUG) console.warn('[books] refresh skipped: missing OWNER_PLAYER.id');
-      renderBookList([]);
-      return;
+async function refreshBooks(){
+  if (!OWNER_PLAYER?.id) {
+    if (DEBUG) console.warn('[books] refresh skipped: missing OWNER_PLAYER.id');
+    renderBookList([]);
+    return;
+  }
+  const sel = $('#student-filter');
+  const filter = sel?.value || 'OTHER';
+  const books = await fetchBooksByFilter(OWNER_PLAYER.id, filter);
+  ALL_BOOKS = books;
+  renderBookList(books);
+  renderShelves(books);
+
+  if (DEBUG) await runDiagnostics();
+}
+
+/* ============ Realtime ============ */
+let booksChannel = null;
+function setupRealtime(ownerId){
+  if (booksChannel) { booksClient.removeChannel(booksChannel); booksChannel = null; }
+  booksChannel = booksClient
+    .channel('books-room-' + ownerId)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'books', filter: `owner_id=eq.${ownerId}` },
+      payload => { refreshBooks(); })
+    .subscribe();
+}
+
+/* ============ 診斷工具（?debug=1） ============ */
+async function runDiagnostics(){
+  const ownerId = OWNER_PLAYER?.id;
+  const stuId = $('#student-filter')?.value;
+
+  console.log('%c[diag] ownerId / studentId', 'color:#0aa', ownerId, stuId);
+
+  const q1 = await booksClient
+    .from('books')
+    .select('id,owner_id,student_id,title', { count: 'exact' })
+    .eq('owner_id', ownerId)
+    .eq('student_id', stuId)
+    .limit(5);
+  console.log('[diag] owner+student → count=', q1.count, 'error=', q1.error);
+  if (q1.data?.length) console.table(q1.data);
+
+  const q2 = await booksClient
+    .from('books')
+    .select('id,owner_id,student_id,title', { count: 'exact' })
+    .eq('student_id', stuId)
+    .limit(5);
+  console.log('[diag] only student → count=', q2.count, 'error=', q2.error);
+  if (q2.data?.length) console.table(q2.data);
+
+  const q3 = await booksClient
+    .from('books')
+    .select('id,owner_id,student_id,title', { count: 'exact' })
+    .eq('owner_id', ownerId)
+    .limit(5);
+  console.log('[diag] only owner → count=', q3.count, 'error=', q3.error);
+  if (q3.data?.length) console.table(q3.data);
+
+  const q4 = await booksClient
+    .from('books')
+    .select('id,owner_id,student_id,title', { count: 'exact' })
+    .limit(5);
+  console.log('[diag] sample(any) → count=', q4.count, 'error=', q4.error);
+  if (q4.data?.length) console.table(q4.data);
+
+  const auth = await booksClient.auth.getUser();
+  console.log('[diag] books auth user =', auth?.data?.user ?? null);
+}
+
+/* ============ ★ 新增：跳轉到「電子書櫃」（交換長簽） ============ */
+async function goToBookChest(e){
+  if (e) e.preventDefault();
+
+  // 1) 拿 A 專案 access_token
+  const { data: sess, error: sErr } = await client.auth.getSession();
+  const accessToken = sess?.session?.access_token;
+  if (sErr || !accessToken){
+    alert('請先登入才能管理書櫃');
+    return;
+  }
+
+  try{
+    // 2) 呼叫 B 專案的 Edge Function 換長簽 JWT
+    const { data, error } = await booksClient.functions.invoke('exchange-token', {
+      body: { token: accessToken }
+    });
+    if (error) throw error;
+    const longToken = data?.token;
+    if (!longToken) throw new Error('exchange-token 沒回 token');
+
+    // 3) 存到 localStorage，並跳轉到書櫃頁
+    localStorage.setItem('xer_b_jwt', longToken);
+    location.href = BOOK_CHEST_URL;
+
+    // 或若想帶在網址上（書櫃頁會自動存入再清掉）：
+    // location.href = `${BOOK_CHEST_URL}?token=${encodeURIComponent(longToken)}`;
+  }catch(err){
+    console.error('[exchange-token] failed', err);
+    alert('登入書櫃失敗：' + (err?.message || JSON.stringify(err)));
+  }
+}
+
+/* ============ 初始化流程 ============ */
+async function init(){
+  try{
+    const params = new URLSearchParams(location.search);
+    const stuCode = params.get('stu'); // ?stu=student_code
+
+    CURRENT_PLAYER = await getCurrentPlayer();
+
+    if (stuCode){
+      const stu = await getStudentByCode(stuCode);
+      if (stu){
+        DEFAULT_STUDENT = stu;
+        OWNER_PLAYER = await getPlayerProfile(stu.player_id);
+      }
     }
-    const sel = $('#student-filter');
-    const filter = sel?.value || 'OTHER';
-    if (DEBUG) console.log('[books] query with owner=', OWNER_PLAYER.id, 'student=', filter);
-    const books = await fetchBooksByFilter(OWNER_PLAYER.id, filter);
-    ALL_BOOKS = books;
-    renderBookList(books);
-    renderShelves(books);
-
-    if (DEBUG) await runDiagnostics(); // 只在 debug 模式下執行深度檢查
-  }
-
-  // =============================
-  // Realtime：books 有變化就自動刷新（同一位 owner）
-  // =============================
-  let booksChannel = null;
-  function setupRealtime(ownerId){
-    if (booksChannel) { booksClient.removeChannel(booksChannel); booksChannel = null; }
-    booksChannel = booksClient
-      .channel('books-room-' + ownerId)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'books', filter: `owner_id=eq.${ownerId}` },
-        payload => { refreshBooks(); })
-      .subscribe();
-  }
-
-  // =============================
-  // 診斷工具（?debug=1）
-  // =============================
-  async function runDiagnostics(){
-    const ownerId = OWNER_PLAYER?.id;
-    const stuId = $('#student-filter')?.value;
-
-    console.log('%c[diag] ownerId / studentId', 'color:#0aa', ownerId, stuId);
-
-    // 1) owner + student
-    const q1 = await booksClient
-      .from('books')
-      .select('id,owner_id,student_id,title', { count: 'exact' })
-      .eq('owner_id', ownerId)
-      .eq('student_id', stuId)
-      .limit(5);
-    console.log('[diag] owner+student → count=', q1.count, 'error=', q1.error);
-    if (q1.data?.length) console.table(q1.data);
-
-    // 2) only student
-    const q2 = await booksClient
-      .from('books')
-      .select('id,owner_id,student_id,title', { count: 'exact' })
-      .eq('student_id', stuId)
-      .limit(5);
-    console.log('[diag] only student → count=', q2.count, 'error=', q2.error);
-    if (q2.data?.length) console.table(q2.data);
-
-    // 3) only owner
-    const q3 = await booksClient
-      .from('books')
-      .select('id,owner_id,student_id,title', { count: 'exact' })
-      .eq('owner_id', ownerId)
-      .limit(5);
-    console.log('[diag] only owner → count=', q3.count, 'error=', q3.error);
-    if (q3.data?.length) console.table(q3.data);
-
-    // 4) sample
-    const q4 = await booksClient
-      .from('books')
-      .select('id,owner_id,student_id,title', { count: 'exact' })
-      .limit(5);
-    console.log('[diag] sample(any) → count=', q4.count, 'error=', q4.error);
-    if (q4.data?.length) console.table(q4.data);
-
-    // 5) books 專案的 auth 狀態（純顯示，與 public read 無關）
-    const auth = await booksClient.auth.getUser();
-    console.log('[diag] books auth user =', auth?.data?.user ?? null);
-  }
-
-  // =============================
-  // 初始化流程
-  // =============================
-  async function init(){
-    try{
-      const params = new URLSearchParams(location.search);
-      const stuCode = params.get('stu');          // ?stu=student_code
-
-      CURRENT_PLAYER = await getCurrentPlayer();
-
-      if (stuCode){
-        // 以 stuCode 找到房間持有者（該學生的 player_id）
-        const stu = await getStudentByCode(stuCode);
-        if (stu){
-          DEFAULT_STUDENT = stu;
-          OWNER_PLAYER = await getPlayerProfile(stu.player_id); // ← 用 RPC 取名稱（可未登入）
-        }
-      }
-
-      // 沒有 stu 或找不到 → 預設用登入者當持有者（若有登入）
-      if (!OWNER_PLAYER && CURRENT_PLAYER){
-        OWNER_PLAYER = { id: CURRENT_PLAYER.id, username: CURRENT_PLAYER.username };
-      }
-
-      // 將 OWNER 掛到 window 便於除錯
-      window.OWNER_PLAYER = OWNER_PLAYER;
-      if (DEBUG) console.log('[INIT] OWNER_PLAYER =', OWNER_PLAYER);
-
-      // 更新標題
-      $('#owner-name').textContent = OWNER_PLAYER?.username || '玩家';
-
-      // 取得持有者的所有「有 student_code」的學生清單
-      if (OWNER_PLAYER?.id){
-        PLAYER_STUDENTS = await getOwnerStudents(OWNER_PLAYER.id);
-      }else{
-        PLAYER_STUDENTS = [];
-      }
-
-      // 下拉：只放有 student_code 的；預設選到 stuCode 指向的那位
-      renderFilterOptions();
-      if (DEBUG) {
-        console.log('[DEBUG] selected student filter =', $('#student-filter')?.value);
-        console.log('[DEBUG] ownerId =', OWNER_PLAYER?.id);
-      }
-
-      // 管理按鈕：持有者 = 登入者 才顯示
-      const manageBtn = $('#manage-btn');
-      if (manageBtn){
-        manageBtn.style.display = (CURRENT_PLAYER && OWNER_PLAYER && CURRENT_PLAYER.id === OWNER_PLAYER.id) ? 'inline-flex' : 'none';
-      }
-
-      // 初次載入書籍 + 書架
-      await refreshBooks();
-
-      // 監聽下拉切換
-      const selEl = document.getElementById('student-filter');
-      if (selEl) selEl.addEventListener('change', refreshBooks);
-
-      // 書架彈窗開啟按鈕（點書櫃）
-      const openBtn = document.querySelector('.book-btn');
-      if (openBtn){
-        openBtn.addEventListener('click', () => {
-          const modal = document.getElementById('library-modal');
-          if (modal) modal.style.display = 'flex';
-        });
-      }
-
-      // 點背景關閉（如不想關可註解）
-      const libModal = document.getElementById('library-modal');
-      if (libModal){
-        libModal.addEventListener('click', (e) => {
-          if (e.target === libModal) libModal.style.display = 'none';
-        });
-      }
-
-      // 啟用 Realtime 監聽
-      if (OWNER_PLAYER?.id) setupRealtime(OWNER_PLAYER.id);
-
-    }catch(err){
-      console.error('[Init Error]', err);
-      renderBookList([]);
+    if (!OWNER_PLAYER && CURRENT_PLAYER){
+      OWNER_PLAYER = { id: CURRENT_PLAYER.id, username: CURRENT_PLAYER.username };
     }
-  }
+    window.OWNER_PLAYER = OWNER_PLAYER;
+    if (DEBUG) console.log('[INIT] OWNER_PLAYER =', OWNER_PLAYER);
 
-  // 預設開啟彈窗 & 初始化
-window.addEventListener('load', () => {
-  if (typeof enforceLandscape === 'function') enforceLandscape();
-  init();
+    $('#owner-name').textContent = OWNER_PLAYER?.username || '玩家';
+
+    if (OWNER_PLAYER?.id){
+      PLAYER_STUDENTS = await getOwnerStudents(OWNER_PLAYER.id);
+    }else{
+      PLAYER_STUDENTS = [];
+    }
+
+    renderFilterOptions();
+    if (DEBUG) {
+      console.log('[DEBUG] selected student filter =', $('#student-filter')?.value);
+      console.log('[DEBUG] ownerId =', OWNER_PLAYER?.id);
+    }
+
+    // 【管理】按鈕只在「持有者 = 登入者」時可見，且改為呼叫 goToBookChest()
+    const manageBtn = $('#manage-btn');
+    if (manageBtn){
+      const isOwner = (CURRENT_PLAYER && OWNER_PLAYER && CURRENT_PLAYER.id === OWNER_PLAYER.id);
+      manageBtn.style.display = isOwner ? 'inline-flex' : 'none';
+      manageBtn.href = '#';
+      manageBtn.addEventListener('click', goToBookChest);
+    }
+
+    await refreshBooks();
+
+    const selEl = document.getElementById('student-filter');
+    if (selEl) selEl.addEventListener('change', refreshBooks);
+
+    const openBtn = document.querySelector('.book-btn');
+    if (openBtn){
+      openBtn.addEventListener('click', () => {
+        const modal = document.getElementById('library-modal');
+        if (modal) modal.style.display = 'flex';
+      });
+    }
+
+    const libModal = document.getElementById('library-modal');
+    if (libModal){
+      libModal.addEventListener('click', (e) => {
+        if (e.target === libModal) libModal.style.display = 'none';
+      });
+    }
+
+    if (OWNER_PLAYER?.id) setupRealtime(OWNER_PLAYER.id);
+
+  }catch(err){
+    console.error('[Init Error]', err);
+    renderBookList([]);
+  }
+}
+
+window.addEventListener('load', init);
+
+/* 全域保險：禁止拖曳所有 <img>（不影響點擊） */
+document.addEventListener('dragstart', e => {
+  if (e.target && e.target.tagName === 'IMG') e.preventDefault();
 });
-
-
-  // ====== 全域保險：禁止拖曳所有 <img>（不影響點擊）======
-  document.addEventListener('dragstart', e => {
-    if (e.target && e.target.tagName === 'IMG') {
-      e.preventDefault();
-    }
-  });
 </script>
-
-
 
 </body>
 </html>
-
