@@ -9,37 +9,9 @@
   function getSheetStart(dbIndex){ return (dbIndex % 2 === 0) ? dbIndex - 1 : dbIndex; }
 
   function rebuildAndRedrawPreserveCursor(preferDbIndex){
-    const focusDb = Math.max(1, preferDbIndex || (window.EditorCore?.getFocusedDbIndex?.() || 1));
-    const focusDom = (() => {
-      if (window.EditorCore?.dbIndexToDomIndex) {
-        return EditorCore.dbIndexToDomIndex(focusDb);
-      }
-      return focusDb + 2; // 封面佔 2
-    })();
-
-    if (typeof window.rebuildTo !== 'function') return;
-
-    rebuildTo(focusDb);
-
-    try {
-      if (window.EditorCore?.setLastDbIndex) EditorCore.setLastDbIndex(focusDb);
-
-      const navigateBack = () => {
-        if (typeof window.gotoPageDomByDbIndex === 'function') {
-          gotoPageDomByDbIndex(focusDb);
-          return;
-        }
-        if (typeof window.gotoDomPage === 'function') {
-          const dom = Math.max(1, focusDom|0);
-          gotoDomPage(dom);
-        }
-      };
-
-      // 等待 BookFlip 完成 mount，再把畫面導回原頁
-      setTimeout(navigateBack, 0);
-    } catch (_) {}
+    const startDb = Math.max(1, preferDbIndex || (window.EditorCore?.getFocusedDbIndex?.() || 1));
+    if (typeof window.rebuildTo === 'function') rebuildTo(startDb);
   }
-
 
   function shiftChaptersAfter(insertAt, delta){
     if (!Array.isArray(window.CHAPTERS_DB) || !CHAPTERS_DB.length) return;
@@ -50,27 +22,10 @@
   }
 
   function insertBlankSheetAfterCurrentSheet(){
-    syncAllStoriesToDB();
-    const focusBefore = EditorCore.getFocusedDbIndex();
-    const sheetStart  = getSheetStart(focusBefore);
-    const insertAt    = sheetStart + 2; // 下一張紙的 front
+  // ★ 改成固定末端插入，並維持焦點在原頁（不跳頁）
+  return insertBlankSheetAtEndKeepFocus();
+}
 
-    const front = { id: genLocalId(), page_index: insertAt,   type:'novel', image_url:'', content_json:{text_plain:'', text_html:''} };
-    const back  = { id: genLocalId(), page_index: insertAt+1, type:'novel', image_url:'', content_json:{text_plain:'', text_html:''} };
-
-    for (const p of PAGES_DB){ if ((p.page_index|0) >= (insertAt|0)) p.page_index = (p.page_index|0) + 2; }
-    shiftChaptersAfter(insertAt, +2);
-
-    PAGES_DB.push(front, back);
-    PAGES_DB.sort((a,b)=> (a.page_index|0) - (b.page_index|0));
-
-    // 原本：rebuildAndRedrawPreserveCursor(insertAt); → 會跳去新頁
-    // 改成：維持舊頁焦點
-    rebuildAndRedrawPreserveCursor(focusBefore);
-    persist();
-    try{ renderMetaForAllPages(); EditorCore.lockMeta(); }catch(_){}
-    return insertAt;
-  }
 
   // ★ 固定末端插入，並維持焦點在原頁（不跳頁）
   function insertBlankSheetAtEndKeepFocus(){
@@ -88,6 +43,10 @@
     PAGES_DB.sort((a,b)=> (a.page_index|0) - (b.page_index|0));
 
     rebuildAndRedrawPreserveCursor(focusBefore);
+// ★ 插完 & 重建後，再硬鎖一次避免在最後一頁時被往前帶
+if (typeof window.lockToDbIndex === 'function') {
+  lockToDbIndex(focusBefore);
+}
     persist();
     try{ renderMetaForAllPages(); EditorCore.lockMeta(); }catch(_){}
     return insertAt;
