@@ -436,45 +436,37 @@ async function runDiagnostics(){
 async function goToBookChest(e){
   if (e) e.preventDefault();
 
-  // 先預開分頁（同步、可通過 popup blocker）
-  const popup = window.open('about:blank', '_blank', 'noopener');
+  // 1) 拿 A 專案 access_token
+  const { data: { session } } = await client.auth.getSession();
+  if (!session?.access_token) { alert('請先登入才能管理書櫃'); return; }
 
-  // 取 A 的 access_token（這段是非同步，不會影響已開好的分頁）
-  const { data: sess } = await client.auth.getSession();
-  const tokenA = sess?.session?.access_token;
-  if (!tokenA) {
-    if (popup && !popup.closed) popup.close();
-    alert('請先登入才能管理書櫃');
-    return;
-  }
-
-  try {
-    const resp = await fetch(`${BOOKS_URL}/functions/v1/exchange-token`, {
+  try{
+    // 2) 用 fetch 直打 Edge Function（只送 content-type，避免 invoke() 自動多的 headers）
+    const resp = await fetch(EXCHANGE_URL, {
       method: 'POST',
-      headers: { 'content-type':'application/json' },
-      body: JSON.stringify({ token: tokenA })
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ token: session.access_token })
     });
-    const out = await resp.json();
-    if (!resp.ok || !out?.token) throw new Error(out?.message || '交換 token 失敗');
+    const out = await resp.json().catch(()=>null);
+    if (!resp.ok || !out?.token) throw new Error(out?.error || out?.detail || 'exchange-token 失敗');
 
-    const url = new URL(BOOK_CHEST_URL, location.href);
-    url.searchParams.set('token', out.token);
+    // 3) 存長簽，帶 owner_id / stuCode 去書櫃
+    localStorage.setItem('xer_b_jwt', out.token);
 
-    const ownerId = OWNER_PLAYER?.id || sess.session.user.id;
-    if (ownerId) url.searchParams.set('id', ownerId);
+    const params  = new URLSearchParams(location.search);
+    const stuCode = params.get('stu');
+    const qs = new URLSearchParams();
+    if (OWNER_PLAYER?.id) qs.set('id', OWNER_PLAYER.id);
+    if (stuCode) qs.set('stu', stuCode);
 
-    const sel = document.getElementById('student-filter');
-    if (sel && sel.value && sel.value !== 'OTHER') {
-      const stu = (window.PLAYER_STUDENTS||[]).find(s => String(s.student_id)===String(sel.value));
-      if (stu?.student_code) url.searchParams.set('stu', stu.student_code);
-    }
+    const base = BOOK_CHEST_URL.endsWith('/') ? BOOK_CHEST_URL : BOOK_CHEST_URL;
+    location.href = `${base}${qs.toString() ? ('?' + qs.toString()) : ''}`;
 
-    const target = url.toString();
-    if (popup && !popup.closed) popup.location.href = target;   // ✅ 走新分頁
-    else location.href = target;                                // ✅ 備援：同分頁
-  } catch (err) {
-    if (popup && !popup.closed) popup.close();
-    alert('登入書櫃失敗：' + (err?.message || '未知錯誤'));
+    // 若想改成透過網址帶 token（書櫃頁已有處理）：
+    // location.href = `${base}?token=${encodeURIComponent(out.token)}${OWNER_PLAYER?.id ? `&id=${encodeURIComponent(OWNER_PLAYER.id)}` : ''}${stuCode ? `&stu=${encodeURIComponent(stuCode)}` : ''}`;
+  }catch(err){
+    console.error('[exchange-token] failed', err);
+    alert('登入書櫃失敗：' + (err?.message || JSON.stringify(err)));
   }
 }
 
