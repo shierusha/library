@@ -38,15 +38,20 @@
     }
     .brand{display:flex;gap:.6rem;align-items:center;font-weight:700}
     .brand .dot{width:10px;height:10px;border-radius:999px;background:linear-gradient(135deg,#5aa7ff,#6ee7b7)}
-    .appbar .tools{display:flex;gap:8px;align-items:center}
+    .appbar .tools{display:flex;gap:8px;align-items:center; flex-wrap: wrap;}
 
-    /* Buttons */
+    /* Buttons / Select */
     .btn{border:1px solid #3a4a78;background:#16244a;color:#fff;padding:.55rem .9rem;border-radius:12px;cursor:pointer}
     .btn:hover{filter:brightness(1.08)}
     .btn:active{transform:translateY(1px)}
     .btn.primary{background:var(--primary);border-color:var(--primary)}
     .btn.ghost{background:#ffffff13;border-color:#ffffff33}
     .btn.danger{background:#2a0f18;border-color:#6b1b2e;color:#ffb3c2}
+
+    .select{
+      height:38px; padding:0 .8rem; border-radius:12px; border:1px solid #3a4a78;
+      background:#0d1a36; color:#e6ebff; min-width:180px;
+    }
 
     /* Layout */
     .view{display:none;min-height:calc(100vh - 56px)}
@@ -108,11 +113,7 @@
     #dlgFilter .filter-preview img{ width:160px; height:160px; object-fit:contain; filter: sepia(0.2) saturate(600%) hue-rotate(332deg) brightness(100%); }
     @media (max-width:780px){ #dlgFilter .filter-grid{ grid-template-columns:1fr; } }
 
-    /* 色相滑桿 */
     .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-    #dlgFilter .form-row.compact{align-items:center}
-    #dlgFilter #f_hue_range{ width:100%; accent-color:var(--primary); height:20px; margin-top:2px; }
-    #dlgFilter .range-scale{ display:flex; justify-content:space-between; font-size:.8rem; color:var(--muted); margin-top:2px; }
   </style>
 </head>
 
@@ -121,6 +122,10 @@
 <div class="appbar">
   <div class="brand"><span class="dot"></span><span id="topTitle">謝爾夏｜書籍一覽</span></div>
   <div class="tools">
+    <!-- ★ 新增：角色選擇（學生名 / 其他） -->
+    <select id="roleSelect" class="select" title="選擇角色（學生 / 其他）">
+      <option value="" disabled selected>讀取角色中…</option>
+    </select>
     <button class="btn primary" id="btnNew">＋ 新增書籍</button>
   </div>
 </div>
@@ -188,7 +193,6 @@
           <label>彩度</label>
           <input id="f_sat" type="number" inputmode="numeric" min="0"  step="1" value="600" required>
         </div>
-        <!-- 彩度滑桿（10–1000） -->
         <div class="form-row compact">
           <label class="sr-only">彩度滑桿</label>
           <input id="f_sat_range" type="range" min="10" max="1000" step="1" value="600">
@@ -198,7 +202,6 @@
           <label>色相</label>
           <input id="f_hue" type="number" inputmode="numeric" min="1" max="360" step="1" value="332" required>
         </div>
-        <!-- 色相滑桿（1–360） -->
         <div class="form-row compact">
           <label class="sr-only">色相滑桿</label>
           <input id="f_hue_range" type="range" min="1" max="360" step="1" value="332">
@@ -208,7 +211,6 @@
           <label>亮度</label>
           <input id="f_bri" type="number" inputmode="numeric" min="55" max="200" step="1" value="100" required>
         </div>
-        <!-- 亮度滑桿（55–200） -->
         <div class="form-row compact">
           <label class="sr-only">亮度滑桿</label>
           <input id="f_bri_range" type="range" min="55" max="200" step="1" value="100">
@@ -232,12 +234,14 @@
 </dialog>
 
 <script>
-/* ========= 0) Supabase 設定 =========
-   你會透過「另一頁」拿到 B 的長簽 JWT，導回此頁時建議帶上 ?token=...。
-   也支援先把 token 存進 localStorage('xer_b_jwt')。
-*/
-const SUPABASE_URL = "https://ogzpfrkwnqqaitytncla.supabase.co";
+/* ========= 常數 ========= */
+const SUPABASE_URL = "https://ogzpfrkwnqqaitytncla.supabase.co"; // B：書櫃
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nenBmcmt3bnFxYWl0eXRuY2xhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxODQzNzEsImV4cCI6MjA3MDc2MDM3MX0.Ls83xOXcKIW7FUcavr8_sOs37I18VGFWYNW3sNFRS24";
+const A_URL  = 'https://wfhwhvodgikpducrhgda.supabase.co';       // A：players/students
+const A_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmaHdodm9kZ2lrcGR1Y3JoZ2RhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgwMTAwNjEsImV4cCI6MjA2MzU4NjA2MX0.P6P-x4SxjiR4VdWH6VFgY_ktgMac_OzuI4Bl7HWskz8';
+
+const DEFAULT_COVER_IMG = 'https://shierusha.github.io/school-battle/images/book.png';
+const FILTER_DEFAULT = { sat:600, hue:332, bri:100 };
 
 /* ========= 工具 ========= */
 const $  = (s,r=document)=>r.querySelector(s);
@@ -245,7 +249,6 @@ const $$ = (s,r=document)=>[...r.querySelectorAll(s)];
 const escapeHtml=s=>(s||'').replace(/[&<>"']/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmtDate=ts=> new Date(ts).toLocaleDateString();
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
-const uid=()=>Math.random().toString(36).slice(2,10); // 只用在前端 UI
 
 /* 書名排版：最多20字，10字自動換行 */
 const formatTitle=(t)=>{
@@ -254,9 +257,7 @@ const formatTitle=(t)=>{
   return t;
 };
 
-/* 書皮濾鏡工具（DB 直接存整段 CSS：`filter: ...;`） */
-const FILTER_DEFAULT = { sat:600, hue:332, bri:100 };
-const DEFAULT_COVER_IMG = 'https://shierusha.github.io/school-battle/images/book.png';
+/* 濾鏡工具 */
 const cssPropToFilterValue = (css) => (css||'').replace(/^\s*filter\s*:\s*/,'').replace(/\s*;?\s*$/,'');
 const toFilterValue = ({sat,hue,bri}) => `sepia(0.2) saturate(${sat}%) hue-rotate(${hue}deg) brightness(${bri}%)`;
 const toFilterCssProp = (vals) => `filter: ${toFilterValue(vals)};`;
@@ -270,19 +271,17 @@ const parseFilterVals = (css) => {
   };
 };
 
-/* 取得長簽 JWT（?token=... 或 localStorage） */
+/* ========= Token / Client ========= */
 function getBearerFromUrlOrStorage(){
   const url = new URL(location.href);
   const t = url.searchParams.get('token') || localStorage.getItem('xer_b_jwt') || '';
   if (url.searchParams.get('token')) {
     localStorage.setItem('xer_b_jwt', url.searchParams.get('token'));
-    // 清掉網址上的 token
     url.searchParams.delete('token');
     history.replaceState(null, '', url.toString());
   }
   return t;
 }
-/* 解析 JWT，拿到 sub = 使用者 id */
 function decodeJwt(token){
   try{
     const [h,p] = token.split('.').slice(0,2);
@@ -293,26 +292,33 @@ function decodeJwt(token){
   }catch(e){ return null; }
 }
 
-/* ========= 1) Supabase Client（用你的長簽 JWT） ========= */
-let SB = null;
-let USER_ID = null;
-function createSBClient(bearer){
-  if(!bearer) return null;
-  const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-    global: { headers: { Authorization: `Bearer ${bearer}` } }
-  });
-  return client;
-}
+let SB = null;           // B 專案 client（帶長簽）
+let AClient = null;      // A 專案 anon client（讀學生）
+let USER_ID = null;      // 長簽 sub
+let OWNER_ID = null;     // 由 ?id 傳入（預設 USER_ID）
+let PRESET_STU_CODE = null; // 由 ?stu 傳入（student_code）
 
-/* ========= 2) 書庫 Store（全部改 DB 版） ========= */
+/* ========= 狀態：角色 / 書清單 ========= */
+let ROLE_OPTIONS = [];   // [{student_id, name, student_code}]，最後會加上 { student_id:null, name:'其他' }
+let CURRENT_STU_ID = null; // null 表示「其他」
+
+/* ========= Store（DB 版） ========= */
 const Store = {
   async list(){
-    const { data, error } = await SB
-      .from('books')
-      .select('id,title,cover_color,cover_image,page_count,sort_order,updated_at')
+    if(!OWNER_ID) return [];
+    let q = SB.from('books')
+      .select('id,title,cover_color,cover_image,page_count,sort_order,updated_at,student_id,owner_id')
+      .eq('owner_id', OWNER_ID)
       .order('sort_order', { ascending: true })
       .order('updated_at', { ascending: false });
+
+    if (CURRENT_STU_ID === null){
+      q = q.is('student_id', null);
+    } else {
+      q = q.eq('student_id', CURRENT_STU_ID);
+    }
+
+    const { data, error } = await q;
     if(error) throw error;
     return (data||[]).map(m => ({
       id: m.id,
@@ -322,23 +328,25 @@ const Store = {
       coverImage: m.cover_image || DEFAULT_COVER_IMG,
       page_count: m.page_count ?? 0,
       sort_order: m.sort_order ?? 1,
+      student_id: m.student_id || null
     }));
   },
   async get(id){
     const { data, error } = await SB.from('books')
-      .select('id,title,binding,direction,cover_color,cover_image,page_count,sort_order,updated_at')
+      .select('id,title,binding,direction,cover_color,cover_image,page_count,sort_order,updated_at,student_id,owner_id')
       .eq('id', id)
       .single();
     if(error) return null;
     return data;
   },
   async create(meta){
-    // 取目前最大 sort_order，新的放最後
-    const { data:maxRow } = await SB.from('books').select('sort_order').order('sort_order', { ascending: false }).limit(1).maybeSingle();
+    // 放到清單最後
+    const { data:maxRow } = await SB.from('books').select('sort_order').eq('owner_id', OWNER_ID).order('sort_order', { ascending: false }).limit(1).maybeSingle();
     const nextOrder = ((maxRow && maxRow.sort_order) || 0) + 1;
 
     const draft = {
-      owner_id: USER_ID,
+      owner_id: USER_ID,                              // 以長簽為準
+      student_id: CURRENT_STU_ID,                     // 由下拉決定，null=其他
       title: meta.title || '未命名書籍',
       binding: meta.binding || 'short',
       direction: meta.direction || 'ltr',
@@ -346,7 +354,6 @@ const Store = {
       cover_image: DEFAULT_COVER_IMG,
       page_count: 0,
       sort_order: nextOrder
-      // created_at/updated_at 由 DB 預設
     };
     const { data, error } = await SB.from('books').insert(draft).select().single();
     if(error) throw error;
@@ -361,6 +368,7 @@ const Store = {
     if('cover_image' in patch) allowed.cover_image = patch.cover_image;
     if('page_count' in patch)  allowed.page_count = patch.page_count;
     if('sort_order' in patch)  allowed.sort_order = patch.sort_order;
+    if('student_id' in patch)  allowed.student_id = patch.student_id;
 
     const { data, error } = await SB.from('books').update(allowed).eq('id', id).select().single();
     if(error) throw error;
@@ -371,7 +379,6 @@ const Store = {
     if(error) throw error;
   },
   async move(id, newIndex){
-    // 重新抓排序、搬移、整批 upsert sort_order
     const list = await this.list();
     const from = list.findIndex(x => x.id === id);
     if(from < 0) return;
@@ -379,26 +386,26 @@ const Store = {
     const arr = [...list];
     const [item] = arr.splice(from, 1);
     arr.splice(to, 0, item);
-
     const updates = arr.map((b, i) => ({ id: b.id, sort_order: i + 1 }));
     const { error } = await SB.from('books').upsert(updates, { onConflict: 'id' });
     if(error) throw error;
   }
 };
 
-/* ========= 3) UI 渲染 ========= */
+/* ========= UI ========= */
 const libGrid   = $('#libGrid');
 const dlgNew    = $('#dlgNew');
 const dlgRename = $('#dlgRename');
 const renameInp = $('#rename_title');
+const roleSelect= $('#roleSelect');
 let renameTargetId = null;
 
 function renderCardList(list){
   if(!list.length){
     libGrid.innerHTML = `
       <div class="card">
-        <h3>${formatTitle('還沒有書籍')}</h3>
-        <div class="muted">點右上角「＋ 新增書籍」開始吧。</div>
+        <h3>${formatTitle('目前分類沒有書籍')}</h3>
+        <div class="muted">右上角選擇「學生／其他」，或點「＋ 新增書籍」。</div>
       </div>`;
     return;
   }
@@ -427,19 +434,16 @@ function renderCardList(list){
     </div>
   `).join('');
 
-  // 綁定每張卡片
   $$('#libGrid .card').forEach((card, cardIndex)=>{
     const id = card.dataset.id;
     const img = card.querySelector('.corner-tools img');
     const editBtn = card.querySelector('.title-edit');
 
-    // 開啟 → 導向編輯器（保持你的原本 URL 規則）
     card.querySelector('[data-act="open"]').onclick = ()=> {
       const url = `/editor.html?book=${encodeURIComponent(id)}`;
       window.location.href = url;
     };
 
-    // 刪除
     card.querySelector('[data-act="del"]').onclick  = async ()=>{
       if(confirm('確定刪除此書？')){
         try { await Store.delete(id); await renderLibrary(); }
@@ -447,7 +451,6 @@ function renderCardList(list){
       }
     };
 
-    // 排序箭頭
     card.querySelector('.sort-btn.prev').onclick = async ()=>{
       try{ await Store.move(id, cardIndex - 1); await renderLibrary(); }
       catch(e){ alert('排序失敗：' + (e?.message||e)); }
@@ -457,23 +460,13 @@ function renderCardList(list){
       catch(e){ alert('排序失敗：' + (e?.message||e)); }
     };
 
-    // 邊界感應
     card.addEventListener('mousemove', (e)=>{
       const r=card.getBoundingClientRect(); const x=e.clientX-r.left; const edge=Math.max(24,r.width*0.12);
       card.classList.toggle('near-left',  x<edge);
       card.classList.toggle('near-right', (r.width-x)<edge);
     });
     card.addEventListener('mouseleave', ()=> card.classList.remove('near-left','near-right'));
-    card.addEventListener('click',(e)=>{
-      const tag=(e.target.tagName||'').toLowerCase();
-      if(['button','input','select','a'].includes(tag)) return;
-      const r=card.getBoundingClientRect(); const x=e.clientX-r.left;
-      card.classList.toggle('near-left', x<r.width/2);
-      card.classList.toggle('near-right', x>=r.width/2);
-      setTimeout(()=> card.classList.remove('near-left','near-right'), 2500);
-    });
 
-    // 改名
     editBtn.addEventListener('click', async (ev)=>{
       ev.stopPropagation();
       renameTargetId = id;
@@ -482,7 +475,6 @@ function renderCardList(list){
       $('#dlgRename').showModal();
     });
 
-    // 顏色小窗
     const btnFilter = card.querySelector('[data-act="filter"]');
     btnFilter.addEventListener('click', async ()=>{
       const b = await Store.get(id);
@@ -490,10 +482,9 @@ function renderCardList(list){
       $('#f_sat').value = vals.sat;
       $('#f_hue').value = vals.hue;
       $('#f_bri').value = vals.bri;
-      const hueRange = $('#f_hue_range'); if (hueRange) hueRange.value = vals.hue;
-      const briRange = $('#f_bri_range'); if (briRange) briRange.value = Math.max(55, Math.min(200, vals.bri));
-      const satRange = $('#f_sat_range'); if (satRange) satRange.value = Math.max(10, Math.min(1000, vals.sat));
-
+      $('#f_hue_range').value = vals.hue;
+      $('#f_bri_range').value = Math.max(55, Math.min(200, vals.bri));
+      $('#f_sat_range').value = Math.max(10, Math.min(1000, vals.sat));
       $('#filterPreviewImg').src = b?.cover_image || DEFAULT_COVER_IMG;
       $('#filterPreviewImg').style.filter = toFilterValue(vals);
       window.__FILTER_TARGET__ = { id, imgEl: img };
@@ -511,14 +502,14 @@ async function renderLibrary(){
   }
 }
 
-/* ========= 4) 新增 & 改名 ========= */
+/* ========= 新增 & 改名 ========= */
 $('#btnNew').addEventListener('click',()=>{ $('#formNew').reset(); $('#dlgNew').showModal(); });
 $('#btnCreate').addEventListener('click', async ()=>{
   const meta = {
     title:    $('#f_title').value.trim() || '未命名書籍',
     binding:  $('#f_binding').value,
     direction:$('#f_direction').value,
-    view:     $('#f_view').value   // 目前未存 DB，保留欄位以後擴充
+    view:     $('#f_view').value
   };
   try{
     const book = await Store.create(meta);
@@ -540,22 +531,18 @@ $('#btnRenameSave').addEventListener('click', async ()=>{
   renameTargetId=null; await renderLibrary();
 });
 
-/* ========= 5) 顏色小窗：即時預覽 + 套用 ========= */
+/* ========= 顏色小窗 ========= */
 const fSat = $('#f_sat'), fHue = $('#f_hue'), fBri = $('#f_bri');
 const pvImg = $('#filterPreviewImg');
 const hueRangeGlobal = $('#f_hue_range');
 const briRangeGlobal = $('#f_bri_range');
 const satRangeGlobal = $('#f_sat_range');
-
 function clampNum(v,min,max){ const n = parseInt(String(v||'').replace(/[^\d]/g,''),10); return isNaN(n)?min: Math.max(min, Math.min(max, n)); }
 function getVals(){ return { sat:clampNum(fSat.value,0,2000), hue:clampNum(fHue.value,0,360), bri:clampNum(fBri.value,0,300) }; }
 function updatePreview(){ if(pvImg) pvImg.style.filter = toFilterValue(getVals()); }
-
-// 數字輸入同步滑桿 + 預覽
 [fSat, fHue, fBri].forEach(inp => {
   inp.addEventListener('input', () => {
     inp.value = inp.value.replace(/[^\d]/g, '');
-
     if (inp === fHue && hueRangeGlobal) {
       const v = Math.max(1, Math.min(360, parseInt(fHue.value || '1', 10) || 1));
       hueRangeGlobal.value = String(v);
@@ -573,20 +560,17 @@ function updatePreview(){ if(pvImg) pvImg.style.filter = toFilterValue(getVals()
     updatePreview();
   });
 });
-
-// 滑桿 → 數字 + 預覽
 if (hueRangeGlobal) hueRangeGlobal.addEventListener('input', ()=>{ fHue.value = hueRangeGlobal.value; updatePreview(); });
 if (briRangeGlobal) briRangeGlobal.addEventListener('input', ()=>{ fBri.value = briRangeGlobal.value; updatePreview(); });
 if (satRangeGlobal) satRangeGlobal.addEventListener('input', ()=>{ fSat.value = satRangeGlobal.value; updatePreview(); });
 
-// 套用 → DB
 $('#btnFilterSave').addEventListener('click', async ()=>{
   const tgt = window.__FILTER_TARGET__;
   if(!tgt?.id){ $('#dlgFilter').close(); return; }
   const vals    = getVals();
   const cssProp = toFilterCssProp(vals);
   try{
-    tgt.imgEl.style.filter = toFilterValue(vals); // 卡片先行預覽
+    tgt.imgEl.style.filter = toFilterValue(vals);
     await Store.update(tgt.id, { cover_color: cssProp });
   }catch(e){
     alert('套用失敗：' + (e?.message||e));
@@ -596,7 +580,98 @@ $('#btnFilterSave').addEventListener('click', async ()=>{
   await renderLibrary();
 });
 
-/* ========= 6) Dialog 關閉 + 啟動 ========= */
+/* ========= 角色下拉（讀 A 專案的學生） ========= */
+async function fetchOwnerStudents(ownerId){
+  try{
+    const { createClient } = window.supabase;
+    if (!AClient) AClient = createClient(A_URL, A_ANON, { auth:{ persistSession:false } });
+    const { data, error } = await AClient
+      .from('students')
+      .select('student_id, name, student_code, player_id')
+      .eq('player_id', ownerId)
+      .not('student_code', 'is', null)
+      .order('name', { ascending:true });
+    if (error) throw error;
+    return data || [];
+  }catch(e){
+    console.warn('[fetchOwnerStudents]', e);
+    return [];
+  }
+}
+async function getStudentByCode(code){
+  if(!code) return null;
+  try{
+    if (!AClient) AClient = window.supabase.createClient(A_URL, A_ANON, { auth:{ persistSession:false } });
+    const { data, error } = await AClient
+      .from('students')
+      .select('student_id, name, student_code, player_id')
+      .eq('student_code', code)
+      .maybeSingle();
+    if (error) throw error;
+    return data || null;
+  }catch(e){
+    console.warn('[getStudentByCode]', e);
+    return null;
+  }
+}
+function renderRoleOptions(){
+  roleSelect.innerHTML = '';
+  ROLE_OPTIONS.forEach(s => {
+    roleSelect.appendChild(new Option(s.name, s.student_id || 'OTHER', false, false));
+  });
+  // 設定目前值
+  roleSelect.value = (CURRENT_STU_ID === null) ? 'OTHER' : CURRENT_STU_ID;
+}
+
+/* ========= 啟動 ========= */
+async function boot(){
+  // 1) 憑證 & client
+  const bearer = getBearerFromUrlOrStorage();
+  if(!bearer){ alert('尚未登入：請先從休息室交換長簽後再進入此頁。'); return; }
+  SB = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    global: { headers: { Authorization: `Bearer ${bearer}` } }
+  });
+  const payload = decodeJwt(bearer);
+  USER_ID = payload?.sub || null;
+  if(!USER_ID){ alert('無效憑證（缺少 sub）。'); return; }
+
+  // 2) owner / stu 預設
+  const url = new URL(location.href);
+  OWNER_ID = url.searchParams.get('id') || USER_ID;
+  PRESET_STU_CODE = url.searchParams.get('stu') || null;
+
+  // 3) 拉學生清單 + 下拉
+  const stuList = await fetchOwnerStudents(OWNER_ID);
+  ROLE_OPTIONS = [...stuList.map(s => ({ student_id: s.student_id, name: s.name, student_code: s.student_code }))];
+  ROLE_OPTIONS.push({ student_id: null, name:'其他', student_code: null });
+
+  // 4) 依 ?stu 預選（若該 code 不屬於此 owner，則退回「其他」）
+  if (PRESET_STU_CODE){
+    const found = await getStudentByCode(PRESET_STU_CODE);
+    if (found && found.player_id === OWNER_ID){
+      CURRENT_STU_ID = found.student_id;
+    } else {
+      CURRENT_STU_ID = null; // 其他
+    }
+  } else {
+    CURRENT_STU_ID = null; // 預設「其他」
+  }
+  renderRoleOptions();
+
+  // 5) 監聽下拉切換
+  roleSelect.addEventListener('change', async ()=>{
+    const v = roleSelect.value;
+    CURRENT_STU_ID = (v === 'OTHER') ? null : v;
+    await renderLibrary();
+  });
+
+  // 6) 初次載入清單
+  await renderLibrary();
+}
+boot();
+
+/* ========= Dialog 關閉 ========= */
 function bindDialogCloseButtons() {
   document.querySelectorAll('dialog').forEach(dlg => {
     dlg.addEventListener('click', (e) => {
@@ -609,33 +684,7 @@ function bindDialogCloseButtons() {
     });
   });
 }
-function showTipOnce() {
-  const KEY = 'xer_book_tip_ok';
-  if (sessionStorage.getItem(KEY)) return;
-  sessionStorage.setItem(KEY, '1');
-  alert('小提示：\n• 書名右上 ✎ 可更改書名\n• 左上 ← / 右下 → 可排序（會更新 sort_order）\n• 「修改書皮顏色」按「套用」會即時更新');
-}
-
-async function boot(){
-  const bearer = getBearerFromUrlOrStorage();
-  if(!bearer){
-    alert('尚未登入：請先從登入頁換到 B 的長簽 JWT，再用 ?token=... 帶進來或寫進 localStorage("xer_b_jwt")。');
-    return;
-  }
-  SB = createSBClient(bearer);
-  const payload = decodeJwt(bearer);
-  USER_ID = payload?.sub || null;
-
-  if(!USER_ID){
-    alert('無效的使用者憑證（缺少 sub）。請重新登入。');
-    return;
-  }
-
-  await renderLibrary();
-  bindDialogCloseButtons();
-  showTipOnce();
-}
-boot();
+bindDialogCloseButtons();
 </script>
 </body>
 </html>
