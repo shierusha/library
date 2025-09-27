@@ -122,7 +122,6 @@
 <div class="appbar">
   <div class="brand"><span class="dot"></span><span id="topTitle">謝爾夏｜書籍一覽</span></div>
   <div class="tools">
-    <!-- ★ 新增：角色選擇（學生名 / 其他） -->
     <select id="roleSelect" class="select" title="選擇角色（學生 / 其他）">
       <option value="" disabled selected>讀取角色中…</option>
     </select>
@@ -130,7 +129,6 @@
   </div>
 </div>
 
-<!-- 書庫列表 -->
 <section class="view active" id="viewLibrary">
   <div class="wrap">
     <h2 style="margin:0.1rem 0 10px 2rem;">書籍一覽</h2>
@@ -138,7 +136,7 @@
   </div>
 </section>
 
-<!-- 新增書籍 -->
+<!-- 新增書籍 Dialog -->
 <dialog id="dlgNew">
   <div class="modal-head">新增書籍</div>
   <form method="dialog" class="modal-body" id="formNew">
@@ -236,7 +234,7 @@
 <script>
 /* ========= 常數 ========= */
 const SUPABASE_URL = "https://ogzpfrkwnqqaitytncla.supabase.co"; // B：書櫃
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nenBmcmt3bnFxYWl0eXRuY2xhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxODQzNzEsImV4cCI6MjA3MDc2MDM3MX0.Ls83xOXcKIW7FUcavr8_sOs37I18VGFWYNW3sNFRS24";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nenBmcmt3bnFxYWl0eXRuY2xhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxODQzNzEsImV4CI6MjA3MDc2MDM3MX0.Ls83xOXcKIW7FUcavr8_sOs37I18VGFWYNW3sNFRS24";
 const A_URL  = 'https://wfhwhvodgikpducrhgda.supabase.co';       // A：players/students
 const A_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmaHdodm9kZ2lrcGR1Y3JoZ2RhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgwMTAwNjEsImV4cCI6MjA2MzU4NjA2MX0.P6P-x4SxjiR4VdWH6VFgY_ktgMac_OzuI4Bl7HWskz8';
 
@@ -250,12 +248,7 @@ const escapeHtml=s=>(s||'').replace(/[&<>"']/g,(c)=>({'&':'&amp;','<':'&lt;','>'
 const fmtDate=ts=> new Date(ts).toLocaleDateString();
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 
-/* 書名排版：最多20字，10字自動換行 */
-const formatTitle=(t)=>{
-  t = (t||'未命名').slice(0,20);
-  if(t.length>10) t = t.slice(0,10) + '\n' + t.slice(10);
-  return t;
-};
+const formatTitle=(t)=>{ t=(t||'未命名').slice(0,20); if(t.length>10) t=t.slice(0,10)+'\n'+t.slice(10); return t; };
 
 /* 濾鏡工具 */
 const cssPropToFilterValue = (css) => (css||'').replace(/^\s*filter\s*:\s*/,'').replace(/\s*;?\s*$/,'');
@@ -286,21 +279,20 @@ function decodeJwt(token){
   try{
     const [h,p] = token.split('.').slice(0,2);
     const pad = s => s + '='.repeat((4 - s.length % 4) % 4);
-    const base64 = pad(p).replace(/-/g,'+').replace(/_/g,'/');
-    const json = atob(base64);
+    const json = atob(pad(p).replace(/-/g,'+').replace(/_/g,'/'));
     return JSON.parse(json);
   }catch(e){ return null; }
 }
 
-let SB = null;           // B 專案 client（帶長簽）
-let AClient = null;      // A 專案 anon client（讀學生）
-let USER_ID = null;      // 長簽 sub
-let OWNER_ID = null;     // 由 ?id 傳入（預設 USER_ID）
-let PRESET_STU_CODE = null; // 由 ?stu 傳入（student_code）
+let SB = null;  // B 專案 client
+let AClient = null;
+let USER_ID = null;
+let OWNER_ID = null;
+let PRESET_STU_CODE = null;
 
-/* ========= 狀態：角色 / 書清單 ========= */
-let ROLE_OPTIONS = [];   // [{student_id, name, student_code}]，最後會加上 { student_id:null, name:'其他' }
-let CURRENT_STU_ID = null; // null 表示「其他」
+/* ========= 狀態 ========= */
+let ROLE_OPTIONS = [];   // 學生清單 + 其他
+let CURRENT_STU_ID = null; // null=其他
 
 /* ========= Store（DB 版） ========= */
 const Store = {
@@ -312,11 +304,8 @@ const Store = {
       .order('sort_order', { ascending: true })
       .order('updated_at', { ascending: false });
 
-    if (CURRENT_STU_ID === null){
-      q = q.is('student_id', null);
-    } else {
-      q = q.eq('student_id', CURRENT_STU_ID);
-    }
+    if (CURRENT_STU_ID === null) q = q.is('student_id', null);
+    else q = q.eq('student_id', CURRENT_STU_ID);
 
     const { data, error } = await q;
     if(error) throw error;
@@ -340,13 +329,12 @@ const Store = {
     return data;
   },
   async create(meta){
-    // 放到清單最後
     const { data:maxRow } = await SB.from('books').select('sort_order').eq('owner_id', OWNER_ID).order('sort_order', { ascending: false }).limit(1).maybeSingle();
     const nextOrder = ((maxRow && maxRow.sort_order) || 0) + 1;
 
     const draft = {
-      owner_id: USER_ID,                              // 以長簽為準
-      student_id: CURRENT_STU_ID,                     // 由下拉決定，null=其他
+      owner_id: USER_ID,
+      student_id: CURRENT_STU_ID,
       title: meta.title || '未命名書籍',
       binding: meta.binding || 'short',
       direction: meta.direction || 'ltr',
@@ -439,8 +427,9 @@ function renderCardList(list){
     const img = card.querySelector('.corner-tools img');
     const editBtn = card.querySelector('.title-edit');
 
+    /* ★ 改 1：卡片「開啟」到 editbook/editbook?bookid=... */
     card.querySelector('[data-act="open"]').onclick = ()=> {
-      const url = `/editor.html?book=${encodeURIComponent(id)}`;
+      const url = `editbook/editbook?bookid=${encodeURIComponent(id)}`;
       window.location.href = url;
     };
 
@@ -619,13 +608,113 @@ function renderRoleOptions(){
   ROLE_OPTIONS.forEach(s => {
     roleSelect.appendChild(new Option(s.name, s.student_id || 'OTHER', false, false));
   });
-  // 設定目前值
   roleSelect.value = (CURRENT_STU_ID === null) ? 'OTHER' : CURRENT_STU_ID;
+}
+
+/* ========= 書架渲染（含點擊） ========= */
+function renderShelves(books){
+  const shelf1 = document.querySelector('.book1-12');
+  const shelf2 = document.querySelector('.book13-24');
+  if (!shelf1 || !shelf2) return;
+
+  const leftStart = 3;
+  const delta = 6;
+  const heights = [75,80,85,90,95,100];
+
+  function renderShelf(el, slice, fallbackUrl){
+    el.innerHTML = '';
+    slice.forEach((b, i) => {
+      const img = document.createElement('img');
+      img.draggable = false;
+      const left = leftStart + i*delta;
+      const h = heights[Math.floor(Math.random()*heights.length)];
+      img.src = fallbackUrl;
+      img.style.left = left + '%';
+      img.style.height = h + '%';
+      img.title = b.title;
+      img.style.cursor = 'pointer';
+
+      const filterStr = (b?.cover_color || '').trim();
+      if (/^filter:/.test(filterStr)) img.style.cssText += ';' + filterStr;
+
+      /* ★ 改 2：書架點書 → editbook/editbook?bookid=... */
+      img.addEventListener('click', () => {
+        window.location.href = `editbook/editbook?bookid=${encodeURIComponent(b.id)}`;
+      });
+      el.appendChild(img);
+    });
+  }
+
+  renderShelf(shelf1, books.slice(0, 12),  'https://shierusha.github.io/library/img/book1.png');
+  renderShelf(shelf2, books.slice(12, 24), 'https://shierusha.github.io/library/img/book2.png');
+}
+
+/* ========= 書單（右側卡片的「前往閱讀」連結也改） ========= */
+function renderBookList(books){
+  const box = $('#book-list');
+  if (!box) return;
+  box.innerHTML = '';
+  if (!books.length){
+    box.innerHTML = `<div style="padding:12px;color:#6b7280;">沒有找到符合的書籍。</div>`;
+    return;
+  }
+  const BOOK_ICON = 'https://shierusha.github.io/school-battle/images/book.png';
+  const frag = document.createDocumentFragment();
+  books.forEach(b => {
+    const card = document.createElement('div');
+    card.className = 'book-card';
+
+    const icon = document.createElement('div');
+    icon.className = 'book-icon';
+    const filterStr = (b?.cover_color || '').trim();
+    icon.innerHTML = `<img draggable="false" alt="book" src="${BOOK_ICON}" style="${/^filter:/.test(filterStr) ? filterStr : ''}">`;
+
+    const meta = document.createElement('div');
+    meta.className = 'book-meta';
+    meta.innerHTML = `
+      <div class="book-title" title="${b.title}">${b.title}</div>
+      <div class="book-sub">最後更新日：${fmtDate(b.updatedAt) || '—'}</div>
+    `;
+
+    const actions = document.createElement('div');
+    actions.className = 'book-actions';
+    const link = document.createElement('a');
+    link.className = 'go-btn';
+    link.innerHTML = '前往<br>閱讀';
+    /* ★ 改 3：列表連結 → editbook/editbook?bookid=... */
+    link.href = `editbook/editbook?bookid=${encodeURIComponent(b.id)}`;
+    actions.appendChild(link);
+
+    card.append(icon, meta, actions);
+    frag.appendChild(card);
+  });
+  box.appendChild(frag);
+}
+
+/* ========= 載入 & Realtime ========= */
+let booksChannel = null;
+function setupRealtime(ownerId){
+  if (booksChannel) { SB.removeChannel?.(booksChannel); booksChannel = null; }
+  booksChannel = SB
+    .channel('books-room-' + ownerId)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'books', filter: `owner_id=eq.${ownerId}` },
+      () => { renderLibrary(); })
+    .subscribe();
+}
+
+async function refreshBooks(){
+  try{
+    const list = await Store.list();
+    renderBookList(list);
+    renderShelves(list);
+  }catch(e){
+    console.warn('[refreshBooks] failed:', e);
+    renderBookList([]);
+  }
 }
 
 /* ========= 啟動 ========= */
 async function boot(){
-  // 1) 憑證 & client
   const bearer = getBearerFromUrlOrStorage();
   if(!bearer){ alert('尚未登入：請先從休息室交換長簽後再進入此頁。'); return; }
   SB = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -636,38 +725,32 @@ async function boot(){
   USER_ID = payload?.sub || null;
   if(!USER_ID){ alert('無效憑證（缺少 sub）。'); return; }
 
-  // 2) owner / stu 預設
   const url = new URL(location.href);
   OWNER_ID = url.searchParams.get('id') || USER_ID;
   PRESET_STU_CODE = url.searchParams.get('stu') || null;
 
-  // 3) 拉學生清單 + 下拉
+  if (!AClient) AClient = supabase.createClient(A_URL, A_ANON, { auth:{ persistSession:false } });
   const stuList = await fetchOwnerStudents(OWNER_ID);
   ROLE_OPTIONS = [...stuList.map(s => ({ student_id: s.student_id, name: s.name, student_code: s.student_code }))];
   ROLE_OPTIONS.push({ student_id: null, name:'其他', student_code: null });
 
-  // 4) 依 ?stu 預選（若該 code 不屬於此 owner，則退回「其他」）
   if (PRESET_STU_CODE){
     const found = await getStudentByCode(PRESET_STU_CODE);
-    if (found && found.player_id === OWNER_ID){
-      CURRENT_STU_ID = found.student_id;
-    } else {
-      CURRENT_STU_ID = null; // 其他
-    }
+    CURRENT_STU_ID = (found && found.player_id === OWNER_ID) ? found.student_id : null;
   } else {
-    CURRENT_STU_ID = null; // 預設「其他」
+    CURRENT_STU_ID = null;
   }
   renderRoleOptions();
 
-  // 5) 監聽下拉切換
   roleSelect.addEventListener('change', async ()=>{
     const v = roleSelect.value;
     CURRENT_STU_ID = (v === 'OTHER') ? null : v;
     await renderLibrary();
   });
 
-  // 6) 初次載入清單
   await renderLibrary();
+
+  if (OWNER_ID) setupRealtime(OWNER_ID);
 }
 boot();
 
@@ -686,7 +769,6 @@ function bindDialogCloseButtons() {
 }
 bindDialogCloseButtons();
 </script>
-  
   <!-- 登出腳本 -->
   <script src="https://shierusha.github.io/library/assets/js/logout.js"></script>
 </body>
