@@ -201,6 +201,32 @@ body::-webkit-scrollbar { width:0; height:0; }
 /* （可選）如果閱讀器不需要右上角儲存/回書單，取消下面兩行註解 */
 /* .reader #btnSave { display:none !important; } */
 /* .reader #btnBack { display:none !important; } */
+
+
+/* ===== 下方置中：寬度 / 視圖控制列 ===== */
+.zoomdock{
+  position: fixed;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  z-index: 150;           /* 蓋過大範圍左右翻頁區（.dock z-index:90） */
+}
+.zoomdock .btn{ padding: 4px 12px; }
+
+/* 桌機：避免重複，底部不顯示「單/雙頁」那顆 */
+@media (min-width: 651px){
+  #btnToggleViewDock{ display: none; }
+}
+
+/* 手機：右側工具列的「單/雙頁」隱藏 → 由底部三顆呈現 */
+@media (max-width: 650px){
+  .side.right #btnToggleView{ display: none; }
+}
+
+
+
   </style>
 </head>
 
@@ -292,6 +318,14 @@ style="
     <button class="btn" data-style="divider-dark">黑置中</button>
     <button class="btn" data-style="illustration">圖片頁</button>
   </div>
+
+<!-- 下方置中的寬度/視圖控制：- 單/雙頁 + -->
+<div class="zoomdock" id="zoomDock">
+  <button class="btn ghost" id="btnStageMinus"> - </button>
+  <button class="btn ghost" id="btnToggleViewDock" style=" background: #b36969;color: #fff;">單/雙頁</button>
+  <button class="btn ghost" id="btnStagePlus"> + </button>
+</div>
+
 
   <!-- TOC Modal -->
   <div id="tocModal" class="modal-overlay" aria-hidden="true">
@@ -484,6 +518,46 @@ style="
     }
     ensureSinglePageWhenReady();
   });
+})();
+</script>
+<script>
+/* －／＋ 調整 .stage 寬度，每次 5%，儲存在 localStorage */
+(function(){
+  const stageEl = document.querySelector('.stage');
+  const minus   = document.getElementById('btnStageMinus');
+  const plus    = document.getElementById('btnStagePlus');
+  const dockTgl = document.getElementById('btnToggleViewDock');
+
+  if (!stageEl || !minus || !plus) return;
+
+  const KEY  = 'stage_width_pct_v1';
+  const STEP = 5, MIN = 40, MAX = 100;
+
+  // 讀取上次設定（預設 80%）
+  let pct = parseInt(localStorage.getItem(KEY), 10);
+  if (isNaN(pct)) pct = 80;
+  pct = Math.max(MIN, Math.min(MAX, pct));
+
+  function apply(){
+    stageEl.style.width = pct + '%';
+    // 觸發 app.js 內的 resize 監聽 → 會重算版面與字級比例
+    window.dispatchEvent(new Event('resize')); // app.js 內有 listener。:contentReference[oaicite:2]{index=2}
+    localStorage.setItem(KEY, String(pct));
+  }
+  function dec(){ pct = Math.max(MIN, pct - STEP); apply(); }
+  function inc(){ pct = Math.min(MAX, pct + STEP); apply(); }
+
+  // 綁定按鈕
+  minus.addEventListener('click', dec);
+  plus .addEventListener('click', inc);
+
+  // 底部那顆「單/雙頁」→ 直接觸發原本右側那顆的 click（沿用既有邏輯）
+  dockTgl?.addEventListener('click', () => {
+    document.getElementById('btnToggleView')?.click();
+  });
+
+  // 首次套用
+  apply();
 })();
 </script>
 
