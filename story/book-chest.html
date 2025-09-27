@@ -114,6 +114,31 @@
     @media (max-width:780px){ #dlgFilter .filter-grid{ grid-template-columns:1fr; } }
 
     .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+
+    /* 新增書籍：即時預覽 */
+.newbook-preview{
+  margin-top:8px; padding:10px 6px 4px;
+  border-top:1px solid #223057;
+}
+.page-pair{ display:flex; gap:10px; justify-content:center; align-items:center; }
+.page{
+  background:#fff; border:1px solid #e5e7eb; border-radius:4px;
+  position:relative; display:flex; align-items:center; justify-content:center;
+  box-shadow:0 2px 6px rgba(0,0,0,.15); overflow:hidden;
+}
+.page.portrait  { aspect-ratio:5/7; width:min(42%,160px); }
+.page.landscape { aspect-ratio:7/5; width:min(42%,200px); }
+.page .page-text{
+  position:absolute; color:#111827; font-weight:700; letter-spacing:.2em; opacity:.9;
+}
+.page .horiz{ left:10px; top:50%; transform:translateY(-50%); white-space:nowrap; }
+.page .vert {
+  right:10px; top:50%; transform:translateY(-50%);
+  writing-mode: vertical-rl; text-orientation: upright;
+}
+
+    
   </style>
 </head>
 
@@ -161,6 +186,19 @@
         <option value="rtl">直式文本</option>
       </select>
     </div>
+      <!-- 即時預覽 -->
+  <div class="newbook-preview" id="newBookPreview">
+    <div class="page-pair">
+      <div class="page portrait" id="prevLeft">
+        <div class="page-text horiz" id="prevLeftText">文本內容</div>
+      </div>
+      <div class="page portrait" id="prevRight">
+        <div class="page-text vert" id="prevRightText">文本內容</div>
+      </div>
+    </div>
+    <div class="muted" style="text-align:center;margin-top:6px;">預覽</div>
+  </div>
+
     <div class="form-row"><label>預設視圖</label>
       <select id="f_view">
         <option value="single">單頁</option>
@@ -776,6 +814,43 @@ function bindDialogCloseButtons() {
   });
 }
 bindDialogCloseButtons();
+
+  /* === 新增書籍預覽 === */
+function updateNewPreview(){
+  const binding   = $('#f_binding')?.value || 'short'; // short=橫本(7:5) / long=直本(5:7)
+  const direction = $('#f_direction')?.value || 'ltr'; // ltr=橫式 / rtl=直式
+
+  const left  = $('#prevLeft');
+  const right = $('#prevRight');
+  [left, right].forEach(p=>{
+    if(!p) return;
+    p.classList.remove('portrait','landscape');
+    p.classList.add(binding === 'long' ? 'portrait' : 'landscape');
+  });
+
+  const leftText  = $('#prevLeftText');
+  const rightText = $('#prevRightText');
+  if (direction === 'ltr'){
+    if (leftText)  leftText.style.display  = 'block';
+    if (rightText) rightText.style.display = 'none';
+  } else { // rtl
+    if (leftText)  leftText.style.display  = 'none';
+    if (rightText) rightText.style.display = 'block';
+  }
+}
+
+/* 綁定下拉即時更新 */
+$('#f_binding')?.addEventListener('change', updateNewPreview);
+$('#f_direction')?.addEventListener('change', updateNewPreview);
+
+/* 打開「新增書籍」時重置並刷新預覽（把你原本的點擊事件改成下面這版） */
+$('#btnNew').addEventListener('click',()=>{
+  $('#formNew').reset();
+  // 依預設值套一次預覽
+  updateNewPreview();
+  $('#dlgNew').showModal();
+});
+
 </script>
 
   <!-- 登出腳本 -->
