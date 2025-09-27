@@ -5,118 +5,118 @@
   <title>謝爾夏｜電子書櫃</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
-<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&family=Noto+Sans+TC:wght@400;600;700&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- 字體 -->
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&family=Noto+Sans+TC:wght@400;600;700&display=swap" rel="stylesheet">
+  <!-- Supabase JS v2 -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
   <style>
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap');
 
-:root{
-  --panel:#0f1830; --line:#2a3555; --ink:#e6ebff; --muted:#98a3c7;
-  --primary:#6f82ff; --danger:#ef4444;
-  --radius:16px; --shadow:0 10px 30px rgba(16,24,40,.25);
-}
-*{box-sizing:border-box}
-html,body{height:100%}
-body{
-  margin:0; color:var(--ink);
-  font-family:'Noto Sans TC',system-ui,-apple-system,Segoe UI,sans-serif;
-  background:
-    linear-gradient(180deg, rgba(11,18,36,.25), rgba(16,25,54,.55)),
-    url('https://shierusha.github.io/school-battle/teachers/img/8.webp') center top / cover no-repeat fixed;
-}
+    :root{
+      --panel:#0f1830; --line:#2a3555; --ink:#e6ebff; --muted:#98a3c7;
+      --primary:#6f82ff; --danger:#ef4444;
+      --radius:16px; --shadow:0 10px 30px rgba(16,24,40,.25);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; color:var(--ink);
+      font-family:'Noto Sans TC',system-ui,-apple-system,Segoe UI,sans-serif;
+      background:
+        linear-gradient(180deg, rgba(11,18,36,.25), rgba(16,25,54,.55)),
+        url('https://shierusha.github.io/school-battle/teachers/img/8.webp') center top / cover no-repeat fixed;
+    }
 
-/* App Bar */
-.appbar{
-  position:sticky; top:0; z-index:20;
-  display:flex; justify-content:space-between; align-items:center;
-  padding:10px 14px; background:rgba(15,27,51,.7);
-  backdrop-filter:saturate(1.1) blur(6px);
-  border-bottom:1px solid rgba(34,48,87,.7);
-}
-.brand{display:flex;gap:.6rem;align-items:center;font-weight:700}
-.brand .dot{width:10px;height:10px;border-radius:999px;background:linear-gradient(135deg,#5aa7ff,#6ee7b7)}
-.appbar .tools{display:flex;gap:8px;align-items:center}
+    /* App Bar */
+    .appbar{
+      position:sticky; top:0; z-index:20;
+      display:flex; justify-content:space-between; align-items:center;
+      padding:10px 14px; background:rgba(15,27,51,.7);
+      backdrop-filter:saturate(1.1) blur(6px);
+      border-bottom:1px solid rgba(34,48,87,.7);
+    }
+    .brand{display:flex;gap:.6rem;align-items:center;font-weight:700}
+    .brand .dot{width:10px;height:10px;border-radius:999px;background:linear-gradient(135deg,#5aa7ff,#6ee7b7)}
+    .appbar .tools{display:flex;gap:8px;align-items:center}
 
-/* Buttons */
-.btn{border:1px solid #3a4a78;background:#16244a;color:#fff;padding:.55rem .9rem;border-radius:12px;cursor:pointer}
-.btn:hover{filter:brightness(1.08)}
-.btn:active{transform:translateY(1px)}
-.btn.primary{background:var(--primary);border-color:var(--primary)}
-.btn.ghost{background:#ffffff13;border-color:#ffffff33}
-.btn.danger{background:#2a0f18;border-color:#6b1b2e;color:#ffb3c2}
+    /* Buttons */
+    .btn{border:1px solid #3a4a78;background:#16244a;color:#fff;padding:.55rem .9rem;border-radius:12px;cursor:pointer}
+    .btn:hover{filter:brightness(1.08)}
+    .btn:active{transform:translateY(1px)}
+    .btn.primary{background:var(--primary);border-color:var(--primary)}
+    .btn.ghost{background:#ffffff13;border-color:#ffffff33}
+    .btn.danger{background:#2a0f18;border-color:#6b1b2e;color:#ffb3c2}
 
-/* Layout */
-.view{display:none;min-height:calc(100vh - 56px)}
-.view.active{display:block}
-.wrap{padding:18px}
+    /* Layout */
+    .view{display:none;min-height:calc(100vh - 56px)}
+    .view.active{display:block}
+    .wrap{padding:18px}
 
-/* Grid + Card */
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
-.card{
-  position:relative;background:var(--panel);border:1px solid var(--line);
-  border-radius:14px;padding:14px;box-shadow:var(--shadow);overflow:hidden;
-}
-.card h3{
-  margin:.1rem 0 .4rem 0; white-space:pre-line; min-height:2.8em; line-height:1.4; font-weight:700;
-}
-.card .muted{color:var(--muted);font-size:.9rem}
+    /* Grid + Card */
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+    .card{
+      position:relative;background:var(--panel);border:1px solid var(--line);
+      border-radius:14px;padding:14px;box-shadow:var(--shadow);overflow:hidden;
+    }
+    .card h3{
+      margin:.1rem 0 .4rem 0; white-space:pre-line; min-height:2.8em; line-height:1.4; font-weight:700;
+    }
+    .card .muted{color:var(--muted);font-size:.9rem}
 
-/* 右上縮圖 */
-.card .corner-tools { position:absolute; top:5%; right:0; display:flex; flex-direction:column; align-items:center; gap:6px; padding:5px; border-radius:10px; }
-.corner-tools img{ width:38px; height:38px; object-fit:contain; filter:drop-shadow(0 1px 3px rgba(0,0,0,.35)); pointer-events:none; }
+    /* 右上縮圖 */
+    .card .corner-tools { position:absolute; top:5%; right:0; display:flex; flex-direction:column; align-items:center; gap:6px; padding:5px; border-radius:10px; }
+    .corner-tools img{ width:38px; height:38px; object-fit:contain; filter:drop-shadow(0 1px 3px rgba(0,0,0,.35)); pointer-events:none; }
 
-/* 主操作 */
-.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+    /* 主操作 */
+    .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 
-/* 排序箭頭 */
-.sort-btn{
-  position:absolute; z-index:2; width:34px; height:34px; display:grid; place-items:center;
-  background:rgba(15,27,51,.85); border:1px solid #31406b; color:#e6ebff;
-  border-radius:10px; cursor:pointer; opacity:0; pointer-events:none; transition:opacity .12s ease;
-}
-.sort-btn.prev{ top:3px; left:3px }
-.sort-btn.next{ bottom:8px; right:8px }
-.card.near-left  .sort-btn.prev,
-.card.near-right .sort-btn.next{ opacity:1; pointer-events:auto }
+    /* 排序箭頭 */
+    .sort-btn{
+      position:absolute; z-index:2; width:34px; height:34px; display:grid; place-items:center;
+      background:rgba(15,27,51,.85); border:1px solid #31406b; color:#e6ebff;
+      border-radius:10px; cursor:pointer; opacity:0; pointer-events:none; transition:opacity .12s ease;
+    }
+    .sort-btn.prev{ top:3px; left:3px }
+    .sort-btn.next{ bottom:8px; right:8px }
+    .card.near-left  .sort-btn.prev,
+    .card.near-right .sort-btn.next{ opacity:1; pointer-events:auto }
 
-/* Dialog */
-dialog{border:none;border-radius:16px;background:#101a34;color:#fff;padding:0;min-width:min(500px,92vw)}
-dialog::backdrop{background:#0008}
-.modal-head{padding:14px 16px;border-bottom:1px solid #223057;font-weight:700}
-.modal-body{padding:10px}
-.modal-foot{padding:12px 16px;border-top:1px solid #223057;display:flex;gap:10px;justify-content:flex-end}
-.form-row{display:flex;gap:10px;align-items:center;margin:10px 0}
-.form-row label{min-width:60px;color:#c8d3ff}
-.form-row input,.form-row select{flex:1;padding:.4rem;border-radius:12px;border:1px solid #31406b;background:#0f1b33;color:#fff}
+    /* Dialog */
+    dialog{border:none;border-radius:16px;background:#101a34;color:#fff;padding:0;min-width:min(500px,92vw)}
+    dialog::backdrop{background:#0008}
+    .modal-head{padding:14px 16px;border-bottom:1px solid #223057;font-weight:700}
+    .modal-body{padding:10px}
+    .modal-foot{padding:12px 16px;border-top:1px solid #223057;display:flex;gap:10px;justify-content:flex-end}
+    .form-row{display:flex;gap:10px;align-items:center;margin:10px 0}
+    .form-row label{min-width:60px;color:#c8d3ff}
+    .form-row input,.form-row select{flex:1;padding:.4rem;border-radius:12px;border:1px solid #31406b;background:#0f1b33;color:#fff}
 
-/* 書名小筆按鈕 */
-.card .title-wrap { position: relative; display: inline-block; }
-.card .title-edit {
-  position:absolute; top:20%; right:-15%; width:26px; height:23px; display:grid; place-items:center;
-  background:rgba(15,27,51,.9); color:#e6ebff; border:1px solid #31406b; border-radius:8px;
-  font-size:.9rem; cursor:pointer; opacity:0; pointer-events:none; transition:opacity .12s ease;
-}
-.card .title-wrap:hover .title-edit { opacity:1; pointer-events:auto; }
+    /* 書名小筆按鈕 */
+    .card .title-wrap { position: relative; display: inline-block; }
+    .card .title-edit {
+      position:absolute; top:20%; right:-15%; width:26px; height:23px; display:grid; place-items:center;
+      background:rgba(15,27,51,.9); color:#e6ebff; border:1px solid #31406b; border-radius:8px;
+      font-size:.9rem; cursor:pointer; opacity:0; pointer-events:none; transition:opacity .12s ease;
+    }
+    .card .title-wrap:hover .title-edit { opacity:1; pointer-events:auto; }
 
-/* 書皮顏色窗 */
-#dlgFilter .filter-grid{ display:grid; grid-template-columns:1fr 280px; gap:16px; align-items:start; min-width:min(700px,92vw); }
-#dlgFilter .filter-inputs .form-row label{min-width:60px}
-#dlgFilter .filter-preview .preview-card{ background:#0f1b33; border:1px solid #31406b; border-radius:12px; padding:12px; display:grid; place-items:center; }
-#dlgFilter .filter-preview img{ width:160px; height:160px; object-fit:contain; filter: sepia(0.2) saturate(600%) hue-rotate(332deg) brightness(100%); }
-@media (max-width:780px){ #dlgFilter .filter-grid{ grid-template-columns:1fr; } }
+    /* 書皮顏色窗 */
+    #dlgFilter .filter-grid{ display:grid; grid-template-columns:1fr 280px; gap:16px; align-items:start; min-width:min(700px,92vw); }
+    #dlgFilter .filter-inputs .form-row label{min-width:60px}
+    #dlgFilter .filter-preview .preview-card{ background:#0f1b33; border:1px solid #31406b; border-radius:12px; padding:12px; display:grid; place-items:center; }
+    #dlgFilter .filter-preview img{ width:160px; height:160px; object-fit:contain; filter: sepia(0.2) saturate(600%) hue-rotate(332deg) brightness(100%); }
+    @media (max-width:780px){ #dlgFilter .filter-grid{ grid-template-columns:1fr; } }
 
-/* 色相滑桿 */
-.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-#dlgFilter .form-row.compact{align-items:center}
-#dlgFilter #f_hue_range{ width:100%; accent-color:var(--primary); height:20px; margin-top:2px; }
-#dlgFilter .range-scale{ display:flex; justify-content:space-between; font-size:.8rem; color:var(--muted); margin-top:2px; }
-
-
-    
+    /* 色相滑桿 */
+    .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+    #dlgFilter .form-row.compact{align-items:center}
+    #dlgFilter #f_hue_range{ width:100%; accent-color:var(--primary); height:20px; margin-top:2px; }
+    #dlgFilter .range-scale{ display:flex; justify-content:space-between; font-size:.8rem; color:var(--muted); margin-top:2px; }
   </style>
 </head>
 
-
+<body>
 <!-- 頂端導覽 -->
 <div class="appbar">
   <div class="brand"><span class="dot"></span><span id="topTitle">謝爾夏｜書籍一覽</span></div>
@@ -178,7 +178,7 @@ dialog::backdrop{background:#0008}
   </div>
 </dialog>
 
-<!-- 書皮顏色（cover_color 直接存完整 CSS：filter: ...;） -->
+<!-- 書皮顏色 -->
 <dialog id="dlgFilter">
   <div class="modal-head">修改書皮顏色</div>
   <form method="dialog" class="modal-body" id="formFilter">
@@ -188,32 +188,31 @@ dialog::backdrop{background:#0008}
           <label>彩度</label>
           <input id="f_sat" type="number" inputmode="numeric" min="0"  step="1" value="600" required>
         </div>
-<!-- 彩度滑桿（0–2000） -->
-<div class="form-row compact">
-  <label class="sr-only">彩度滑桿</label>
-  <input id="f_sat_range" type="range" min="10" max="1000" step="1" value="600">
-</div>
+        <!-- 彩度滑桿（10–1000） -->
+        <div class="form-row compact">
+          <label class="sr-only">彩度滑桿</label>
+          <input id="f_sat_range" type="range" min="10" max="1000" step="1" value="600">
+        </div>
 
         <div class="form-row">
           <label>色相</label>
           <input id="f_hue" type="number" inputmode="numeric" min="1" max="360" step="1" value="332" required>
         </div>
-        <!-- 色相滑桿（0–360） -->
+        <!-- 色相滑桿（1–360） -->
         <div class="form-row compact">
           <label class="sr-only">色相滑桿</label>
           <input id="f_hue_range" type="range" min="1" max="360" step="1" value="332">
         </div>
+
         <div class="form-row">
           <label>亮度</label>
           <input id="f_bri" type="number" inputmode="numeric" min="55" max="200" step="1" value="100" required>
         </div>
-
-<!-- 亮度滑桿（55–200） -->
-<div class="form-row compact">
-  <label class="sr-only">亮度滑桿</label>
-  <input id="f_bri_range" type="range" min="55" max="200" step="1" value="100">
-</div>
-
+        <!-- 亮度滑桿（55–200） -->
+        <div class="form-row compact">
+          <label class="sr-only">亮度滑桿</label>
+          <input id="f_bri_range" type="range" min="55" max="200" step="1" value="100">
+        </div>
       </div>
 
       <div class="filter-preview">
@@ -232,31 +231,21 @@ dialog::backdrop{background:#0008}
   </div>
 </dialog>
 
-  
+<script>
+/* ========= 0) Supabase 設定 =========
+   你會透過「另一頁」拿到 B 的長簽 JWT，導回此頁時建議帶上 ?token=...。
+   也支援先把 token 存進 localStorage('xer_b_jwt')。
+*/
+const SUPABASE_URL = "https://ogzpfrkwnqqaitytncla.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nenBmcmt3bnFxYWl0eXRuY2xhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxODQzNzEsImV4cCI6MjA3MDc2MDM3MX0.Ls83xOXcKIW7FUcavr8_sOs37I18VGFWYNW3sNFRS24";
 
-  <!-- Supabase -->
-  <script>
-    const SUPABASE_URL = "https://ogzpfrkwnqqaitytncla.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nenBmcmt3bnFxYWl0eXRuY2xhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxODQzNzEsImV4cCI6MjA3MDc2MDM3MX0.Ls83xOXcKIW7FUcavr8_sOs37I18VGFWYNW3sNFRS24";
-
-
-
-
-    (()=>{
-/* ========= 0) 基本設定 ========= */
-// 開啟書：每次先跳通知，再同頁導向
-const BOOK_URL = id => `/editor.html?book=${encodeURIComponent(id)}`;
-function openBook(id){
-  window.location.href = BOOK_URL(id);
-}
-
-// DOM helpers
+/* ========= 工具 ========= */
 const $  = (s,r=document)=>r.querySelector(s);
 const $$ = (s,r=document)=>[...r.querySelectorAll(s)];
-const uid=()=>Math.random().toString(36).slice(2,10);
 const escapeHtml=s=>(s||'').replace(/[&<>"']/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmtDate=ts=> new Date(ts).toLocaleDateString();
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
+const uid=()=>Math.random().toString(36).slice(2,10); // 只用在前端 UI
 
 /* 書名排版：最多20字，10字自動換行 */
 const formatTitle=(t)=>{
@@ -265,8 +254,9 @@ const formatTitle=(t)=>{
   return t;
 };
 
-/* ========= 1) 濾鏡工具 —— cover_color 直接存完整 CSS（filter: ...;） ========= */
+/* 書皮濾鏡工具（DB 直接存整段 CSS：`filter: ...;`） */
 const FILTER_DEFAULT = { sat:600, hue:332, bri:100 };
+const DEFAULT_COVER_IMG = 'https://shierusha.github.io/school-battle/images/book.png';
 const cssPropToFilterValue = (css) => (css||'').replace(/^\s*filter\s*:\s*/,'').replace(/\s*;?\s*$/,'');
 const toFilterValue = ({sat,hue,bri}) => `sepia(0.2) saturate(${sat}%) hue-rotate(${hue}deg) brightness(${bri}%)`;
 const toFilterCssProp = (vals) => `filter: ${toFilterValue(vals)};`;
@@ -280,64 +270,121 @@ const parseFilterVals = (css) => {
   };
 };
 
-/* ========= 2) LocalStorage Store（純前端，不用資料庫） ========= */
-const LIB_KEY='xer_book_library_ok', BOOK_PREFIX='xer_book_';
-const LocalStore = {
-  async list(){ try{ return JSON.parse(localStorage.getItem(LIB_KEY))||[] }catch{ return [] } },
-  saveList(list){ localStorage.setItem(LIB_KEY, JSON.stringify(list)) },
-  async get(id){ try{ return JSON.parse(localStorage.getItem(BOOK_PREFIX+id))||null }catch{ return null } },
+/* 取得長簽 JWT（?token=... 或 localStorage） */
+function getBearerFromUrlOrStorage(){
+  const url = new URL(location.href);
+  const t = url.searchParams.get('token') || localStorage.getItem('xer_b_jwt') || '';
+  if (url.searchParams.get('token')) {
+    localStorage.setItem('xer_b_jwt', url.searchParams.get('token'));
+    // 清掉網址上的 token
+    url.searchParams.delete('token');
+    history.replaceState(null, '', url.toString());
+  }
+  return t;
+}
+/* 解析 JWT，拿到 sub = 使用者 id */
+function decodeJwt(token){
+  try{
+    const [h,p] = token.split('.').slice(0,2);
+    const pad = s => s + '='.repeat((4 - s.length % 4) % 4);
+    const base64 = pad(p).replace(/-/g,'+').replace(/_/g,'/');
+    const json = atob(base64);
+    return JSON.parse(json);
+  }catch(e){ return null; }
+}
+
+/* ========= 1) Supabase Client（用你的長簽 JWT） ========= */
+let SB = null;
+let USER_ID = null;
+function createSBClient(bearer){
+  if(!bearer) return null;
+  const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    global: { headers: { Authorization: `Bearer ${bearer}` } }
+  });
+  return client;
+}
+
+/* ========= 2) 書庫 Store（全部改 DB 版） ========= */
+const Store = {
+  async list(){
+    const { data, error } = await SB
+      .from('books')
+      .select('id,title,cover_color,cover_image,page_count,sort_order,updated_at')
+      .order('sort_order', { ascending: true })
+      .order('updated_at', { ascending: false });
+    if(error) throw error;
+    return (data||[]).map(m => ({
+      id: m.id,
+      title: m.title,
+      updatedAt: new Date(m.updated_at).getTime(),
+      coverColor: m.cover_color || toFilterCssProp(FILTER_DEFAULT),
+      coverImage: m.cover_image || DEFAULT_COVER_IMG,
+      page_count: m.page_count ?? 0,
+      sort_order: m.sort_order ?? 1,
+    }));
+  },
+  async get(id){
+    const { data, error } = await SB.from('books')
+      .select('id,title,binding,direction,cover_color,cover_image,page_count,sort_order,updated_at')
+      .eq('id', id)
+      .single();
+    if(error) return null;
+    return data;
+  },
   async create(meta){
-    const book={
-      id:uid(),
-      title:meta.title||'未命名書籍',
-      binding:meta.binding||'short',
-      direction:meta.direction||'ltr',
-      viewMode:meta.view||'single',
+    // 取目前最大 sort_order，新的放最後
+    const { data:maxRow } = await SB.from('books').select('sort_order').order('sort_order', { ascending: false }).limit(1).maybeSingle();
+    const nextOrder = ((maxRow && maxRow.sort_order) || 0) + 1;
+
+    const draft = {
+      owner_id: USER_ID,
+      title: meta.title || '未命名書籍',
+      binding: meta.binding || 'short',
+      direction: meta.direction || 'ltr',
       cover_color: toFilterCssProp(FILTER_DEFAULT),
-      cover_image:'https://shierusha.github.io/school-battle/images/book.png',
-      page_count:0, sort_order:1,
-      updated_at:new Date().toISOString(), created_at:new Date().toISOString()
+      cover_image: DEFAULT_COVER_IMG,
+      page_count: 0,
+      sort_order: nextOrder
+      // created_at/updated_at 由 DB 預設
     };
-    localStorage.setItem(BOOK_PREFIX+book.id, JSON.stringify(book));
-    const list=await this.list();
-    list.unshift({
-      id:book.id, title:book.title, updatedAt:Date.now(),
-      coverColor:book.cover_color, coverImage:book.cover_image,
-      page_count:book.page_count, sort_order:book.sort_order
-    });
-    this.saveList(list);
-    return book;
+    const { data, error } = await SB.from('books').insert(draft).select().single();
+    if(error) throw error;
+    return data;
   },
   async update(id, patch){
-    const b=await this.get(id); if(!b) return null;
-    Object.assign(b, patch, { updated_at:new Date().toISOString() });
-    localStorage.setItem(BOOK_PREFIX+id, JSON.stringify(b));
-    const list=await this.list(); const i=list.findIndex(x=>x.id===id);
-    if(i>-1){
-      list[i].title      = b.title;
-      list[i].updatedAt  = Date.now();
-      list[i].coverColor = b.cover_color;  // ★ 讓列表渲染用的新值
-      list[i].coverImage = b.cover_image;
-      list[i].page_count = b.page_count;
-      list[i].sort_order = b.sort_order;
-      this.saveList(list);
-    }
-    return b;
+    const allowed = {};
+    if('title' in patch)       allowed.title = patch.title;
+    if('binding' in patch)     allowed.binding = patch.binding;
+    if('direction' in patch)   allowed.direction = patch.direction;
+    if('cover_color' in patch) allowed.cover_color = patch.cover_color;
+    if('cover_image' in patch) allowed.cover_image = patch.cover_image;
+    if('page_count' in patch)  allowed.page_count = patch.page_count;
+    if('sort_order' in patch)  allowed.sort_order = patch.sort_order;
+
+    const { data, error } = await SB.from('books').update(allowed).eq('id', id).select().single();
+    if(error) throw error;
+    return data;
   },
   async delete(id){
-    localStorage.removeItem(BOOK_PREFIX+id);
-    this.saveList((await this.list()).filter(x=>x.id!==id));
+    const { error } = await SB.from('books').delete().eq('id', id);
+    if(error) throw error;
   },
-  async move(id,newIndex){
-    const list=await this.list(); const i=list.findIndex(x=>x.id===id); if(i<0) return;
-    const [item]=list.splice(i,1); const j=clamp(newIndex,0,list.length);
-    list.splice(j,0,item);
-    this.saveList(list);
+  async move(id, newIndex){
+    // 重新抓排序、搬移、整批 upsert sort_order
+    const list = await this.list();
+    const from = list.findIndex(x => x.id === id);
+    if(from < 0) return;
+    const to = clamp(newIndex, 0, list.length - 1);
+    const arr = [...list];
+    const [item] = arr.splice(from, 1);
+    arr.splice(to, 0, item);
+
+    const updates = arr.map((b, i) => ({ id: b.id, sort_order: i + 1 }));
+    const { error } = await SB.from('books').upsert(updates, { onConflict: 'id' });
+    if(error) throw error;
   }
 };
-
-// 這版固定使用 LocalStorage
-const Store = LocalStore;
 
 /* ========= 3) UI 渲染 ========= */
 const libGrid   = $('#libGrid');
@@ -362,7 +409,7 @@ function renderCardList(list){
 
       <div class="corner-tools">
         <img alt="cover"
-             src="${escapeHtml(m.coverImage || 'https://shierusha.github.io/school-battle/images/book.png')}"
+             src="${escapeHtml(m.coverImage || DEFAULT_COVER_IMG)}"
              style="filter:${cssPropToFilterValue(m.coverColor)}">
       </div>
 
@@ -386,19 +433,31 @@ function renderCardList(list){
     const img = card.querySelector('.corner-tools img');
     const editBtn = card.querySelector('.title-edit');
 
-    // 開啟 → 跳通知 + 導向
-    card.querySelector('[data-act="open"]').onclick = ()=> openBook(id);
+    // 開啟 → 導向編輯器（保持你的原本 URL 規則）
+    card.querySelector('[data-act="open"]').onclick = ()=> {
+      const url = `/editor.html?book=${encodeURIComponent(id)}`;
+      window.location.href = url;
+    };
 
     // 刪除
     card.querySelector('[data-act="del"]').onclick  = async ()=>{
-      if(confirm('確定刪除此書？')){ await Store.delete(id); await renderLibrary(); }
+      if(confirm('確定刪除此書？')){
+        try { await Store.delete(id); await renderLibrary(); }
+        catch(e){ alert('刪除失敗：' + (e?.message||e)); }
+      }
     };
 
     // 排序箭頭
-    card.querySelector('.sort-btn.prev').onclick = async ()=>{ await Store.move(id, cardIndex-1); await renderLibrary(); };
-    card.querySelector('.sort-btn.next').onclick = async ()=>{ await Store.move(id, cardIndex+1); await renderLibrary(); };
+    card.querySelector('.sort-btn.prev').onclick = async ()=>{
+      try{ await Store.move(id, cardIndex - 1); await renderLibrary(); }
+      catch(e){ alert('排序失敗：' + (e?.message||e)); }
+    };
+    card.querySelector('.sort-btn.next').onclick = async ()=>{
+      try{ await Store.move(id, cardIndex + 1); await renderLibrary(); }
+      catch(e){ alert('排序失敗：' + (e?.message||e)); }
+    };
 
-    // 邊界感應：靠近左右邊界顯示箭頭
+    // 邊界感應
     card.addEventListener('mousemove', (e)=>{
       const r=card.getBoundingClientRect(); const x=e.clientX-r.left; const edge=Math.max(24,r.width*0.12);
       card.classList.toggle('near-left',  x<edge);
@@ -432,14 +491,10 @@ function renderCardList(list){
       $('#f_hue').value = vals.hue;
       $('#f_bri').value = vals.bri;
       const hueRange = $('#f_hue_range'); if (hueRange) hueRange.value = vals.hue;
-      // ★ 新增：亮度滑桿初值（限制在 55–200 區間）
       const briRange = $('#f_bri_range'); if (briRange) briRange.value = Math.max(55, Math.min(200, vals.bri));
-      
       const satRange = $('#f_sat_range'); if (satRange) satRange.value = Math.max(10, Math.min(1000, vals.sat));
 
-      
-      
-      $('#filterPreviewImg').src = b?.cover_image || 'https://shierusha.github.io/school-battle/images/book.png';
+      $('#filterPreviewImg').src = b?.cover_image || DEFAULT_COVER_IMG;
       $('#filterPreviewImg').style.filter = toFilterValue(vals);
       window.__FILTER_TARGET__ = { id, imgEl: img };
       $('#dlgFilter').showModal();
@@ -448,8 +503,12 @@ function renderCardList(list){
 }
 
 async function renderLibrary(){
-  const list = await Store.list();
-  renderCardList(list);
+  try{
+    const list = await Store.list();
+    renderCardList(list);
+  }catch(e){
+    libGrid.innerHTML = `<div class="card"><h3>載入失敗</h3><div class="muted">${escapeHtml(e?.message||String(e))}</div></div>`;
+  }
 }
 
 /* ========= 4) 新增 & 改名 ========= */
@@ -459,96 +518,82 @@ $('#btnCreate').addEventListener('click', async ()=>{
     title:    $('#f_title').value.trim() || '未命名書籍',
     binding:  $('#f_binding').value,
     direction:$('#f_direction').value,
-    view:     $('#f_view').value
+    view:     $('#f_view').value   // 目前未存 DB，保留欄位以後擴充
   };
-  const book = await Store.create(meta);
-  if(book){ $('#dlgNew').close(); await renderLibrary(); }
+  try{
+    const book = await Store.create(meta);
+    if(book){ $('#dlgNew').close(); await renderLibrary(); }
+  }catch(e){
+    alert('建立失敗：' + (e?.message||e));
+  }
 });
 
 $('#btnRenameSave').addEventListener('click', async ()=>{
-  let t = (renameInp.value||'').replace(/\n/g,'').trim(); if(!t) t='未命名'; if(t.length>20) t=t.slice(0,20);
-  if(renameTargetId){ await Store.update(renameTargetId, { title:t }); }
+  let t = (renameInp.value||'').replace(/\n/g,'').trim();
+  if(!t) t='未命名';
+  if(t.length>20) t=t.slice(0,20);
+  if(renameTargetId){
+    try { await Store.update(renameTargetId, { title:t }); }
+    catch(e){ alert('更名失敗：' + (e?.message||e)); }
+  }
   $('#dlgRename').close();
   renameTargetId=null; await renderLibrary();
 });
 
-/* ========= 5) 顏色小窗：即時預覽 + 套用（修好！） ========= */
+/* ========= 5) 顏色小窗：即時預覽 + 套用 ========= */
 const fSat = $('#f_sat'), fHue = $('#f_hue'), fBri = $('#f_bri');
 const pvImg = $('#filterPreviewImg');
 const hueRangeGlobal = $('#f_hue_range');
-// ★ 新增：亮度滑桿節點
 const briRangeGlobal = $('#f_bri_range');
-// ★ 新增：彩度滑桿節點
 const satRangeGlobal = $('#f_sat_range');
-
 
 function clampNum(v,min,max){ const n = parseInt(String(v||'').replace(/[^\d]/g,''),10); return isNaN(n)?min: Math.max(min, Math.min(max, n)); }
 function getVals(){ return { sat:clampNum(fSat.value,0,2000), hue:clampNum(fHue.value,0,360), bri:clampNum(fBri.value,0,300) }; }
 function updatePreview(){ if(pvImg) pvImg.style.filter = toFilterValue(getVals()); }
 
-// 數字輸入：只允許數字、同步滑桿（for 色相）、即時預覽
-  [fSat, fHue, fBri].forEach(inp => {
+// 數字輸入同步滑桿 + 預覽
+[fSat, fHue, fBri].forEach(inp => {
   inp.addEventListener('input', () => {
     inp.value = inp.value.replace(/[^\d]/g, '');
 
     if (inp === fHue && hueRangeGlobal) {
-      const v = Math.max(0, Math.min(360, parseInt(fHue.value || '0', 10) || 0));
+      const v = Math.max(1, Math.min(360, parseInt(fHue.value || '1', 10) || 1));
       hueRangeGlobal.value = String(v);
     }
-    // ★ 新增：彩度數字 → 滑桿（10–1000）
     if (inp === fSat && satRangeGlobal) {
-      const n = parseInt(fSat.value || '0', 10) || 0;
+      const n = parseInt(fSat.value || '10', 10) || 10;
       const v = Math.max(10, Math.min(1000, n));
       satRangeGlobal.value = String(v);
     }
-    // 既有：亮度數字 → 滑桿（55–200）
     if (inp === fBri && briRangeGlobal) {
-      const n = parseInt(fBri.value || '0', 10) || 0;
+      const n = parseInt(fBri.value || '55', 10) || 55;
       const v = Math.max(55, Math.min(200, n));
       briRangeGlobal.value = String(v);
     }
-
     updatePreview();
   });
 });
 
+// 滑桿 → 數字 + 預覽
+if (hueRangeGlobal) hueRangeGlobal.addEventListener('input', ()=>{ fHue.value = hueRangeGlobal.value; updatePreview(); });
+if (briRangeGlobal) briRangeGlobal.addEventListener('input', ()=>{ fBri.value = briRangeGlobal.value; updatePreview(); });
+if (satRangeGlobal) satRangeGlobal.addEventListener('input', ()=>{ fSat.value = satRangeGlobal.value; updatePreview(); });
 
-// 色相滑桿：拖動時同步數字欄位 + 預覽
-if (hueRangeGlobal) {
-  hueRangeGlobal.addEventListener('input', ()=>{
-    fHue.value = hueRangeGlobal.value;
-    updatePreview();
-  });
-}
-
-// ★ 新增：亮度滑桿 → 數字 + 預覽
-if (briRangeGlobal) {
-  briRangeGlobal.addEventListener('input', ()=>{
-    fBri.value = briRangeGlobal.value;
-    updatePreview();
-  });
-}
-  
-  // ★ 新增：彩度滑桿
-if (satRangeGlobal) {
-  satRangeGlobal.addEventListener('input', () => {
-    fSat.value = satRangeGlobal.value;
-    updatePreview();
-  });
-}
-  
-
-// ★★★ 關鍵：套用（寫回 LocalStorage + 即時更新卡片 + 關窗） ★★★
+// 套用 → DB
 $('#btnFilterSave').addEventListener('click', async ()=>{
   const tgt = window.__FILTER_TARGET__;
   if(!tgt?.id){ $('#dlgFilter').close(); return; }
   const vals    = getVals();
-  const cssProp = toFilterCssProp(vals);       // "filter: sepia(...) ..."
-  try{ tgt.imgEl.style.filter = toFilterValue(vals); }catch{}
-  await Store.update(tgt.id, { cover_color: cssProp });
+  const cssProp = toFilterCssProp(vals);
+  try{
+    tgt.imgEl.style.filter = toFilterValue(vals); // 卡片先行預覽
+    await Store.update(tgt.id, { cover_color: cssProp });
+  }catch(e){
+    alert('套用失敗：' + (e?.message||e));
+  }
   $('#dlgFilter').close();
   window.__FILTER_TARGET__ = null;
-  await renderLibrary();                       // 保證列表用新值
+  await renderLibrary();
 });
 
 /* ========= 6) Dialog 關閉 + 啟動 ========= */
@@ -568,18 +613,29 @@ function showTipOnce() {
   const KEY = 'xer_book_tip_ok';
   if (sessionStorage.getItem(KEY)) return;
   sessionStorage.setItem(KEY, '1');
-  alert('小提示：\n• 書名右上 ✎ 可更改書名\n• 左上 ← / 右下 → 可排序\n• 「修改書皮顏色」按「套用」會即時更新\n• ');
+  alert('小提示：\n• 書名右上 ✎ 可更改書名\n• 左上 ← / 右下 → 可排序（會更新 sort_order）\n• 「修改書皮顏色」按「套用」會即時更新');
 }
 
 async function boot(){
+  const bearer = getBearerFromUrlOrStorage();
+  if(!bearer){
+    alert('尚未登入：請先從登入頁換到 B 的長簽 JWT，再用 ?token=... 帶進來或寫進 localStorage("xer_b_jwt")。');
+    return;
+  }
+  SB = createSBClient(bearer);
+  const payload = decodeJwt(bearer);
+  USER_ID = payload?.sub || null;
+
+  if(!USER_ID){
+    alert('無效的使用者憑證（缺少 sub）。請重新登入。');
+    return;
+  }
+
   await renderLibrary();
   bindDialogCloseButtons();
   showTipOnce();
 }
 boot();
-})();
-
-  </script>
-
+</script>
 </body>
 </html>
