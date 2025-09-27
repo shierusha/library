@@ -5,6 +5,7 @@
  * - 封面：書名同步、雙擊可輸入封面圖片網址（空值=移除）
  * - 版面縮放以面積推字級（--scale），不動你的 CSS
  * - ★ 修正：章節載入 + TOC 綁定 + BookFlip 游標同步 + 書名輸入不重置游標
+ * - ★ 重要：任何「重建/插頁/跳頁」都以『硬鎖當前 DB 頁』為準，不做四捨五入，不跳頁
  */
 
 (function(){
@@ -322,34 +323,47 @@
     }
   };
 
-  /* ===== 跳頁 ===== */
+  /* ===== ★ 核心：硬鎖到指定 DB 頁（不跳頁，不取整） ===== */
+  function lockToDbIndex(dbIndex){
+    if (!dbIndex || dbIndex < 1) dbIndex = 1;
+    const domIndex = dbIndex + 2;        // DB 1-based → DOM 1-based(含封面)
+    const domZero  = domIndex - 1;       // 0-based
+    if (book){
+      // 直接指定游標頁，再 mount 一次（不經任何換算）
+      book._cursorPage = domZero;
+      if (typeof book._mountCurrent === 'function') book._mountCurrent();
+    }
+    // 同步樣式區塊用的最後互動頁
+    if (window.EditorCore && typeof EditorCore.setLastDbIndex === 'function'){
+      EditorCore.setLastDbIndex(dbIndex);
+    }
+    lightRedraw();
+  }
+
+  /* ===== 跳頁（公開 API） ===== */
   window.gotoPageDomByDbIndex = function gotoPageDomByDbIndex(dbIndex){
-    const domIndex = dbIndex + 2; // 封面佔 1、2
-    gotoDomPage(domIndex);
+    lockToDbIndex(dbIndex);
   };
   window.gotoDomPage = function gotoDomPage(domIndex){
     const isSpread = state.mode === 'spread';
     const totalDom = isSpread
       ? elBook.querySelectorAll('.paper').length * 2
       : elBook.querySelectorAll('.single-page').length;
-
     const clamped = Math.max(1, Math.min(totalDom, domIndex|0));
-    if (book){
-      book._cursorPage = clamped - 1;
-      if (typeof book._mountCurrent === 'function') book._mountCurrent();
-    }
-    // 同步最後互動頁（讓樣式按鈕打在當前頁）
-    if (window.EditorCore && typeof EditorCore.setLastDbIndex === 'function'){
-      const dom = (book?._cursorPage || 0) + 1;
-      const db  = EditorCore.domIndexToDbIndex(dom) || 1;
-      EditorCore.setLastDbIndex(db);
-    }
-    lightRedraw();
+    const dbIndex = Math.max(1, clamped - 2);
+    lockToDbIndex(dbIndex);
   };
 
-  /* ===== 重建（動到頁數時） ===== */
+  /* ===== 重建（動到頁數時） =====
+   * 關鍵：new BookFlip 後，立刻把 _cursorPage 設成「我要的 DOM 索引」，再做一次同步
+   * 這樣第一次 rebuild 也不會被 spread pair 取整導致往前一頁。
+   */
   window.rebuildTo = function rebuildTo(targetDbIndex){
     try{
+      if (!targetDbIndex || targetDbIndex < 1) targetDbIndex = 1;
+      const targetDomIdx = targetDbIndex + 2; // DOM 1-based(含封面)
+      const targetZero   = targetDomIdx - 1;  // 0-based
+
       const pairs = buildPairsFromPages();
       window.book = new BookFlip('#bookCanvas', {
         mode: state.mode,
@@ -358,12 +372,14 @@
         singleSpeed: 300,
         perspective: 2000,
         data: { pairs },
-startPageIndex: Math.max(0, (targetDbIndex + 2) - 1),
-
+        startPageIndex: targetZero,     // 先給正確的 0-based 起點
         coverPapers: 1
       });
 
-      // ★ BookFlip 游標同步：確保 getFocusedDbIndex 的 fallback 正確
+      // 立刻以「我要的 side」覆寫游標（避免第一次被 round）
+      book._cursorPage = targetZero;
+
+      // 之後若 controller 更新，依照「當前 side」回推 _cursorPage（不變側別）
       function totalDomPages(){
         const isSpread = (book?.opts?.mode || state.mode) === 'spread';
         return isSpread
@@ -375,28 +391,20 @@ startPageIndex: Math.max(0, (targetDbIndex + 2) - 1),
         const mode = book.opts?.mode || 'spread';
         const total = Math.max(1, totalDomPages());
         const ctrl  = book._controller;
+        const keepSide = (book?._cursorPage || 0) % 2; // 0=左/前, 1=右/後
         if (ctrl && Number.isFinite(ctrl.current)){
-         if (mode === 'spread') {
-  const coverOffset = (book?.opts?.coverPapers ? book.opts.coverPapers * 2 : 0);
-  const parity = ((book?._cursorPage ?? Math.max(0, (targetDbIndex + 2) - 1)) % 2);
-  book._cursorPage = Math.max(
-    0,
-    Math.min(total - 1, coverOffset + ctrl.current * 2 + parity)
-  );
-} else {
-  const coverOffset = (book?.opts?.coverPapers ? book.opts.coverPapers * 2 : 0);
-  book._cursorPage = Math.max(0, Math.min(total - 1, coverOffset + ctrl.current));
-}
-
+          if (mode === 'spread') {
+            // pair idx → dom page（保留 side，不跳）
+            book._cursorPage = Math.max(0, Math.min(total - 1, ctrl.current * 2 + keepSide));
+          } else {
+            book._cursorPage = Math.max(0, Math.min(total - 1, ctrl.current));
+          }
         } else {
           book._cursorPage = Math.max(0, Math.min(total - 1, book._cursorPage|0));
         }
       }
 
-      // 初次同步
-      syncCursorFromController();
-
-      // 包 next / prev / setMode / _mountCurrent
+      // 包 next / prev / setMode / _mountCurrent：每次掛完都回寫 _cursorPage（保留 side）
       if (typeof book.next === 'function'){
         const _next = book.next.bind(book);
         book.next = ()=>{ _next(); setTimeout(()=>{ syncCursorFromController(); }, 0); };
@@ -414,7 +422,7 @@ startPageIndex: Math.max(0, (targetDbIndex + 2) - 1),
         book._mountCurrent = function(){
           const r = _origMount();
           setTimeout(()=>{ 
-            syncCursorFromController(); 
+            syncCursorFromController();
             // 同步最後互動頁
             if (window.EditorCore && typeof EditorCore.setLastDbIndex === 'function'){
               const dom = (book?._cursorPage || 0) + 1;
@@ -427,8 +435,7 @@ startPageIndex: Math.max(0, (targetDbIndex + 2) - 1),
         };
       }
 
-      // 導到目標頁
-book._cursorPage = Math.max(0, (targetDbIndex + 2) - 1);
+      // 立即 mount 一次（已經先把 _cursorPage 設成我要的）
       if (typeof book._mountCurrent === 'function') book._mountCurrent();
 
       applyLayout(); lightRedraw();
@@ -661,17 +668,11 @@ book._cursorPage = Math.max(0, (targetDbIndex + 2) - 1);
     try {
       await initData();
 
-      const pairs = buildPairsFromPages();
-      window.book = new BookFlip('#bookCanvas', {
-        mode: state.mode,
-        direction: state.direction,
-        speed: 450,
-        singleSpeed: 300,
-        perspective: 2000,
-        data: { pairs },
-        startPageIndex: 0,
-        coverPapers: 1
-      });
+      // 以「目前聚焦頁」為起點硬鎖（確保第一次就不跳）
+      const focus = (window.EditorCore && typeof EditorCore.getFocusedDbIndex === 'function')
+        ? (EditorCore.getFocusedDbIndex() || 1)
+        : 1;
+      rebuildTo(focus);
 
       // 初次也包一層 mount 後重繪
       if (typeof book._mountCurrent === 'function'){
