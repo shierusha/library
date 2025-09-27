@@ -543,18 +543,31 @@ async function renderLibrary(){
 
 /* ========= 新增 & 改名 ========= */
 $('#btnNew').addEventListener('click',()=>{ $('#formNew').reset(); $('#dlgNew').showModal(); });
-$('#btnCreate').addEventListener('click', async ()=>{
+$('#btnCreate').addEventListener('click', async () => {
+  const titleEl     = document.querySelector('#f_title');
+  const bindingEl   = document.querySelector('#f_binding');
+  const directionEl = document.querySelector('#f_direction');
+
+  if (!titleEl || !bindingEl || !directionEl) {
+    console.error('[Create] missing fields', { titleEl, bindingEl, directionEl });
+    alert('表單未載入完整，請重新整理頁面再試一次（Ctrl+F5）。');
+    return;
+  }
+
   const meta = {
-    title:    $('#f_title').value.trim() || '未命名書籍',
-    binding:  $('#f_binding').value,
-    direction:$('#f_direction').value,
-    view:     $('#f_view').value
+    title:     (titleEl.value || '').trim() || '未命名書籍',
+    binding:   bindingEl.value || 'short',
+    direction: directionEl.value || 'ltr'
   };
-  try{
+
+  try {
     const book = await Store.create(meta);
-    if(book){ $('#dlgNew').close(); await renderLibrary(); }
-  }catch(e){
-    alert('建立失敗：' + (e?.message||e));
+    if (book) {
+      document.querySelector('#dlgNew').close();
+      await renderLibrary();
+    }
+  } catch (e) {
+    alert('建立失敗：' + (e?.message || e));
   }
 });
 
