@@ -2,21 +2,19 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="utf-8" />
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>謝爾夏|休息室</title>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
   <!-- Supabase JS v2 -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
- <style>
+  <style>
   :root{
     --room-bg: url("https://shierusha.github.io/library/img/ROOM.webp");
     --panel-bg: #ffffffec;
     --panel-stroke: rgba(0,0,0,.08);
     --text: #1f2937;
     --radius-2xl: 24px;
-    --control-h: 38px; /* 基本等高，會被 .modal-content2 .modal-header 內的 clamp 覆蓋 */
+    --control-h: 38px;
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; }
@@ -27,7 +25,6 @@
     background: #393c47;
   }
 
-  /* 中央房間容器 */
   .room-wrap{
     width: 90vw;
     max-width: 1600px;
@@ -42,7 +39,6 @@
     overflow: hidden;
   }
 
-  /* 書架上的書群組容器 */
   .book{
     position: absolute;
     left: 5.5%;
@@ -67,7 +63,6 @@
     cursor: pointer;
   }
 
-  /* ===== Modal（沿用你的視覺，調整排版） ===== */
   .modal-overlay {
     position: fixed;
     inset: 0;
@@ -77,168 +72,68 @@
     justify-content: center;
     animation: modal-fadein-bg 0.25s;
   }
-  @keyframes modal-fadein-bg {
-    from { background: rgba(0,0,0,0); }
-    to   { background: rgba(0,0,0,0.45); }
-  }
-  .modal-content {
-    background: rgb(13 27 77 / 82%);
-    border-radius: 18px;
-    border: 2px solid #1eb5e5;
-    box-shadow: 0 0 16px 2px #62f1fe88, 0 8px 32px #1eb5e5aa;
-    width: 500px; max-width: 93vw;
-    height: 340px; max-height: 80vh;
-    display: flex; flex-direction: column;
-    overflow: hidden;
-    animation: modal-pop 0.32s cubic-bezier(.42,1.4,.51,1.01);
-  }
+  @keyframes modal-fadein-bg { from{background:rgba(0,0,0,0)} to{background:rgba(0,0,0,0.45)} }
   .modal-content2 {
     background: rgb(255 255 255 / 69%);
     border-radius: 18px;
     border: 2px solid #1eb5e5;
     box-shadow: 0 0 16px 2px #62f1fe88, 0 8px 32px #1eb5e5aa;
-    width: 75vw;
-    max-width: 1200px;
-    min-height: 75vh;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
+    width: 75vw; max-width: 1200px; min-height: 75vh;
+    display: flex; flex-direction: column; overflow: hidden;
     animation: modal-pop 0.32s cubic-bezier(.42, 1.4, .51, 1.01);
   }
+  @keyframes modal-pop { from{opacity:0;transform:scale(0.92)} to{opacity:1;transform:scale(1)} }
 
-  @keyframes modal-pop {
-    from { opacity: 0; transform: scale(0.92); }
-    to   { opacity: 1; transform: scale(1); }
-  }
-
-  /* ===== Header：左右區塊、右側等高並靠右、分界線滿寬 ===== */
   .modal-header {
     background: none;
     padding: 15px 20px 0px 24px;
     font-size: 1.5em; font-weight: bold;
     letter-spacing: 1px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
   }
   .modal-header::after {
-    content: "";
-    display: block;
-    height: 5px;
-    width: 100%;
-    margin:.5rem 0 0;
-    border-radius: 2px;
-    background: linear-gradient(to right,#53e2ff99 65%,#53e2ff00 100%);
-    pointer-events: none;
-    flex-basis: 100%;
+    content: ""; display: block; height: 5px; width: 100%; margin:.5rem 0 0;
+    border-radius: 2px; background: linear-gradient(to right,#53e2ff99 65%,#53e2ff00 100%);
+    pointer-events: none; flex-basis: 100%;
   }
   .header-title{
-    flex: 1;
-    min-width: 0;
-    white-space: normal;
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
+    flex: 1; min-width: 0; white-space: normal;
+    display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
   }
-
-  .header-actions{
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-left: auto;
-  }
-
-  .modal-content2 .modal-header{
-    font-size: clamp(14px, 2.2vw, 22px);
-    --control-h: clamp(30px, 5.5vw, 42px);
-  }
-
+  .header-actions{ display:flex; align-items:center; gap:10px; margin-left:auto; }
+  .modal-content2 .modal-header{ font-size:clamp(14px, 2.2vw, 22px); --control-h: clamp(30px, 5.5vw, 42px); }
   #student-filter{
-    font-size: 1em;
-    height: var(--control-h);
-    padding: 0 0.8em;
-    border-radius: .5rem;
-    border: 1px solid var(--panel-stroke);
-    background: #fff;
+    font-size:1em; height:var(--control-h); padding:0 .8em; border-radius:.5rem; border:1px solid var(--panel-stroke); background:#fff;
   }
   .manage-btn{
-    display: inline-flex;
-    align-items: center;
-    height: var(--control-h);
-    padding: 0 1em;
-    border-radius: .55rem;
-    border: 1px solid #d1d5db;
-    background: #f9fafb;
-    cursor: pointer;
-    text-decoration: none;
-    color: #111827;
-    line-height: 1;
+    display:inline-flex; align-items:center; height:var(--control-h); padding:0 1em;
+    border-radius:.55rem; border:1px solid #d1d5db; background:#f9fafb;
+    cursor:pointer; text-decoration:none; color:#111827; line-height:1;
   }
   .manage-btn:hover{ background:#eef2f7; }
 
-  .modal-body {
-    color: #fff;
-    padding: 12px 24px 24px 24px;
-    font-size: 1em;
-    overflow-y: auto;
-    max-height: 60vh;
-  }
+  .modal-body { color:#fff; padding:12px 24px 24px 24px; font-size:1em; overflow-y:auto; max-height:60vh; }
   .modal-body::-webkit-scrollbar { display:none; }
 
-  /* 書卡片 */
   .book-list{ display:grid; }
-  .book-card {
-    display: grid;
-    grid-template-columns: 15% 1fr 65px;
-    gap: 10px;
-    align-items: center;
-    color: #111827;
-  }
-
-  .book-icon{
-    width:100%;
-    flex:0 0 auto;
-    border-radius:6px;
-    display:grid;
-    place-items:center;
-  }
-  .book-icon img{max-width:100%;max-height:100%;display:block;}
-  .book-meta{min-width:0;display:flex;flex-direction:column;gap:4px;}
-  .book-title{font-weight:700;line-height:1.2;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;}
-  .book-sub{font-size:.88rem;color:#6b7280;}
-  .book-actions{margin-left:auto;}
+  .book-card{ display:grid; grid-template-columns:15% 1fr 65px; gap:10px; align-items:center; color:#111827; }
+  .book-icon{ width:100%; border-radius:6px; display:grid; place-items:center; }
+  .book-icon img{ max-width:100%; max-height:100%; display:block; }
+  .book-meta{ min-width:0; display:flex; flex-direction:column; gap:4px; }
+  .book-title{ font-weight:700; line-height:1.2; white-space:nowrap; text-overflow:ellipsis; overflow:hidden; }
+  .book-sub{ font-size:.88rem; color:#6b7280; }
+  .book-actions{ margin-left:auto; }
   .go-btn{
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: .55rem .9rem;
-    border-radius: .55rem;
-    border: 1px solid #d1d5db;
-    background: #214568;
-    cursor: pointer;
-    text-decoration: none;
-    color: #ffffff;
-    line-height: 1.2;
-    text-align: center;
-    white-space: normal;
-    font-weight: 600;
+    display:inline-flex; align-items:center; justify-content:center; padding:.55rem .9rem;
+    border-radius:.55rem; border:1px solid #d1d5db; background:#214568; cursor:pointer; text-decoration:none;
+    color:#ffffff; line-height:1.2; text-align:center; white-space:normal; font-weight:600;
   }
-  .go-btn:hover{background:#cc3f3f;}
+  .go-btn:hover{ background:#cc3f3f; }
 
-  @media (max-width: 640px){
-    .book-list{grid-template-columns:1fr;}
-  }
+  @media (max-width: 640px){ .book-list{ grid-template-columns:1fr; } }
 
-  img {
-    -webkit-user-drag: none;
-    user-select: none;
-    -webkit-touch-callout: none;
-  }
-</style>
-
+  img { -webkit-user-drag:none; user-select:none; -webkit-touch-callout:none; }
+  </style>
 </head>
 <body>
 
@@ -249,7 +144,7 @@
         <div class="header-title">歡迎來到 <span id="owner-name">玩家</span> 的書櫃</div>
         <div class="header-actions">
           <select id="student-filter"></select>
-          <!-- href 改為 #，改由 JS 控制導向 -->
+          <!-- href 改為 #，由 JS 控制導向 -->
           <a id="manage-btn" class="manage-btn" href="#" style="display:none;">管理</a>
         </div>
       </div>
@@ -261,15 +156,10 @@
 
   <!-- 房間背景 & 書籍清單 -->
   <div class="room-wrap">
-    <!-- 第 1–12 本 -->
     <div class="book book1-12" style="bottom: 78.2%;"></div>
-    <!-- 第 13–24 本 -->
     <div class="book book13-24" style="bottom: 64.2%;"></div>
 
-    <!-- 蓋在書本上方的書櫃 -->
     <img draggable="false" style="position: absolute; height: 100%; width: 100%;" src="https://shierusha.github.io/library/img/ROOM-TOP.png" alt="bookshelf overlay">
-
-    <!-- 可點擊的隱形大按鈕（打開彈窗） -->
     <button class="book-btn" aria-label="打開書櫃"></button>
   </div>
 
@@ -290,6 +180,9 @@ const client = window.supabase.createClient(
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmaHdodm9kZ2lrcGR1Y3JoZ2RhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgwMTAwNjEsImV4cCI6MjA2MzU4NjA2MX0.P6P-x4SxjiR4VdWH6VFgY_ktgMac_OzuI4Bl7HWskz8'
 );
 
+/* Edge Function（B 專案）的完整 URL —— 用 fetch() 直打 */
+const EXCHANGE_URL = 'https://ogzpfrkwnqqaitytncla.supabase.co/functions/v1/exchange-token';
+
 /* 電子書櫃頁路徑 */
 const BOOK_CHEST_URL = 'book-chest';
 
@@ -309,9 +202,9 @@ function fDate(x){
 function bookImg(_b, fallback){ return fallback; }
 
 /* ============ 主要狀態 ============ */
-let CURRENT_PLAYER = null;      // 目前登入者 { id, username }
-let OWNER_PLAYER   = null;      // 房間持有者 { id, username }
-let PLAYER_STUDENTS = [];       // 持有者的學生（有 student_code）
+let CURRENT_PLAYER = null;
+let OWNER_PLAYER   = null;
+let PLAYER_STUDENTS = [];
 let DEFAULT_STUDENT = null;
 let ALL_BOOKS = [];
 
@@ -319,10 +212,7 @@ let ALL_BOOKS = [];
 async function getCurrentPlayer(){
   const res = await client.auth.getUser();
   if (res.error) {
-    if (res.error.name === 'AuthSessionMissingError' ||
-        /Auth session missing/i.test(res.error.message || '')) {
-      return null;
-    }
+    if (res.error.name === 'AuthSessionMissingError' || /Auth session missing/i.test(res.error.message||'')) return null;
     console.warn('[auth.getUser] unexpected error:', res.error);
     return null;
   }
@@ -353,21 +243,14 @@ async function getStudentByCode(code){
   return data || null;
 }
 
-/* 用 RPC 取玩家暱稱（未登入亦可） */
 async function getPlayerUsernameByRPC(playerId){
   if (!playerId) return '玩家';
   try{
     const { data, error } = await client.rpc('get_player_username', { p_id: playerId });
-    if (error) {
-      console.warn('[getPlayerUsernameByRPC] error:', error);
-      return '玩家';
-    }
+    if (error) { console.warn('[getPlayerUsernameByRPC] error:', error); return '玩家'; }
     const name = (data && String(data).trim()) || '玩家';
     return name;
-  }catch(e){
-    console.warn('[getPlayerUsernameByRPC] exception:', e);
-    return '玩家';
-  }
+  }catch(e){ console.warn('[getPlayerUsernameByRPC] exception:', e); return '玩家'; }
 }
 async function getPlayerProfile(playerId){
   const username = await getPlayerUsernameByRPC(playerId);
@@ -413,16 +296,11 @@ function renderFilterOptions(){
   if (!sel) return;
   sel.innerHTML = '';
 
-  PLAYER_STUDENTS.forEach(s => {
-    sel.appendChild(new Option(s.name, s.student_id, false, false));
-  });
+  PLAYER_STUDENTS.forEach(s => sel.appendChild(new Option(s.name, s.student_id, false, false)));
   sel.appendChild(new Option('其他', 'OTHER', false, false));
 
-  if (DEFAULT_STUDENT){
-    sel.value = DEFAULT_STUDENT.student_id;
-  }else{
-    sel.value = PLAYER_STUDENTS[0]?.student_id || 'OTHER';
-  }
+  if (DEFAULT_STUDENT) sel.value = DEFAULT_STUDENT.student_id;
+  else sel.value = PLAYER_STUDENTS[0]?.student_id || 'OTHER';
 }
 
 function renderBookList(books){
@@ -455,7 +333,7 @@ function renderBookList(books){
     const link = document.createElement('a');
     link.className = 'go-btn';
     link.innerHTML = '前往<br>閱讀';
-    link.href = `./book?book=${encodeURIComponent(b.title)}`; // 依你原邏輯保留
+    link.href = `./book?book=${encodeURIComponent(b.title)}`;
     actions.appendChild(link);
 
     card.append(icon, meta, actions);
@@ -487,9 +365,7 @@ function renderShelves(books){
       img.style.cursor = 'pointer';
 
       const filterStr = (b?.cover_color || '').trim();
-      if (/^filter:/.test(filterStr)) {
-        img.style.cssText += ';' + filterStr;
-      }
+      if (/^filter:/.test(filterStr)) img.style.cssText += ';' + filterStr;
 
       img.addEventListener('click', () => {
         window.location.href = `./reader.html?book_id=${encodeURIComponent(b.id)}`;
@@ -536,35 +412,19 @@ async function runDiagnostics(){
 
   console.log('%c[diag] ownerId / studentId', 'color:#0aa', ownerId, stuId);
 
-  const q1 = await booksClient
-    .from('books')
-    .select('id,owner_id,student_id,title', { count: 'exact' })
-    .eq('owner_id', ownerId)
-    .eq('student_id', stuId)
-    .limit(5);
+  const q1 = await booksClient.from('books').select('id,owner_id,student_id,title', { count: 'exact' }).eq('owner_id', ownerId).eq('student_id', stuId).limit(5);
   console.log('[diag] owner+student → count=', q1.count, 'error=', q1.error);
   if (q1.data?.length) console.table(q1.data);
 
-  const q2 = await booksClient
-    .from('books')
-    .select('id,owner_id,student_id,title', { count: 'exact' })
-    .eq('student_id', stuId)
-    .limit(5);
+  const q2 = await booksClient.from('books').select('id,owner_id,student_id,title', { count: 'exact' }).eq('student_id', stuId).limit(5);
   console.log('[diag] only student → count=', q2.count, 'error=', q2.error);
   if (q2.data?.length) console.table(q2.data);
 
-  const q3 = await booksClient
-    .from('books')
-    .select('id,owner_id,student_id,title', { count: 'exact' })
-    .eq('owner_id', ownerId)
-    .limit(5);
+  const q3 = await booksClient.from('books').select('id,owner_id,student_id,title', { count: 'exact' }).eq('owner_id', ownerId).limit(5);
   console.log('[diag] only owner → count=', q3.count, 'error=', q3.error);
   if (q3.data?.length) console.table(q3.data);
 
-  const q4 = await booksClient
-    .from('books')
-    .select('id,owner_id,student_id,title', { count: 'exact' })
-    .limit(5);
+  const q4 = await booksClient.from('books').select('id,owner_id,student_id,title', { count: 'exact' }).limit(5);
   console.log('[diag] sample(any) → count=', q4.count, 'error=', q4.error);
   if (q4.data?.length) console.table(q4.data);
 
@@ -572,33 +432,38 @@ async function runDiagnostics(){
   console.log('[diag] books auth user =', auth?.data?.user ?? null);
 }
 
-/* ============ ★ 新增：跳轉到「電子書櫃」（交換長簽） ============ */
+/* ============ ★ 改成 fetch()：跳轉到「電子書櫃」（交換長簽） ============ */
 async function goToBookChest(e){
   if (e) e.preventDefault();
 
   // 1) 拿 A 專案 access_token
-  const { data: sess, error: sErr } = await client.auth.getSession();
-  const accessToken = sess?.session?.access_token;
-  if (sErr || !accessToken){
-    alert('請先登入才能管理書櫃');
-    return;
-  }
+  const { data: { session } } = await client.auth.getSession();
+  if (!session?.access_token) { alert('請先登入才能管理書櫃'); return; }
 
   try{
-    // 2) 呼叫 B 專案的 Edge Function 換長簽 JWT
-    const { data, error } = await booksClient.functions.invoke('exchange-token', {
-      body: { token: accessToken }
+    // 2) 用 fetch 直打 Edge Function（只送 content-type，避免 invoke() 自動多的 headers）
+    const resp = await fetch(EXCHANGE_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ token: session.access_token })
     });
-    if (error) throw error;
-    const longToken = data?.token;
-    if (!longToken) throw new Error('exchange-token 沒回 token');
+    const out = await resp.json().catch(()=>null);
+    if (!resp.ok || !out?.token) throw new Error(out?.error || out?.detail || 'exchange-token 失敗');
 
-    // 3) 存到 localStorage，並跳轉到書櫃頁
-    localStorage.setItem('xer_b_jwt', longToken);
-    location.href = BOOK_CHEST_URL;
+    // 3) 存長簽，帶 owner_id / stuCode 去書櫃
+    localStorage.setItem('xer_b_jwt', out.token);
 
-    // 或若想帶在網址上（書櫃頁會自動存入再清掉）：
-    // location.href = `${BOOK_CHEST_URL}?token=${encodeURIComponent(longToken)}`;
+    const params  = new URLSearchParams(location.search);
+    const stuCode = params.get('stu');
+    const qs = new URLSearchParams();
+    if (OWNER_PLAYER?.id) qs.set('id', OWNER_PLAYER.id);
+    if (stuCode) qs.set('stu', stuCode);
+
+    const base = BOOK_CHEST_URL.endsWith('/') ? BOOK_CHEST_URL : BOOK_CHEST_URL;
+    location.href = `${base}${qs.toString() ? ('?' + qs.toString()) : ''}`;
+
+    // 若想改成透過網址帶 token（書櫃頁已有處理）：
+    // location.href = `${base}?token=${encodeURIComponent(out.token)}${OWNER_PLAYER?.id ? `&id=${encodeURIComponent(OWNER_PLAYER.id)}` : ''}${stuCode ? `&stu=${encodeURIComponent(stuCode)}` : ''}`;
   }catch(err){
     console.error('[exchange-token] failed', err);
     alert('登入書櫃失敗：' + (err?.message || JSON.stringify(err)));
@@ -640,7 +505,7 @@ async function init(){
       console.log('[DEBUG] ownerId =', OWNER_PLAYER?.id);
     }
 
-    // 【管理】按鈕只在「持有者 = 登入者」時可見，且改為呼叫 goToBookChest()
+    // 【管理】按鈕：持有者 = 登入者 才顯示；改由 fetch 版本的 goToBookChest()
     const manageBtn = $('#manage-btn');
     if (manageBtn){
       const isOwner = (CURRENT_PLAYER && OWNER_PLAYER && CURRENT_PLAYER.id === OWNER_PLAYER.id);
@@ -679,7 +544,7 @@ async function init(){
 
 window.addEventListener('load', init);
 
-/* 全域保險：禁止拖曳所有 <img>（不影響點擊） */
+/* 禁止拖曳 <img>（不影響點擊） */
 document.addEventListener('dragstart', e => {
   if (e.target && e.target.tagName === 'IMG') e.preventDefault();
 });
