@@ -9,8 +9,35 @@
   function getSheetStart(dbIndex){ return (dbIndex % 2 === 0) ? dbIndex - 1 : dbIndex; }
 
   function rebuildAndRedrawPreserveCursor(preferDbIndex){
-    const startDb = Math.max(1, preferDbIndex || (window.EditorCore?.getFocusedDbIndex?.() || 1));
+  const focusedDb = Math.max(1, preferDbIndex || (window.EditorCore?.getFocusedDbIndex?.() || 1));
+    const knownDom = (() => {
+      if (window.book && Number.isFinite(window.book._cursorPage)) {
+        return (window.book._cursorPage|0) + 1; // BookFlip 使用 0-based 游標
+      }
+      if (window.EditorCore?.dbIndexToDomIndex) {
+        return EditorCore.dbIndexToDomIndex(focusedDb);
+      }
+      return focusedDb + 2; // 封面佔 2
+    })();
+    const startDom = Math.max(1, Math.floor(knownDom || 1));
+    const startDb = Math.max(
+      1,
+      window.EditorCore?.domIndexToDbIndex
+        ? EditorCore.domIndexToDbIndex(startDom)
+        : focusedDb
+    );
+
     if (typeof window.rebuildTo === 'function') {
+      rebuildTo(startDb);
+      try {
+        if (window.EditorCore?.setLastDbIndex) EditorCore.setLastDbIndex(startDb);
+        if (typeof window.gotoDomPage === 'function') {
+          setTimeout(() => gotoDomPage(startDom), 0);
+        } else if (typeof window.gotoPageDomByDbIndex === 'function') {
+          setTimeout(() => gotoPageDomByDbIndex(startDb), 0);
+        }
+      } catch (_) {}
+    }
       rebuildTo(startDb);
       try {
         if (window.EditorCore?.setLastDbIndex) EditorCore.setLastDbIndex(startDb);
