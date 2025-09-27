@@ -436,31 +436,27 @@ async function runDiagnostics(){
 async function goToBookChest(e){
   if (e) e.preventDefault();
 
-  // 先嘗試開一個空白分頁（有些瀏覽器會擋，擋了就會是 null）
+  // 先預開分頁（同步、可通過 popup blocker）
   const popup = window.open('about:blank', '_blank', 'noopener');
 
-  // 1) 取 A 專案 access_token
-  const { data: sess, error: sErr } = await client.auth.getSession();
-  const accessToken = sess?.session?.access_token;
-  if (sErr || !accessToken){
+  // 取 A 的 access_token（這段是非同步，不會影響已開好的分頁）
+  const { data: sess } = await client.auth.getSession();
+  const tokenA = sess?.session?.access_token;
+  if (!tokenA) {
     if (popup && !popup.closed) popup.close();
     alert('請先登入才能管理書櫃');
     return;
   }
 
-  try{
-    // 2) 用 fetch 換 B 的長簽
+  try {
     const resp = await fetch(`${BOOKS_URL}/functions/v1/exchange-token`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ token: accessToken })
+      headers: { 'content-type':'application/json' },
+      body: JSON.stringify({ token: tokenA })
     });
-    const out = await resp.json().catch(()=>null);
-    if (!resp.ok || !out?.token) {
-      throw new Error(out?.message || out?.error || '交換 token 失敗');
-    }
+    const out = await resp.json();
+    if (!resp.ok || !out?.token) throw new Error(out?.message || '交換 token 失敗');
 
-    // 3) 組目的地網址（注意用 location.href 保持目前 /library/ 路徑）
     const url = new URL(BOOK_CHEST_URL, location.href);
     url.searchParams.set('token', out.token);
 
@@ -469,26 +465,19 @@ async function goToBookChest(e){
 
     const sel = document.getElementById('student-filter');
     if (sel && sel.value && sel.value !== 'OTHER') {
-      const stu = (window.PLAYER_STUDENTS || []).find(s => String(s.student_id) === String(sel.value));
+      const stu = (window.PLAYER_STUDENTS||[]).find(s => String(s.student_id)===String(sel.value));
       if (stu?.student_code) url.searchParams.set('stu', stu.student_code);
     }
 
     const target = url.toString();
-
-    // 4) 有成功開到分頁就導向那分頁；被擋就同分頁開啟
-    if (popup && !popup.closed) {
-      popup.location.href = target;
-    } else {
-      // 被 popup blocker 擋了
-      alert('瀏覽器封鎖了新分頁，我們改用同分頁開啟。');
-      location.href = target;
-    }
-  }catch(err){
-    console.error('[exchange-token] failed', err);
+    if (popup && !popup.closed) popup.location.href = target;   // ✅ 走新分頁
+    else location.href = target;                                // ✅ 備援：同分頁
+  } catch (err) {
     if (popup && !popup.closed) popup.close();
     alert('登入書櫃失敗：' + (err?.message || '未知錯誤'));
   }
 }
+
 /* ============ 初始化流程 ============ */
 async function init(){
   try{
