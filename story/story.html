@@ -436,12 +436,10 @@ async function runDiagnostics(){
 async function goToBookChest(e){
   if (e) e.preventDefault();
 
-  // 1) 拿 A 專案 access_token
   const { data: { session } } = await client.auth.getSession();
   if (!session?.access_token) { alert('請先登入才能管理書櫃'); return; }
 
   try{
-    // 2) 用 fetch 直打 Edge Function（只送 content-type，避免 invoke() 自動多的 headers）
     const resp = await fetch(EXCHANGE_URL, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -450,20 +448,8 @@ async function goToBookChest(e){
     const out = await resp.json().catch(()=>null);
     if (!resp.ok || !out?.token) throw new Error(out?.error || out?.detail || 'exchange-token 失敗');
 
-    // 3) 存長簽，帶 owner_id / stuCode 去書櫃
     localStorage.setItem('xer_b_jwt', out.token);
-
-    const params  = new URLSearchParams(location.search);
-    const stuCode = params.get('stu');
-    const qs = new URLSearchParams();
-    if (OWNER_PLAYER?.id) qs.set('id', OWNER_PLAYER.id);
-    if (stuCode) qs.set('stu', stuCode);
-
-    const base = BOOK_CHEST_URL.endsWith('/') ? BOOK_CHEST_URL : BOOK_CHEST_URL;
-    location.href = `${base}${qs.toString() ? ('?' + qs.toString()) : ''}`;
-
-    // 若想改成透過網址帶 token（書櫃頁已有處理）：
-    // location.href = `${base}?token=${encodeURIComponent(out.token)}${OWNER_PLAYER?.id ? `&id=${encodeURIComponent(OWNER_PLAYER.id)}` : ''}${stuCode ? `&stu=${encodeURIComponent(stuCode)}` : ''}`;
+    location.href = BOOK_CHEST_URL;  // 不再帶 id / stu
   }catch(err){
     console.error('[exchange-token] failed', err);
     alert('登入書櫃失敗：' + (err?.message || JSON.stringify(err)));
