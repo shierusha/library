@@ -314,7 +314,7 @@ const Store = {
       title: m.title,
       updatedAt: new Date(m.updated_at).getTime(),
       coverColor: m.cover_color || toFilterCssProp(FILTER_DEFAULT),
-      coverImage: m.cover_image || DEFAULT_COVER_IMG,
+      coverImage: m.cover_image,  
       page_count: m.page_count ?? 0,
       sort_order: m.sort_order ?? 1,
       student_id: m.student_id || null
