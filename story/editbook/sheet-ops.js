@@ -9,43 +9,37 @@
   function getSheetStart(dbIndex){ return (dbIndex % 2 === 0) ? dbIndex - 1 : dbIndex; }
 
   function rebuildAndRedrawPreserveCursor(preferDbIndex){
-  const focusedDb = Math.max(1, preferDbIndex || (window.EditorCore?.getFocusedDbIndex?.() || 1));
-    const knownDom = (() => {
-      if (window.book && Number.isFinite(window.book._cursorPage)) {
-        return (window.book._cursorPage|0) + 1; // BookFlip 使用 0-based 游標
-      }
+    const focusDb = Math.max(1, preferDbIndex || (window.EditorCore?.getFocusedDbIndex?.() || 1));
+    const focusDom = (() => {
       if (window.EditorCore?.dbIndexToDomIndex) {
-        return EditorCore.dbIndexToDomIndex(focusedDb);
+        return EditorCore.dbIndexToDomIndex(focusDb);
       }
-      return focusedDb + 2; // 封面佔 2
+      return focusDb + 2; // 封面佔 2
     })();
-    const startDom = Math.max(1, Math.floor(knownDom || 1));
-    const startDb = Math.max(
-      1,
-      window.EditorCore?.domIndexToDbIndex
-        ? EditorCore.domIndexToDbIndex(startDom)
-        : focusedDb
-    );
 
-    if (typeof window.rebuildTo === 'function') {
-      rebuildTo(startDb);
-      try {
-        if (window.EditorCore?.setLastDbIndex) EditorCore.setLastDbIndex(startDb);
-        if (typeof window.gotoDomPage === 'function') {
-          setTimeout(() => gotoDomPage(startDom), 0);
-        } else if (typeof window.gotoPageDomByDbIndex === 'function') {
-          setTimeout(() => gotoPageDomByDbIndex(startDb), 0);
-        }
-      } catch (_) {}
-    }
-      rebuildTo(startDb);
-      try {
-        if (window.EditorCore?.setLastDbIndex) EditorCore.setLastDbIndex(startDb);
+    if (typeof window.rebuildTo !== 'function') return;
+
+    rebuildTo(focusDb);
+
+    try {
+      if (window.EditorCore?.setLastDbIndex) EditorCore.setLastDbIndex(focusDb);
+
+      const navigateBack = () => {
         if (typeof window.gotoPageDomByDbIndex === 'function') {
-          setTimeout(() => gotoPageDomByDbIndex(startDb), 0);
+          gotoPageDomByDbIndex(focusDb);
+          return;
         }
-      } catch (_) {}
-    }  }
+        if (typeof window.gotoDomPage === 'function') {
+          const dom = Math.max(1, focusDom|0);
+          gotoDomPage(dom);
+        }
+      };
+
+      // 等待 BookFlip 完成 mount，再把畫面導回原頁
+      setTimeout(navigateBack, 0);
+    } catch (_) {}
+  }
+
 
   function shiftChaptersAfter(insertAt, delta){
     if (!Array.isArray(window.CHAPTERS_DB) || !CHAPTERS_DB.length) return;
