@@ -358,7 +358,8 @@
         singleSpeed: 300,
         perspective: 2000,
         data: { pairs },
-        startPageIndex: Math.max(0, (targetDbIndex + 2) - 1 - 1), // db->dom->0based
+startPageIndex: Math.max(0, (targetDbIndex + 2) - 1),
+
         coverPapers: 1
       });
 
@@ -375,11 +376,18 @@
         const total = Math.max(1, totalDomPages());
         const ctrl  = book._controller;
         if (ctrl && Number.isFinite(ctrl.current)){
-          if (mode === 'spread') {
-            book._cursorPage = Math.max(0, Math.min(total - 1, ctrl.current * 2));
-          } else {
-            book._cursorPage = Math.max(0, Math.min(total - 1, ctrl.current));
-          }
+         if (mode === 'spread') {
+  const coverOffset = (book?.opts?.coverPapers ? book.opts.coverPapers * 2 : 0);
+  const parity = ((book?._cursorPage ?? Math.max(0, (targetDbIndex + 2) - 1)) % 2);
+  book._cursorPage = Math.max(
+    0,
+    Math.min(total - 1, coverOffset + ctrl.current * 2 + parity)
+  );
+} else {
+  const coverOffset = (book?.opts?.coverPapers ? book.opts.coverPapers * 2 : 0);
+  book._cursorPage = Math.max(0, Math.min(total - 1, coverOffset + ctrl.current));
+}
+
         } else {
           book._cursorPage = Math.max(0, Math.min(total - 1, book._cursorPage|0));
         }
@@ -420,7 +428,7 @@
       }
 
       // 導到目標頁
-      book._cursorPage = Math.max(0, (targetDbIndex + 2) - 2);
+book._cursorPage = Math.max(0, (targetDbIndex + 2) - 1);
       if (typeof book._mountCurrent === 'function') book._mountCurrent();
 
       applyLayout(); lightRedraw();
