@@ -289,6 +289,7 @@ style="
     padding: 0;
     cursor: pointer;
     height: 100%;
+-webkit-tap-highlight-color: transparent; 
 "
 ></button>
 
@@ -301,6 +302,7 @@ style="
     padding: 0;
     cursor: pointer;
     height: 100%;
+-webkit-tap-highlight-color: transparent; 
 "
 ></button>
 
@@ -531,7 +533,7 @@ style="
   if (!stageEl || !minus || !plus) return;
 
   const KEY  = 'stage_width_pct_v1';
-  const STEP = 5, MIN = 20, MAX = 120;
+  const STEP = 5, MIN = 40, MAX = 100;
 
   // 讀取上次設定（預設 80%）
   let pct = parseInt(localStorage.getItem(KEY), 10);
