@@ -403,6 +403,39 @@ body::-webkit-scrollbar { width:0; height:0; }
   const NOTIFY_ENDPOINT = 'https://ogzpfrkwnqqaitytncla.supabase.co/functions/v1/notify-discord';
   const SHARED_TOKEN = ''; // 例：'你的自訂token'；若 Edge Function 沒開驗證就留空字串或刪掉
 
+    /* === 解析學號（優先沿用網址 ?stu；否則反查 books.student_id -> students.student_code） === */
+  const A_URL  = 'https://wfhwhvodgikpducrhgda.supabase.co';
+  const A_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmaHdodm9kZ2lrcGR1Y3JoZ2RhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgwMTAwNjEsImV4cCI6MjA2MzU4NjA2MX0.P6P-x4SxjiR4VdWH6VFgY_ktgMac_OzuI4Bl7HWskz8';
+  let AClient = null;
+
+  function getStuFromUrl(){
+    const u = new URL(location.href);
+    const code = (u.searchParams.get('stu') || '').trim();
+    return code || null;
+  }
+
+  async function resolveStuCodeForBack(){
+    // 1) 先沿用網址上的 ?stu
+    const fromUrl = getStuFromUrl();
+    if (fromUrl) return fromUrl;
+
+    // 2) 反查本書 student_id -> 學號
+    try{
+      const r1 = await SB.from('books').select('student_id').eq('id', BOOK_ID).single();
+      const sid = r1?.data?.student_id || null;
+      if (!sid) return null;
+
+      if (!AClient) AClient = window.supabase.createClient(A_URL, A_ANON, { auth:{ persistSession:false } });
+      const r2 = await AClient.from('students').select('student_code').eq('student_id', sid).maybeSingle();
+      const code = r2?.data?.student_code || null;
+      return (code && String(code).trim()) || null;
+    }catch(e){
+      console.warn('[resolveStuCodeForBack] fallback failed:', e);
+      return null;
+    }
+  }
+
+
   /* === 新增：成功儲存後要送的通知 === */
   async function notifyDiscordAfterSave() {
     const studentName = localStorage.getItem('player_username') || '未命名學生';
@@ -669,12 +702,14 @@ body::-webkit-scrollbar { width:0; height:0; }
     const btnBack = document.getElementById('btnBack');
     if (btnBack) btnBack.disabled = true;
     const ok = await saveAll({ navigateAfter: false });
-    if (ok) {
-      await notifyDiscordAfterSave();
-      location.href = BACK_URL;
-    } else if (btnBack) {
-      btnBack.disabled = false;
-    }
+   if (ok) {
+    await notifyDiscordAfterSave();
+    const stu = await resolveStuCodeForBack(); // ← 新增
+    const target = BACK_URL + (stu ? `?stu=${encodeURIComponent(stu)}` : ''); // ← 新增
+    location.href = target; // ← 修改：帶著 ?stu 回去
+  } else if (btnBack) {
+    btnBack.disabled = false;
+  }
   });
 })();
 </script>
