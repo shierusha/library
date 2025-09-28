@@ -128,7 +128,6 @@ function removeCoverHint(target){
   
 // 提供給其他檔案共用（選用）
 window.TypeMap = { normalizeType, fromDbType, toDbType };
-
 function toHTMLFromPlain(s){
   return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/\n/g,'<br>');
 }
@@ -173,7 +172,7 @@ function applyCoverFromBook(isFromTitleTyping = false) {
       coverFront.style.alignItems = 'center';
       coverFront.style.justifyContent = 'center';
       coverFront.innerHTML = `<div class="cover-title" style="font-size:1.8em;font-weight:700">${escapeHTML(title)}</div>`;
-      ensureCoverHint(coverFront);  
+      ensureCoverHint(front); 
     }
     if (coverBack) {
       // 背面只設底色，避免用 shorthand
