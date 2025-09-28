@@ -73,47 +73,49 @@
   }
 
   /* ===== 封面（第一張 .paper，不算頁碼） ===== */
- // app.js
-function applyCoverFromBook(isFromTitleTyping = false) {
-  const title = ACTIVE_BOOK?.title || '未命名書籍';
-  const coverURL = (ACTIVE_BOOK?.cover_image || '').trim();
+  function applyCoverFromBook(isFromTitleTyping = false) {
+    const title = ACTIVE_BOOK?.title || '未命名書籍';
+    const coverURL = (ACTIVE_BOOK?.cover_image || '').trim();
 
-  if (state.mode === 'spread') {
-    const coverFront = elBook.querySelector('.paper .page.front');
-    if (!coverFront) return;
+    if (state.mode === 'spread') {
+      const coverFront = elBook.querySelector('.paper .page.front');
+      const coverBack  = elBook.querySelector('.paper .page.back');
+      if (!coverFront) return;
 
-    // 清掉舊版可能遺留的樣式與類名（恢復原樣）
-    coverFront.classList.remove('page--illustration');
-    coverFront.style.display = '';
-    coverFront.style.alignItems = '';
-    coverFront.style.justifyContent = '';
+      if (coverURL) {
+        coverFront.classList.add('page--illustration');
+        coverFront.style.backgroundImage = `url("${coverURL}")`;
+        coverFront.innerHTML = '';
+      } else {
+        coverFront.classList.remove('page--illustration');
+        coverFront.style.backgroundImage = '';
+        coverFront.style.background = '#fff';
+        coverFront.style.display = 'flex';
+        coverFront.style.alignItems = 'center';
+        coverFront.style.justifyContent = 'center';
+        coverFront.innerHTML = `<div class="cover-title" style="font-size:1.8em;font-weight:700">${escapeHTML(title)}</div>`;
+      }
+      if (coverBack) coverBack.style.background = '#fff';
+    } else {
+      const sp = elBook.querySelectorAll('.single-page');
+      const front = sp[0], back = sp[1];
+      if (!front) return;
 
-    // 只設定背景圖；沒有圖片就清空 backgroundImage（其他都不動）
-    coverFront.style.backgroundImage = coverURL ? `url("${coverURL}")` : '';
-    // 不再動 back，也不改 innerHTML、不設白底
-  } else {
-    const sp = elBook.querySelectorAll('.single-page');
-    const front = sp[0];
-    if (!front) return;
-
-    front.classList.remove('page--illustration');
-    front.style.display = '';
-    front.style.alignItems = '';
-    front.style.justifyContent = '';
-
-    front.style.backgroundImage = coverURL ? `url("${coverURL}")` : '';
-    // 不再動 back，也不改 innerHTML
-  }
-
-  // 維持原本的書名同步邏輯
-  if (!isFromTitleTyping) {
-    const titleNode = document.getElementById('bookTitle');
-    if (titleNode && titleNode.textContent !== title) {
-      titleNode.textContent = title;
+      if (coverURL) {
+        front.classList.add('page--illustration');
+        front.style.backgroundImage = `url("${coverURL}")`;
+        front.innerHTML = '';
+      } else {
+        front.classList.remove('page--illustration');
+        front.style.backgroundImage = '';
+        front.style.background = '#fff';
+        front.style.display = 'flex';
+        front.style.alignItems = 'center';
+        front.style.justifyContent = 'center';
+        front.innerHTML = `<div class="cover-title" style="font-size:1.8em;font-weight:700">${escapeHTML(title)}</div>`;
+      }
+      if (back) back.style.background = '#fff';
     }
-  }
-}
-
 
     // ★ 修正：輸入期間不要回寫 #bookTitle，避免游標跳到第一字
     if (!isFromTitleTyping) {
