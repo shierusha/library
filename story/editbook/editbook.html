@@ -481,6 +481,18 @@ body::-webkit-scrollbar { width:0; height:0; }
         if (r.error) return die('update-books', r.error);
       }
 
+
+// 內部 → DB ENUM（優先用 app.js 暴露的 toDbType；沒有就用後備對映）
+const toDbTypeForPages = (t)=>{
+  if (window.TypeMap?.toDbType) return window.TypeMap.toDbType(t);
+  const x = String(t||'').trim().toLowerCase().replace(/-/g,'_');
+  if (x==='divider_light' || x==='divider_white') return 'divider_white';
+  if (x==='divider_dark'  || x==='divider_black') return 'divider_black';
+  if (x==='illustration'  || x==='image')         return 'image';
+  return 'novel';
+};
+
+      
       // 2) 讀 DB 現況
       const [dbPagesRes, dbChRes] = await Promise.all([
         SB.from('pages').select('id,page_index').eq('book_id', bookId).order('page_index', { ascending: true }),
@@ -494,11 +506,11 @@ body::-webkit-scrollbar { width:0; height:0; }
       const dbChapters = (dbChRes.data || []).map(r => ({ id:r.id, page_id:r.page_id, title:r.title, page_index:r.pages?.page_index||1 }));
 
       // 3) 新狀態（畫面上的頁）
-      const desiredPages = (window.PAGES_DB || []).map((p, i) => ({
-        id: p.id || null,
+const desiredPages = (window.PAGES_DB || []).map((p, i) => ({
+  id: p.id || null,
         book_id: window.BOOK_ID,
         page_index: i + 1,
-        type: normType(p.type),
+        type: toDbTypeForPages(p.type),
         image_url: p.image_url || null,
         content_json: p.content_json ? p.content_json : { text_plain:'', text_html:'' }
       }));
@@ -626,7 +638,11 @@ body::-webkit-scrollbar { width:0; height:0; }
         .sort((a,b)=> a.page_index - b.page_index);
 
       window.ACTIVE_BOOK = freshBook.data;
-      window.PAGES_DB    = freshPages.data || [];
+window.PAGES_DB = (freshPages.data || []).map(p => ({
+   ...p,
+   // 用 app.js 的 fromDbType；沒有就用現成的 normType 做降級轉換
+   type: (window.TypeMap?.fromDbType ? window.TypeMap.fromDbType(p.type) : normType(p.type))
+ })); 
       window.CHAPTERS_DB = chapters;
       try { window.persistDraft && window.persistDraft(); } catch(_) {}
 
