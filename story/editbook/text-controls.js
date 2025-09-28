@@ -1,16 +1,37 @@
 /* text-controls.js
  * 文字工具列：B / I / U / A+ / A-
- * - 只作用目前頁（EditorCore.getFocusedDbIndex）
- * - 只作用反白區段；保持選取（不會跳到第一字）
- * - A+ / A-：只包「一層」 <span data-fs style="font-size:...em">；重複點持續累加
- * - 跨多段時，以選取端點附近的 data-fs 當基準（無則 1.0）
- * - 變更後合併左右同級的 data-fs，避免產生一堆 span
+ * - 部分選取：只作用未套用區；已套用處不重複包
+ * - 全選皆已套用：只在選取範圍內取消（unwrap）
+ * - 合併相鄰同義標籤：B/STRONG、I/EM、U
+ * - A+ / A-：只包一層 <span data-fs style="font-size:...em">；可只調整選取段（會切三段）
  * - 每次操作後：寫回 DB + 觸發 PasteFlow.forceReflow(story)
  */
 (function(){
 
   /* ---------- 公用 ---------- */
   const clamp = (v,min,max)=> Math.max(min, Math.min(max, v));
+
+  // 同義群組定義
+  const GROUPS = {
+    B: { canonical:'B', all:['B','STRONG'] },
+    I: { canonical:'I', all:['I','EM']     },
+    U: { canonical:'U', all:['U']          },
+  };
+  function getGroupForTAG(TAG){
+    const t = String(TAG||'').toUpperCase();
+    return GROUPS[t] || { canonical:t, all:[t] };
+  }
+  function isInGroup(tagName, group){
+    return group.all.includes(String(tagName||'').toUpperCase());
+  }
+  function ensureCanonicalTag(el, group){
+    if (!el || el.nodeType!==1) return el;
+    if (el.tagName === group.canonical) return el;
+    const canon = document.createElement(group.canonical);
+    while (el.firstChild) canon.appendChild(el.firstChild);
+    el.parentNode && el.parentNode.replaceChild(canon, el);
+    return canon;
+  }
 
   // 判斷是否為我們的字級 span
   function isOurFsSpan(el){
@@ -23,7 +44,7 @@
            !String(n.nodeValue||'').replace(/\u00a0/g,' ').trim();
   }
 
-  // 清掃：移除沒有內容的 b/i/u 與空的字級 span（避免越按越累積空殼）
+  // 清掃：移除沒有內容的 b/i/u(含同義) 與空的字級 span
   function sweepInlineGarbage(root){
     if (!root) return;
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null);
@@ -37,7 +58,7 @@
       const tag = el.tagName;
       const isInline = /^(B|I|U|EM|STRONG|S|SMALL|MARK|SUB|SUP|SPAN)$/i.test(tag);
       if (!isInline) continue;
-      if (tag === 'SPAN' && !isOurFsSpan(el)) continue; // 只處理我們的 fs-span
+      if (tag === 'SPAN' && !isOurFsSpan(el)) continue;
 
       const text = (el.textContent || '').replace(/\u00a0/g,' ').trim();
       const onlyBr = el.children.length === 1 &&
@@ -51,9 +72,7 @@
     trash.forEach(el=>{
       const parent = el.parentNode;
       if (!parent) return;
-      while (el.firstChild){
-        parent.insertBefore(el.firstChild, el);
-      }
+      while (el.firstChild){ parent.insertBefore(el.firstChild, el); }
       parent.removeChild(el);
     });
   }
@@ -72,22 +91,17 @@
   }
 
   function afterChange(story){
-    // 清掉空 b/i/u 與空的字級 span，避免殘留
     sweepInlineGarbage(story);
-
     const db = Number(story.dataset.dbIndex||'0')|0;
     EditorCore.updatePageJsonFromStory(db, story);
-    if (window.PasteFlow && typeof window.PasteFlow.forceReflow === 'function') {
-      window.PasteFlow.forceReflow(story);
-    } else {
-      story.dispatchEvent(new Event('input', { bubbles:true }));
-    }
+    if (window.PasteFlow?.forceReflow) window.PasteFlow.forceReflow(story);
+    else story.dispatchEvent(new Event('input', { bubbles:true }));
   }
 
   /* ---------- B / I / U：部分選取只套未套用；全選已套用則取消 ---------- */
 
-  // 檢查 fragment 內「所有非空白文字節點」是否都在指定標籤內（例：B/I/U）
-  function allTextInsideTag(root, TAG){
+  // 檢查 fragment 內「所有非空白文字節點」是否都在指定群組內
+  function allTextInsideGroup(root, group){
     const tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
     let hasText = false;
     while (tw.nextNode()){
@@ -96,16 +110,16 @@
       hasText = true;
       let cur = t.parentElement, ok = false;
       while (cur && cur !== root){
-        if (cur.tagName === TAG) { ok = true; break; }
+        if (isInGroup(cur.tagName, group)) { ok = true; break; }
         cur = cur.parentElement;
       }
       if (!ok) return false;
     }
-    return hasText ? true : false; // 沒文字則當作「非全在」
+    return hasText ? true : false;
   }
 
-  // 在 fragment 中，把 **未在 TAG 內** 的文字節點包一層 TAG
-  function applyTagToUnstyledTextInFragment(root, TAG){
+  // 在 fragment 中，把 **未在群組內** 的文字節點包一層 canonical tag
+  function applyGroupToUnstyledTextInFragment(root, group){
     const tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
     const targets = [];
     while (tw.nextNode()){
@@ -114,32 +128,30 @@
 
       let cur = t.parentElement, covered = false;
       while (cur && cur !== root){
-        if (cur.tagName === TAG) { covered = true; break; }
+        if (isInGroup(cur.tagName, group)) { covered = true; break; }
         cur = cur.parentElement;
       }
       if (!covered) targets.push(t);
     }
 
-    // 分別包起來
     targets.forEach(t=>{
-      const wrap = document.createElement(TAG);
-      const p = t.parentNode;
-      if (!p) return;
+      const wrap = document.createElement(group.canonical);
+      const p = t.parentNode; if (!p) return;
       p.insertBefore(wrap, t);
       wrap.appendChild(t);
     });
 
-    // 合併 fragment 內相鄰同 TAG
-    mergeAdjacentTagsInFragment(root, TAG);
+    mergeAdjacentGroupTagsInFragment(root, group);
   }
 
-  // 把 fragment 中的 TAG 移除（僅限 fragment 範圍）
-  function unwrapTagDeep(root, TAG){
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, {
-      acceptNode: (el)=> (el.tagName === TAG ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP)
-    });
+  // 把 fragment 中的群組標籤移除（僅限 fragment 範圍）
+  function unwrapGroupDeep(root, group){
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null);
     const targets = [];
-    while (walker.nextNode()) targets.push(walker.currentNode);
+    while (walker.nextNode()){
+      const el = walker.currentNode;
+      if (isInGroup(el.tagName, group)) targets.push(el);
+    }
     targets.forEach(el=>{
       const parent = el.parentNode;
       if (!parent) return;
@@ -148,79 +160,79 @@
     });
   }
 
-  // 合併相鄰同標籤（<b>..</b><b>..</b> → <b>....</b>）
-  function mergeAdjacentTagAround(node, TAG){
+  // 合併相鄰同義標籤（例：<strong>…</strong><b>…</b> → <b>…</b>）
+  function mergeAdjacentGroupAround(node, group){
     if (!node || !node.parentNode) return;
-    const el = (node.nodeType===1) ? node : node.parentElement;
+    let el = (node.nodeType===1) ? node : node.parentElement;
     if (!el) return;
+    el = ensureCanonicalTag(el, group);
 
     // 向左
     let prev = el.previousSibling;
     while (prev && isWhitespaceText(prev)) prev = prev.previousSibling;
-    if (prev && prev.nodeType===1 && prev.tagName === TAG && el.tagName === TAG){
+    if (prev && prev.nodeType===1 && isInGroup(prev.tagName, group)){
+      prev = ensureCanonicalTag(prev, group);
       while (el.firstChild) prev.appendChild(el.firstChild);
       el.parentNode && el.parentNode.replaceChild(prev, el);
+      el = prev;
     }
 
-    // 基準點
-    const base = (prev && prev.tagName===TAG) ? prev : el;
-
     // 向右
-    let next = base.nextSibling;
+    let next = el.nextSibling;
     while (next && isWhitespaceText(next)) next = next.nextSibling;
-    if (next && next.nodeType===1 && next.tagName === TAG){
-      while (next.firstChild) base.appendChild(next.firstChild);
+    if (next && next.nodeType===1 && isInGroup(next.tagName, group)){
+      next = ensureCanonicalTag(next, group);
+      while (next.firstChild) el.appendChild(next.firstChild);
       next.parentNode && next.parentNode.removeChild(next);
     }
   }
 
-  // 在 fragment 內遍歷所有 TAG，嘗試與左右鄰近 TAG 合併
-  function mergeAdjacentTagsInFragment(root, TAG){
+  function mergeAdjacentGroupTagsInFragment(root, group){
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null);
     const list = [];
     while (walker.nextNode()){
       const el = walker.currentNode;
-      if (el.tagName === TAG) list.push(el);
+      if (isInGroup(el.tagName, group)) list.push(el);
     }
-    list.forEach(el=> mergeAdjacentTagAround(el, TAG));
+    list.forEach(el=> mergeAdjacentGroupAround(el, group));
   }
 
-  // 找出 fragment 內「最左/最右」的頂層 TAG（插回去後用於邊界合併）
-  function findEdgeTagsInFragment(root, TAG){
+  // 找出 fragment 內「最左/最右」的頂層群組標籤
+  function findEdgeGroupTagsInFragment(root, group){
     let firstTag = null, lastTag = null;
     for (let i=0;i<root.childNodes.length;i++){
       const n = root.childNodes[i];
-      if (n.nodeType===1 && n.tagName===TAG){ firstTag = n; break; }
+      if (n.nodeType===1 && isInGroup(n.tagName, group)){ firstTag = n; break; }
     }
     for (let i=root.childNodes.length-1;i>=0;i--){
       const n = root.childNodes[i];
-      if (n.nodeType===1 && n.tagName===TAG){ lastTag = n; break; }
+      if (n.nodeType===1 && isInGroup(n.tagName, group)){ lastTag = n; break; }
     }
     return { firstTag, lastTag };
   }
 
   function toggleInline(tag){
-    const TAG = String(tag||'').toUpperCase();
+    const group = getGroupForTAG(tag);
     const ctx = getActiveStory(); if (!ctx) return false;
     const {story, range} = ctx;
 
     return EditorCore.keepSelectionAround(story, ()=>{
       const frag = range.extractContents();
-      const allInside = allTextInsideTag(frag, TAG);
+      const allInside = allTextInsideGroup(frag, group);
 
       if (allInside){
         // 整段都已套用 → 取消（只在選取範圍內拆掉）
-        unwrapTagDeep(frag, TAG);
+        unwrapGroupDeep(frag, group);
         range.insertNode(frag);
       } else {
-        // 部分未套用 → 只對「未套用」的文字節點加 TAG，不動已套用者
-        applyTagToUnstyledTextInFragment(frag, TAG);
-        const { firstTag, lastTag } = findEdgeTagsInFragment(frag, TAG);
+        // 部分未套用 → 只對「未套用」的文字節點加 canonical tag，不動已套用者
+        applyGroupToUnstyledTextInFragment(frag, group);
+        const { firstTag, lastTag } = findEdgeGroupTagsInFragment(frag, group);
         range.insertNode(frag);
 
-        // 嘗試把 fragment 邊界與外側同 TAG 合併，避免邊界出現兩個 TAG
-        if (firstTag) mergeAdjacentTagAround(firstTag, TAG);
-        if (lastTag && lastTag !== firstTag) mergeAdjacentTagAround(lastTag, TAG);
+        // 邊界與外側同義合併，並統一為 canonical
+        if (firstTag) mergeAdjacentGroupAround(firstTag, group);
+        if (lastTag && lastTag !== firstTag) mergeAdjacentGroupAround(lastTag, group);
       }
 
       afterChange(story);
@@ -229,12 +241,7 @@
   }
 
   /* ---------- A+ / A-：只調整選取；若在同一 fs-span 內則切段 ---------- */
-
-  function parseEm(str){
-    if (!str) return NaN;
-    const m = String(str).match(/([0-9.]+)\s*em$/i);
-    return m ? parseFloat(m[1]) : NaN;
-  }
+  function parseEm(str){ const m = String(str||'').match(/([0-9.]+)\s*em$/i); return m ? parseFloat(m[1]) : NaN; }
   function getSpanSize(span){
     if (!span) return NaN;
     if (span.dataset.fs) return parseFloat(span.dataset.fs);
@@ -249,9 +256,7 @@
   function findFsWrapper(node){
     let cur = (node && node.nodeType===1) ? node : (node ? node.parentElement : null);
     while (cur && cur !== document){
-      if (cur.tagName === 'SPAN' && (cur.dataset.fs || /em$/.test(cur.style.fontSize||''))){
-        return cur;
-      }
+      if (cur.tagName === 'SPAN' && (cur.dataset.fs || /em$/.test(cur.style.fontSize||''))) return cur;
       cur = cur.parentElement;
     }
     return null;
@@ -273,7 +278,7 @@
     const sizeKey = span.dataset.fs || (span.style.fontSize||'').replace('em','');
     if (!sizeKey) return;
 
-    // 合併左：忽略純空白文字節點
+    // 左
     let prev = span.previousSibling;
     while (prev && isWhitespaceText(prev)) prev = prev.previousSibling;
     if (prev && prev.nodeType===1 && prev.tagName==='SPAN'){
@@ -284,7 +289,7 @@
         span = prev;
       }
     }
-    // 合併右：忽略純空白文字節點
+    // 右
     let next = span.nextSibling;
     while (next && isWhitespaceText(next)) next = next.nextSibling;
     if (next && next.nodeType===1 && next.tagName==='SPAN'){
@@ -295,16 +300,11 @@
       }
     }
   }
-
-  // 幫手：建立一個 data-fs span
   function createFsSpanWith(valEm){
     const s = document.createElement('span');
     setSpanSize(s, valEm);
     return s;
   }
-
-  // 幫手：把同一個 data-fs wrapper（wrap）切成 [左] [mid] [右] 三段
-  // 讓 mid（通常是新插入的選取段）從 wrap 裡「脫出」到與 wrap 同層，避免字級相乘
   function splitFsWrapperAroundChild(wrap, mid){
     if (!wrap || !mid || !wrap.parentNode) return;
     const parent = wrap.parentNode;
@@ -313,27 +313,16 @@
     const left  = createFsSpanWith(base);
     const right = createFsSpanWith(base);
 
-    // 把 mid 左邊的節點移到 left
-    while (wrap.firstChild && wrap.firstChild !== mid){
-      left.appendChild(wrap.firstChild);
-    }
-
-    // 把 mid 自 wrap 中取出（若 mid 現在就在 wrap 內）
+    while (wrap.firstChild && wrap.firstChild !== mid){ left.appendChild(wrap.firstChild); }
     if (mid.parentNode === wrap) wrap.removeChild(mid);
+    while (wrap.firstChild){ right.appendChild(wrap.firstChild); }
 
-    // 把剩餘節點移到 right
-    while (wrap.firstChild){
-      right.appendChild(wrap.firstChild);
-    }
-
-    // 用 [left?][mid][right?] 取代原 wrap
     const ref = wrap.nextSibling;
     parent.removeChild(wrap);
     if (left.childNodes.length)  parent.insertBefore(left,  ref);
     parent.insertBefore(mid,  ref);
     if (right.childNodes.length) parent.insertBefore(right, ref);
 
-    // 合併相鄰 data-fs，避免碎片
     if (left.childNodes.length)  mergeAdjacentFs(left);
     if (right.childNodes.length) mergeAdjacentFs(right);
   }
@@ -346,12 +335,10 @@
       const startWrap = findFsWrapper(range.startContainer);
       const endWrap   = findFsWrapper(range.endContainer);
 
-      // 若選取完全在同一個 data-fs 內 → 只切選取段，單獨調整那段大小
       if (startWrap && startWrap === endWrap){
         const wrap = startWrap;
         const base = getSpanSize(wrap) || 1;
 
-        // 把選取抽出，扁平化內部 fs，包回一個新的 fs span
         const frag = range.extractContents();
         stripFsInFragment(frag);
 
@@ -359,10 +346,8 @@
         selSpan.appendChild(frag);
         range.insertNode(selSpan);
 
-        // 把原 wrapper 切三段，讓選取段脫離原 wrapper，避免相乘
         splitFsWrapperAroundChild(wrap, selSpan);
 
-        // 合併左右可能相同大小的 fs
         const prev = selSpan.previousSibling;
         const next = selSpan.nextSibling;
         if (prev && prev.tagName === 'SPAN') mergeAdjacentFs(prev);
@@ -372,13 +357,10 @@
         return true;
       }
 
-      // 否則（跨多個 fs-span 或沒有 fs-span）：
-      // 取端點附近已存在的 data-fs 當基準，沒有就 1.0
       let base = getSpanSize(startWrap);
       if (isNaN(base)) base = getSpanSize(endWrap);
       if (isNaN(base)) base = 1.0;
 
-      // 把選取抽出，扁平化裡面所有 data-fs，然後用一層新的包回
       const frag = range.extractContents();
       stripFsInFragment(frag);
 
@@ -404,7 +386,6 @@
     btnI && btnI.addEventListener('click', ()=> toggleInline('i'));
     btnU && btnU.addEventListener('click', ()=> toggleInline('u'));
 
-    // 步進 0.1em（連按可持續放大/縮小）
     btnUp && btnUp.addEventListener('click', ()=> adjustFont(+0.1));
     btnDn && btnDn.addEventListener('click', ()=> adjustFont(-0.1));
   }
