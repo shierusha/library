@@ -12,6 +12,54 @@
   /* ---------- 公用 ---------- */
   const clamp = (v,min,max)=> Math.max(min, Math.min(max, v));
 
+  // 判斷是否為我們的字級 span
+  function isOurFsSpan(el){
+    return el && el.tagName === 'SPAN' &&
+           (el.dataset.fs || /em$/.test((el.style && el.style.fontSize) || ''));
+  }
+  // 文字節點是否只含空白（含 NBSP）
+  function isWhitespaceText(n){
+    return n && n.nodeType === 3 &&
+           !String(n.nodeValue||'').replace(/\u00a0/g,' ').trim();
+  }
+
+  // 清掃：移除沒有內容的 b/i/u 與空的字級 span（避免越按越累積空殼）
+  function sweepInlineGarbage(root){
+    if (!root) return;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null);
+    const trash = [];
+
+    while (walker.nextNode()){
+      const el = walker.currentNode;
+      if (!el || el === root) continue;
+      if (el.getAttribute && el.getAttribute('data-caret') === '1') continue;
+
+      const tag = el.tagName;
+      const isInline = /^(B|I|U|EM|STRONG|S|SMALL|MARK|SUB|SUP|SPAN)$/i.test(tag);
+      if (!isInline) continue;
+      if (tag === 'SPAN' && !isOurFsSpan(el)) continue; // 只處理我們的 fs-span
+
+      const text = (el.textContent || '').replace(/\u00a0/g,' ').trim();
+      const onlyBr = el.children.length === 1 &&
+                     el.firstElementChild && el.firstElementChild.tagName === 'BR' &&
+                     text === '';
+      const noText = text === '';
+
+      if (onlyBr || noText){
+        trash.push(el);
+      }
+    }
+
+    trash.forEach(el=>{
+      const parent = el.parentNode;
+      if (!parent) return;
+      while (el.firstChild){
+        parent.insertBefore(el.firstChild, el);
+      }
+      parent.removeChild(el);
+    });
+  }
+
   function getActiveStory(){
     const dbIndex = EditorCore.getFocusedDbIndex();
     if (!dbIndex) return null;
@@ -26,6 +74,9 @@
   }
 
   function afterChange(story){
+    // 新增：先清掉空 b/i/u 與空的字級 span，避免殘留
+    sweepInlineGarbage(story);
+
     const db = Number(story.dataset.dbIndex||'0')|0;
     EditorCore.updatePageJsonFromStory(db, story);
     if (window.PasteFlow && typeof window.PasteFlow.forceReflow === 'function') {
@@ -102,9 +153,9 @@
     const sizeKey = span.dataset.fs || (span.style.fontSize||'').replace('em','');
     if (!sizeKey) return;
 
-    // 合併左
+    // 合併左：忽略純空白文字節點
     let prev = span.previousSibling;
-    while (prev && prev.nodeType===3 && !prev.nodeValue) prev = prev.previousSibling;
+    while (prev && isWhitespaceText(prev)) prev = prev.previousSibling;
     if (prev && prev.nodeType===1 && prev.tagName==='SPAN'){
       const prevKey = prev.dataset.fs || (prev.style.fontSize||'').replace('em','');
       if (prevKey === sizeKey){
@@ -113,9 +164,9 @@
         span = prev;
       }
     }
-    // 合併右
+    // 合併右：忽略純空白文字節點
     let next = span.nextSibling;
-    while (next && next.nodeType===3 && !next.nodeValue) next = next.nextSibling;
+    while (next && isWhitespaceText(next)) next = next.nextSibling;
     if (next && next.nodeType===1 && next.tagName==='SPAN'){
       const nextKey = next.dataset.fs || (next.style.fontSize||'').replace('em','');
       if (nextKey === sizeKey){
