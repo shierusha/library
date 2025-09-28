@@ -5,7 +5,6 @@
  * - 封面：書名同步、雙擊可輸入封面圖片網址（空值=移除）
  * - 版面縮放以面積推字級（--scale），不動你的 CSS
  * - ★ 修正：章節載入 + TOC 綁定 + BookFlip 游標同步 + 書名輸入不重置游標
- * - ★ 重要：任何「重建/插頁/跳頁」都以『硬鎖當前 DB 頁』為準，不做四捨五入，不跳頁
  */
 
 (function(){
@@ -27,18 +26,6 @@
     aspectShort: 5/7,      // 高/寬
     aspectLong:  7/5
   };
-
-  /* ===== 顯示錨點（新增） =====
-   * 'self' = 顯示當前頁；'next' = 顯示下一頁（你要的效果）
-   */
-  window.PAGE_ANCHOR = 'next';
-  function anchorDbIndex(dbIndex){
-    const len = (Array.isArray(window.PAGES_DB) ? PAGES_DB.length : 0) | 0;
-    const cur = Math.max(1, dbIndex|0);
-    // 只在 spread 模式才偏移到下一頁；單頁模式維持當前頁更直覺
-    const wantNext = (window.PAGE_ANCHOR === 'next') && (window.state?.mode === 'spread');
-    return wantNext ? Math.min(len || cur, cur + 1) : cur;
-  }
 
   /* ===== 全域資料 ===== */
   const urlq = new URLSearchParams(location.search);
@@ -73,49 +60,65 @@
   }
 
   /* ===== 封面（第一張 .paper，不算頁碼） ===== */
-  function applyCoverFromBook(isFromTitleTyping = false) {
-    const title = ACTIVE_BOOK?.title || '未命名書籍';
-    const coverURL = (ACTIVE_BOOK?.cover_image || '').trim();
+function applyCoverFromBook(isFromTitleTyping = false) {
+  const title = ACTIVE_BOOK?.title || '未命名書籍';
+  const coverURL = (ACTIVE_BOOK?.cover_image || '').trim();
 
-    if (state.mode === 'spread') {
-      const coverFront = elBook.querySelector('.paper .page.front');
-      const coverBack  = elBook.querySelector('.paper .page.back');
-      if (!coverFront) return;
+  if (state.mode === 'spread') {
+    const coverFront = elBook.querySelector('.paper .page.front');
+    const coverBack  = elBook.querySelector('.paper .page.back');
+    if (!coverFront) return;
 
-      if (coverURL) {
-        coverFront.classList.add('page--illustration');
-        coverFront.style.backgroundImage = `url("${coverURL}")`;
-        coverFront.innerHTML = '';
-      } else {
-        coverFront.classList.remove('page--illustration');
-        coverFront.style.backgroundImage = '';
-        coverFront.style.background = '#fff';
-        coverFront.style.display = 'flex';
-        coverFront.style.alignItems = 'center';
-        coverFront.style.justifyContent = 'center';
-        coverFront.innerHTML = `<div class="cover-title" style="font-size:1.8em;font-weight:700">${escapeHTML(title)}</div>`;
-      }
-      if (coverBack) coverBack.style.background = '#fff';
+    if (coverURL) {
+      // 有圖片：只保留 background-image，其餘清空
+      coverFront.classList.add('page--illustration');
+      coverFront.style.background = '';                 // 清掉 shorthand（避免出現 rgb(...)）
+      coverFront.style.backgroundColor = 'transparent'; // 確保沒有底色
+      coverFront.style.backgroundImage = `url("${coverURL}")`;
+      coverFront.style.display = '';                    // 清掉先前置中用的 flex
+      coverFront.style.alignItems = '';
+      coverFront.style.justifyContent = '';
+      coverFront.innerHTML = '';
     } else {
-      const sp = elBook.querySelectorAll('.single-page');
-      const front = sp[0], back = sp[1];
-      if (!front) return;
-
-      if (coverURL) {
-        front.classList.add('page--illustration');
-        front.style.backgroundImage = `url("${coverURL}")`;
-        front.innerHTML = '';
-      } else {
-        front.classList.remove('page--illustration');
-        front.style.backgroundImage = '';
-        front.style.background = '#fff';
-        front.style.display = 'flex';
-        front.style.alignItems = 'center';
-        front.style.justifyContent = 'center';
-        front.innerHTML = `<div class="cover-title" style="font-size:1.8em;font-weight:700">${escapeHTML(title)}</div>`;
-      }
-      if (back) back.style.background = '#fff';
+      // 無圖片：白底＋置中書名
+      coverFront.classList.remove('page--illustration');
+      coverFront.style.backgroundImage = '';
+      coverFront.style.background = '#fff';
+      coverFront.style.display = 'flex';
+      coverFront.style.alignItems = 'center';
+      coverFront.style.justifyContent = 'center';
+      coverFront.innerHTML = `<div class="cover-title" style="font-size:1.8em;font-weight:700">${escapeHTML(title)}</div>`;
     }
+    if (coverBack) coverBack.style.background = '#fff';
+
+  } else {
+    const sp = elBook.querySelectorAll('.single-page');
+    const front = sp[0], back = sp[1];
+    if (!front) return;
+
+    if (coverURL) {
+      // 有圖片：只保留 background-image，其餘清空
+      front.classList.add('page--illustration');
+      front.style.background = '';
+      front.style.backgroundColor = 'transparent';
+      front.style.backgroundImage = `url("${coverURL}")`;
+      front.style.display = '';
+      front.style.alignItems = '';
+      front.style.justifyContent = '';
+      front.innerHTML = '';
+    } else {
+      // 無圖片：白底＋置中書名
+      front.classList.remove('page--illustration');
+      front.style.backgroundImage = '';
+      front.style.background = '#fff';
+      front.style.display = 'flex';
+      front.style.alignItems = 'center';
+      front.style.justifyContent = 'center';
+      front.innerHTML = `<div class="cover-title" style="font-size:1.8em;font-weight:700">${escapeHTML(title)}</div>`;
+    }
+    if (back) back.style.background = '#fff';
+  }
+}
 
     // ★ 修正：輸入期間不要回寫 #bookTitle，避免游標跳到第一字
     if (!isFromTitleTyping) {
@@ -335,112 +338,112 @@
     }
   };
 
-  /* ===== ★ 核心：硬鎖到指定 DB 頁（不跳頁，不取整） ===== */
-function lockToDbIndex(dbIndex){
-  if (!dbIndex || dbIndex < 1) dbIndex = 1;
-
-  // 顯示錨點：spread 模式下顯示「下一頁」
-  const viewDb   = anchorDbIndex(dbIndex);
-  const domIndex = viewDb + 2;        // DB 1-based → DOM 1-based(含封面)
-  const domZero  = domIndex - 1;      // 0-based
-
-  // 第一拍：立即鎖
-  if (book){
-    book._cursorPage = domZero;
-    if (typeof book._mountCurrent === 'function') book._mountCurrent();
-  }
-
-  // 第二拍：下一個 animation frame 再鎖一次（避免外掛在 mount 後回調把頁面拉走）
-  requestAnimationFrame(()=>{
-    if (book){
-      book._cursorPage = domZero;
-      if (typeof book._mountCurrent === 'function') book._mountCurrent();
-    }
-    // 第三拍：再保險一次
-    requestAnimationFrame(()=>{
-      if (book){
-        book._cursorPage = domZero;
-        if (typeof book._mountCurrent === 'function') book._mountCurrent();
-      }
-    });
-  });
-
-  // 同步樣式區塊用的最後互動頁（單純映射）
-  if (window.EditorCore && typeof EditorCore.setLastDbIndex === 'function'){
-    EditorCore.setLastDbIndex(dbIndex);
-  }
-  lightRedraw();
-}
-
-  /* ===== 跳頁（公開 API） ===== */
+  /* ===== 跳頁 ===== */
   window.gotoPageDomByDbIndex = function gotoPageDomByDbIndex(dbIndex){
-    lockToDbIndex(dbIndex);
+    const domIndex = dbIndex + 2; // 封面佔 1、2
+    gotoDomPage(domIndex);
   };
   window.gotoDomPage = function gotoDomPage(domIndex){
     const isSpread = state.mode === 'spread';
     const totalDom = isSpread
       ? elBook.querySelectorAll('.paper').length * 2
       : elBook.querySelectorAll('.single-page').length;
+
     const clamped = Math.max(1, Math.min(totalDom, domIndex|0));
-    const dbIndex = Math.max(1, clamped - 2);
-    lockToDbIndex(dbIndex);
+    if (book){
+      book._cursorPage = clamped - 1;
+      if (typeof book._mountCurrent === 'function') book._mountCurrent();
+    }
+    // 同步最後互動頁（讓樣式按鈕打在當前頁）
+    if (window.EditorCore && typeof EditorCore.setLastDbIndex === 'function'){
+      const dom = (book?._cursorPage || 0) + 1;
+      const db  = EditorCore.domIndexToDbIndex(dom) || 1;
+      EditorCore.setLastDbIndex(db);
+    }
+    lightRedraw();
   };
 
-  /* ===== 重建（動到頁數時） =====
- * 關鍵：new BookFlip 後，不做任何推算；直接鎖到 targetDbIndex（含雙 rAF 硬鎖）
- */
-window.rebuildTo = function rebuildTo(targetDbIndex){
-  try{
-    if (!targetDbIndex || targetDbIndex < 1) targetDbIndex = 1;
+  /* ===== 重建（動到頁數時） ===== */
+  window.rebuildTo = function rebuildTo(targetDbIndex){
+    try{
+      const pairs = buildPairsFromPages();
+      window.book = new BookFlip('#bookCanvas', {
+        mode: state.mode,
+        direction: state.direction,
+        speed: 450,
+        singleSpeed: 300,
+        perspective: 2000,
+        data: { pairs },
+        startPageIndex: Math.max(0, (targetDbIndex + 2) - 1 - 1), // db->dom->0based
+        coverPapers: 1
+      });
 
-    const pairs = buildPairsFromPages();
-
-    // ★ 第一次 mount 就站在「錨點頁」（spread=下一頁；single=當前頁）
-    const viewDb  = anchorDbIndex(targetDbIndex);
-    const domZero = Math.max(
-      0,
-      ((window.EditorCore?.dbIndexToDomIndex?.(viewDb) || (viewDb + 2)) - 1)
-    );
-
-    window.book = new BookFlip('#bookCanvas', {
-      mode: state.mode,
-      direction: state.direction,
-      speed: 450,
-      singleSpeed: 300,
-      perspective: 2000,
-      data: { pairs },
-      startPageIndex: domZero,   // ← 不要 0，直接用正確頁起跑
-      coverPapers: 1
-    });
-
-    // mount 後只做視覺鉤子，不改游標
-    if (typeof book._mountCurrent === 'function'){
-      const _origMount = book._mountCurrent.bind(book);
-      book._mountCurrent = function(){
-        const r = _origMount();
-        setTimeout(()=>{ 
-          // 同步最後互動頁（單純映射）
-          if (window.EditorCore && typeof EditorCore.setLastDbIndex === 'function'){
-            const dom = (book?._cursorPage || 0) + 1;
-            const db  = EditorCore.domIndexToDbIndex(dom) || 1;
-            EditorCore.setLastDbIndex(db);
+      // ★ BookFlip 游標同步：確保 getFocusedDbIndex 的 fallback 正確
+      function totalDomPages(){
+        const isSpread = (book?.opts?.mode || state.mode) === 'spread';
+        return isSpread
+          ? elBook.querySelectorAll('.paper').length * 2
+          : elBook.querySelectorAll('.single-page').length;
+      }
+      function syncCursorFromController(){
+        if (!book) return;
+        const mode = book.opts?.mode || 'spread';
+        const total = Math.max(1, totalDomPages());
+        const ctrl  = book._controller;
+        if (ctrl && Number.isFinite(ctrl.current)){
+          if (mode === 'spread') {
+            book._cursorPage = Math.max(0, Math.min(total - 1, ctrl.current * 2));
+          } else {
+            book._cursorPage = Math.max(0, Math.min(total - 1, ctrl.current));
           }
-          lightRedraw(); 
-        }, 0);
-        return r;
-      };
-    }
+        } else {
+          book._cursorPage = Math.max(0, Math.min(total - 1, book._cursorPage|0));
+        }
+      }
 
-    // ★ 重建完成 → 立刻硬鎖到「指定的 DB 頁」（也會依錨點顯示）
-    lockToDbIndex(targetDbIndex);
+      // 初次同步
+      syncCursorFromController();
 
-    applyLayout();
-    if (typeof window.ensureSwipeBinding === 'function') ensureSwipeBinding();
-    lightRedraw();
+      // 包 next / prev / setMode / _mountCurrent
+      if (typeof book.next === 'function'){
+        const _next = book.next.bind(book);
+        book.next = ()=>{ _next(); setTimeout(()=>{ syncCursorFromController(); }, 0); };
+      }
+      if (typeof book.prev === 'function'){
+        const _prev = book.prev.bind(book);
+        book.prev = ()=>{ _prev(); setTimeout(()=>{ syncCursorFromController(); }, 0); };
+      }
+      if (typeof book.setMode === 'function'){
+        const _setMode = book.setMode.bind(book);
+        book.setMode = (m)=>{ _setMode(m); setTimeout(()=>{ syncCursorFromController(); }, 0); };
+      }
+      if (typeof book._mountCurrent === 'function'){
+        const _origMount = book._mountCurrent.bind(book);
+        book._mountCurrent = function(){
+          const r = _origMount();
+          setTimeout(()=>{ 
+            syncCursorFromController(); 
+            // 同步最後互動頁
+            if (window.EditorCore && typeof EditorCore.setLastDbIndex === 'function'){
+              const dom = (book?._cursorPage || 0) + 1;
+              const db  = EditorCore.domIndexToDbIndex(dom) || 1;
+              EditorCore.setLastDbIndex(db);
+            }
+            lightRedraw(); 
+          }, 0);
+          return r;
+        };
+      }
 
-  }catch(e){ console.warn('rebuild failed:', e); }
-};
+      // 導到目標頁
+      book._cursorPage = Math.max(0, (targetDbIndex + 2) - 2);
+      if (typeof book._mountCurrent === 'function') book._mountCurrent();
 
+      applyLayout(); lightRedraw();
+      if (typeof window.ensureSwipeBinding === 'function') ensureSwipeBinding();
+
+    }catch(e){ console.warn('rebuild failed:', e); }
+  };
 
   /* ===== 左右鍵 ===== */
   function goLeft(){
@@ -457,19 +460,7 @@ window.rebuildTo = function rebuildTo(targetDbIndex){
   /* ===== 三顆主控 ===== */
   function toggleDir(){ state.direction = (state.direction === 'ltr') ? 'rtl' : 'ltr'; book.setDirection(state.direction); applyLayout(); lightRedraw(); }
   function toggleBind(){ state.bind = (state.bind === 'short') ? 'long' : 'short'; applyLayout(); lightRedraw(); }
-  function toggleView(){
-  state.mode = (state.mode === 'spread') ? 'single' : 'spread';
-  const db = (window.EditorCore && typeof EditorCore.getFocusedDbIndex === 'function')
-    ? (EditorCore.getFocusedDbIndex() || 1)
-    : 1;
-  book?.setMode?.(state.mode);
-  // ★ 切換模式後，立刻硬鎖回目前 DB 頁（會依錨點顯示）
-  lockToDbIndex(db);
-  applyLayout(); 
-  ensureSwipeBinding(); 
-  lightRedraw();
-}
-
+  function toggleView(){ state.mode = (state.mode === 'spread') ? 'single' : 'spread'; book.setMode(state.mode); applyLayout(); ensureSwipeBinding(); lightRedraw(); }
   document.getElementById('btnToggleDir') .addEventListener('click', toggleDir);
   document.getElementById('btnToggleBind').addEventListener('click', toggleBind);
   document.getElementById('btnToggleView').addEventListener('click', toggleView);
@@ -678,11 +669,17 @@ window.rebuildTo = function rebuildTo(targetDbIndex){
     try {
       await initData();
 
-      // 以「目前聚焦頁」為起點硬鎖（確保第一次就不跳）
-      const focus = (window.EditorCore && typeof EditorCore.getFocusedDbIndex === 'function')
-        ? (EditorCore.getFocusedDbIndex() || 1)
-        : 1;
-      rebuildTo(focus);
+      const pairs = buildPairsFromPages();
+      window.book = new BookFlip('#bookCanvas', {
+        mode: state.mode,
+        direction: state.direction,
+        speed: 450,
+        singleSpeed: 300,
+        perspective: 2000,
+        data: { pairs },
+        startPageIndex: 0,
+        coverPapers: 1
+      });
 
       // 初次也包一層 mount 後重繪
       if (typeof book._mountCurrent === 'function'){
