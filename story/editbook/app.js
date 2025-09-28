@@ -1,4 +1,4 @@
-/* app.js — 本地化編輯模式 + BookFlip 掛載（完整版，含 TOC、章節初始化、游標同步）
+/* app.js — 本地化編輯模式 + BookFlip 掛載（完整版，含 TOC、章節初始化、游標同步） 調整ENUM版
  * 重點：
  * - 以 ?bookid=UUID 讀一次 Supabase → 寫進 localStorage
  * - 後續操作都走 LOCAL（persistDraft() 只寫 localStorage）
@@ -85,7 +85,7 @@ function fromDbType(t){
   return normalizeType(t);
 }
 
-// 內部 → DB（寫回時）
+// 內部 → DB（寫回時 / 保存到 LOCAL）
 function toDbType(canon){
   const c = normalizeType(canon);
   return TYPE_DB_PREF[c] || 'novel';
@@ -625,11 +625,13 @@ window.rebuildTo = function rebuildTo(targetDbIndex){
   window.persistDraft = function persistDraft(){
     if (!ACTIVE_BOOK?.id) return;
     writeLS(LS_KEY_BOOK(ACTIVE_BOOK.id), ACTIVE_BOOK);
+
+    // 直接把 type 存成 DB 枚舉（divider_white / divider_black / image / novel）
     writeLS(LS_KEY_PAGES(ACTIVE_BOOK.id), PAGES_DB.map(p => ({
-   ...p,
-   type: normalizeType(p.type), // 內部一致
-   type_db: toDbType(p.type),   // 未來上傳 DB 用
- })));
+      ...p,
+      type: toDbType(p.type),
+    })));
+
     writeLS(LS_KEY_CHAP(ACTIVE_BOOK.id), CHAPTERS_DB);
   };
 
@@ -700,13 +702,15 @@ window.rebuildTo = function rebuildTo(targetDbIndex){
     let local = loadFromLocal(BOOK_ID_Q);
     if (local){
       ACTIVE_BOOK = local.bookData;
-PAGES_DB = (local.pages || []).map(p => ({ ...p, type: fromDbType(p.type) }));
+      // LOCAL 存的是 DB 枚舉；讀入後正規化回內部型別
+      PAGES_DB = (local.pages || []).map(p => ({ ...p, type: fromDbType(p.type) }));
       CHAPTERS_DB = local.chapters || [];
     }else{
       // 首次：打 DB 取回 → 寫入 LS
       const { bookData, pages, chapters } = await fetchFromSupabase(BOOK_ID_Q);
       ACTIVE_BOOK = bookData;
-     PAGES_DB = (pages || []).map(p => ({ ...p, type: fromDbType(p.type) }));
+      // DB 回來的枚舉 → 正規化回內部型別
+      PAGES_DB = (pages || []).map(p => ({ ...p, type: fromDbType(p.type) }));
       CHAPTERS_DB = chapters || [];
       persistDraft();
     }
