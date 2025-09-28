@@ -72,59 +72,87 @@
     try{ localStorage.setItem(key, JSON.stringify(val)); }catch(_){}
   }
 
-  /* ===== 封面（第一張 .paper，不算頁碼） ===== */
-  function applyCoverFromBook(isFromTitleTyping = false) {
-    const title = ACTIVE_BOOK?.title || '未命名書籍';
-    const coverURL = (ACTIVE_BOOK?.cover_image || '').trim();
+/* ===== 封面（第一張 .paper，不算頁碼） ===== */
+function applyCoverFromBook(isFromTitleTyping = false) {
+  const title = ACTIVE_BOOK?.title || '未命名書籍';
+  const coverURL = (ACTIVE_BOOK?.cover_image || '').trim();
 
-    if (state.mode === 'spread') {
-      const coverFront = elBook.querySelector('.paper .page.front');
-      const coverBack  = elBook.querySelector('.paper .page.back');
-      if (!coverFront) return;
+  if (state.mode === 'spread') {
+    const coverFront = elBook.querySelector('.paper .page.front');
+    const coverBack  = elBook.querySelector('.paper .page.back');
+    if (!coverFront) return;
 
-      if (coverURL) {
-        coverFront.classList.add('page--illustration');
-        coverFront.style.backgroundImage = `url("${coverURL}")`;
-        coverFront.innerHTML = '';
-      } else {
-        coverFront.classList.remove('page--illustration');
-        coverFront.style.backgroundImage = '';
-        coverFront.style.background = '#fff';
-        coverFront.style.display = 'flex';
-        coverFront.style.alignItems = 'center';
-        coverFront.style.justifyContent = 'center';
-        coverFront.innerHTML = `<div class="cover-title" style="font-size:1.8em;font-weight:700">${escapeHTML(title)}</div>`;
-      }
-      if (coverBack) coverBack.style.background = '#fff';
+    if (coverURL) {
+      coverFront.classList.add('page--illustration');
+      // 先清掉可能殘留的 shorthand
+      coverFront.style.background = '';
+      coverFront.style.backgroundColor = '';
+      // 僅設定 backgroundImage
+      coverFront.style.backgroundImage = `url("${coverURL}")`;
+      // 還原可能被「無圖」狀態設定的排版
+      coverFront.style.display = '';
+      coverFront.style.alignItems = '';
+      coverFront.style.justifyContent = '';
+      coverFront.innerHTML = '';
     } else {
-      const sp = elBook.querySelectorAll('.single-page');
-      const front = sp[0], back = sp[1];
-      if (!front) return;
-
-      if (coverURL) {
-        front.classList.add('page--illustration');
-        front.style.backgroundImage = `url("${coverURL}")`;
-        front.innerHTML = '';
-      } else {
-        front.classList.remove('page--illustration');
-        front.style.backgroundImage = '';
-        front.style.background = '#fff';
-        front.style.display = 'flex';
-        front.style.alignItems = 'center';
-        front.style.justifyContent = 'center';
-        front.innerHTML = `<div class="cover-title" style="font-size:1.8em;font-weight:700">${escapeHTML(title)}</div>`;
-      }
-      if (back) back.style.background = '#fff';
+      coverFront.classList.remove('page--illustration');
+      // 清掉圖片，只留底色
+      coverFront.style.background = '';          // 清 shorthand（保險）
+      coverFront.style.backgroundImage = '';
+      coverFront.style.backgroundColor = '#fff'; // 用 backgroundColor 取代 shorthand
+      coverFront.style.display = 'flex';
+      coverFront.style.alignItems = 'center';
+      coverFront.style.justifyContent = 'center';
+      coverFront.innerHTML = `<div class="cover-title" style="font-size:1.8em;font-weight:700">${escapeHTML(title)}</div>`;
     }
+    if (coverBack) {
+      // 背面只設底色，避免用 shorthand
+      coverBack.style.background = '';
+      coverBack.style.backgroundImage = '';
+      coverBack.style.backgroundColor = '#fff';
+    }
+  } else {
+    const sp = elBook.querySelectorAll('.single-page');
+    const front = sp[0], back = sp[1];
+    if (!front) return;
 
-    // ★ 修正：輸入期間不要回寫 #bookTitle，避免游標跳到第一字
-    if (!isFromTitleTyping) {
-      const titleNode = document.getElementById('bookTitle');
-      if (titleNode && titleNode.textContent !== title) {
-        titleNode.textContent = title;
-      }
+    if (coverURL) {
+      front.classList.add('page--illustration');
+      // 先清掉可能殘留的 shorthand
+      front.style.background = '';
+      front.style.backgroundColor = '';
+      // 僅設定 backgroundImage
+      front.style.backgroundImage = `url("${coverURL}")`;
+      front.style.display = '';
+      front.style.alignItems = '';
+      front.style.justifyContent = '';
+      front.innerHTML = '';
+    } else {
+      front.classList.remove('page--illustration');
+      front.style.background = '';
+      front.style.backgroundImage = '';
+      front.style.backgroundColor = '#fff';
+      front.style.display = 'flex';
+      front.style.alignItems = 'center';
+      front.style.justifyContent = 'center';
+      front.innerHTML = `<div class="cover-title" style="font-size:1.8em;font-weight:700">${escapeHTML(title)}</div>`;
+    }
+    if (back) {
+      back.style.background = '';
+      back.style.backgroundImage = '';
+      back.style.backgroundColor = '#fff';
     }
   }
+
+  // ★ 修正：輸入期間不要回寫 #bookTitle，避免游標跳到第一字
+  if (!isFromTitleTyping) {
+    const titleNode = document.getElementById('bookTitle');
+    if (titleNode && titleNode.textContent !== title) {
+      titleNode.textContent = title;
+    }
+  }
+}
+
 
   // 封面雙擊：輸入封面 URL，空=移除
   function bindCoverEdit(){
