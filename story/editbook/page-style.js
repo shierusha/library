@@ -34,20 +34,26 @@
   function applyDomClassForType(pageEl, type, pageObj) {
     if (!pageEl) return;
 
-    // 清掉舊類名與背景
+    // 清掉舊類名與背景（重點：同時清 shorthand 與 image）
     CLASS_ALL.forEach(c => pageEl.classList.remove(c));
+    pageEl.style.background = '';         // ← 新增：避免 shorthand 殘留
     pageEl.style.backgroundImage = '';
+    pageEl.style.backgroundColor = '';
 
     if (type === 'divider_light') {
       pageEl.classList.add('page--divider_light');
+      // 置中頁不應有圖片，已於上方清空
     } else if (type === 'divider_dark') {
       pageEl.classList.add('page--divider_dark');
+      // 同上
     } else if (type === 'illustration') {
       pageEl.classList.add('page--illustration');
       const url = (pageObj?.image_url || '').trim();
       if (url) pageEl.style.backgroundImage = `url("${url}")`;
+      // 不使用 background shorthand，避免覆蓋 background-image
     } else {
       pageEl.classList.add('page--novel');
+      // 一般頁維持無背景；若需底色請用 CSS 類別控制，不用 inline shorthand
     }
   }
 
