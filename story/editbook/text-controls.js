@@ -1,6 +1,7 @@
-/* text-controls.js — B/I/U（OK）+ A+/A-（只動反白、統一尺寸、截斷邊界；且不產生 data-fs 巢狀）
+/* text-controls.js — B/I/U（OK）+ A+/A-（只動反白、分段提級、不合併鄰居、可連按）
  * - B/I/U：原生 toggle + 清理
- * - A+/A-：先包選取 → strip 內部 data-fs → 再把這個包「提」到外層 data-fs 之外（分成左右/中三段）
+ * - A+/A-：僅在有選取時運作；抽出→去內部 data-fs→包目標字級→把包「提」到任何外層 data-fs 之外
+ *          不與左右同字級合併，然後把選取重設到剛剛那段，方便一直 ++++ / ----
  */
 (function () {
   if (!window.EditorCore) return;
@@ -66,7 +67,7 @@
         if (!hasText) unwrap(el);
       });
 
-      // 去巢狀 + 合併相鄰
+      // 去巢狀
       let changed = true;
       while (changed) {
         changed = false;
@@ -75,14 +76,8 @@
           if (p && p.tagName.toLowerCase() === tag) { unwrap(el); changed = true; }
         });
       }
-      Array.from(root.querySelectorAll(tag)).forEach(el=>{
-        let next = el.nextSibling;
-        while (next && next.nodeType === 3 && !(next.nodeValue||"").trim()) next = next.nextSibling;
-        if (next && next.nodeType === 1 && next.tagName.toLowerCase() === tag) {
-          while (next.firstChild) el.appendChild(next.firstChild);
-          next.remove();
-        }
-      });
+
+      // 不做相鄰合併，避免影響下次選取範圍
     });
   }
 
@@ -130,25 +125,7 @@
     }
     Array.from(el.childNodes).forEach(stripFsInFragment);
   }
-  function mergeAdjacentFs(span) {
-    if (!span || span.nodeType !== 1 || span.tagName !== "SPAN") return;
-    const key = span.dataset.fs || (span.style.fontSize || "").replace("em", "");
-    if (!key) return;
-    // 左
-    let prev = span.previousSibling;
-    while (prev && prev.nodeType === 3 && !prev.nodeValue) prev = prev.previousSibling;
-    if (prev && prev.nodeType === 1 && prev.tagName === "SPAN") {
-      const k = prev.dataset.fs || (prev.style.fontSize || "").replace("em","");
-      if (k === key) { while (span.firstChild) prev.appendChild(span.firstChild); span.replaceWith(prev); span = prev; }
-    }
-    // 右
-    let next = span.nextSibling;
-    while (next && next.nodeType === 3 && !next.nodeValue) next = next.nextSibling;
-    if (next && next.nodeType === 1 && next.tagName === "SPAN") {
-      const k = next.dataset.fs || (next.style.fontSize || "").replace("em","");
-      if (k === key) { while (next.firstChild) span.appendChild(next.firstChild); next.remove(); }
-    }
-  }
+
   function cleanupEmptyFs(root){
     Array.from(root.querySelectorAll('span[data-fs],span[style*="font-size"]')).forEach(el=>{
       let hasText = false;
@@ -160,6 +137,7 @@
       if (!hasText && !hasElement) unwrap(el);
     });
   }
+
   function computeBaseEmForSelection(range){
     const findFsWrapper = (node)=>{
       let cur = node && node.nodeType === 1 ? node : node ? node.parentElement : null;
@@ -176,7 +154,7 @@
     return isNaN(base2) ? 1.0 : base2;
   }
 
-  /* ========== 把選取包「提級」出外層 data-fs（避免巢狀） ========== */
+  /* ========== 把選取包「提級」出外層 data-fs（避免巢狀），且不合併鄰居 ========== */
   function liftOutFromFs(wrapper) {
     let w = wrapper;
     while (w.parentElement && isFsSpan(w.parentElement)) {
@@ -212,11 +190,10 @@
       // 把 wrapper 提到 p 的位置
       gp.replaceChild(w, p);
     }
-    // 清一下相鄰同字級
-    mergeAdjacentFs(w);
+    // 不與左右同字級合併，避免擴大範圍
   }
 
-  /* ========== A+/A-（只動反白、分開而不包在舊 data-fs 裡） ========== */
+  /* ========== A+/A-（只動反白、不影響未選取，且可連按） ========== */
   function adjustFont(deltaStep) {
     const ctx = getStoryAndRange(false /* 必須有選取 */);
     if (!ctx) return false;
@@ -239,9 +216,15 @@
       // 3) 把這個「包」往外提到任何 data-fs 之外 → 形成左右(原尺寸)/中(新尺寸) 三段
       liftOutFromFs(span);
 
-      // 4) 合併相鄰同字級 + 移除空 wrapper
-      mergeAdjacentFs(span);
+      // 4) 清空空 wrapper
       cleanupEmptyFs(story);
+
+      // 5) 重新選取剛剛那段，支援連按 A+ / A-
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      const nr = document.createRange();
+      nr.selectNodeContents(span);
+      sel.addRange(nr);
 
       afterChange(story);
       return true;
