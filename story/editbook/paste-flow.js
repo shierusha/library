@@ -1,13 +1,28 @@
 /* paste-flow.js
- * 貼上純文字 / Enter / 輸入 → 視覺溢出自動分頁到下一個 novel 頁
- * - 溢出判斷依 writing-mode 決定：直排看寬、橫排看高
- * - 沒有可寫頁就插入一張白紙（兩頁），並繼續流向新 front
+ * 目標：貼上純文字 → 以 <br> 斷行（不產生 <div>/<p>）
+ *       Enter 也寫入 <br>（與 editor-core 的行為一致）
+ *       視覺溢出推到下一頁時，同樣用 <br> 插入剩餘文字
+ * 備註：保留你原有的自動分頁邏輯與選取復位流程
  */
 (function(){
+  /* ===== 小工具：純文字 → 安全 HTML（以 <br> 斷行） ===== */
+  function escHtml(s){
+    return String(s||'')
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;')
+      .replace(/'/g,'&#39;');
+  }
+  function plainToBrHtml(t){
+    // 先統一換行，再轉 <br>
+    return escHtml(String(t||'').replace(/\r\n/g,'\n').replace(/\r/g,'\n')).replace(/\n/g,'<br>');
+  }
+
   function isVerticalFlow(storyEl){
     const page = storyEl.closest('.page, .single-page') || storyEl;
     const wm = (page && getComputedStyle(page).writingMode) || '';
-    return wm.indexOf('vertical') === 0; // vertical-rl / vertical-lr
+    return wm.indexOf('vertical') === 0;
   }
   function isOverflow(storyEl){
     if (!storyEl) return false;
@@ -16,7 +31,7 @@
     else   { return (storyEl.scrollHeight - storyEl.clientHeight) > 0.5; }
   }
 
-  // 保留格式的子樹截斷（用視覺溢出判斷二分）
+  // 保留格式的子樹截斷（原樣）
   function truncateHTMLPreserve(firstHTML, nChars){
     if (nChars <= 0) return '';
     const tmp = document.createElement('div'); tmp.innerHTML = firstHTML;
@@ -83,95 +98,82 @@
     return 0;
   }
 
- function flowOverflowFrom(dbIndex){
-  // ① 記住一開始的頁，順便保存選取（貼上時通常焦點在這頁）
-  const startDb = dbIndex | 0;
-  const storyBefore = EditorCore.getStoryByDbIndex(startDb);
-  const savedSel = storyBefore ? EditorCore.getOffsets(storyBefore) : null;
+  function flowOverflowFrom(dbIndex){
+    const startDb = dbIndex | 0;
+    const storyBefore = EditorCore.getStoryByDbIndex(startDb);
+    const savedSel = storyBefore ? EditorCore.getOffsets(storyBefore) : null;
 
-  let curIdx = dbIndex, guard=0, MAX=2500;
-  while (curIdx > 0 && curIdx <= PAGES_DB.length){
-    if (++guard > MAX) break;
+    let curIdx = dbIndex, guard=0, MAX=2500;
+    while (curIdx > 0 && curIdx <= PAGES_DB.length){
+      if (++guard > MAX) break;
 
-    const pageEl = EditorCore.getDomPagesList()[EditorCore.dbIndexToDomIndex(curIdx)-1];
-    const story  = EditorCore.ensureStoryOnPageEl(pageEl, curIdx);
-    if (!story){ curIdx++; continue; }
+      const pageEl = EditorCore.getDomPagesList()[EditorCore.dbIndexToDomIndex(curIdx)-1];
+      const story  = EditorCore.ensureStoryOnPageEl(pageEl, curIdx);
+      if (!story){ curIdx++; continue; }
 
-    const { restPlain } = fitKeepWithFormat(story);
-    EditorCore.updatePageJsonFromStory(curIdx, story);
+      const { restPlain } = fitKeepWithFormat(story);
+      EditorCore.updatePageJsonFromStory(curIdx, story);
 
-    // 沒有溢出就收工
-    if (!restPlain || restPlain.length === 0) break;
+      if (!restPlain || restPlain.length === 0) break;
 
-    // 尋找下一個可放文字的 novel；沒有就插一張白紙
-    let nextIdx = findNextNovel(curIdx);
-    if (!nextIdx){
-      // ② 插頁後「立刻」鎖回原始頁，避免畫面被帶走
-      nextIdx = SheetOps.insertBlankSheetAfterCurrentSheet();
-      if (typeof window.lockToDbIndex === 'function') lockToDbIndex(startDb);
-
-      // 保險：確保指到 novel
-      if (String(PAGES_DB[nextIdx-1]?.type||'').toLowerCase().replace(/-/g,'_') !== 'novel'){
-        for (let k=curIdx+1;k<=PAGES_DB.length;k++){
-          if (String(PAGES_DB[k-1]?.type||'').toLowerCase().replace(/-/g,'_') === 'novel') { nextIdx = k; break; }
+      let nextIdx = findNextNovel(curIdx);
+      if (!nextIdx){
+        nextIdx = SheetOps.insertBlankSheetAfterCurrentSheet();
+        if (typeof window.lockToDbIndex === 'function') lockToDbIndex(startDb);
+        if (String(PAGES_DB[nextIdx-1]?.type||'').toLowerCase().replace(/-/g,'_') !== 'novel'){
+          for (let k=curIdx+1;k<=PAGES_DB.length;k++){
+            if (String(PAGES_DB[k-1]?.type||'').toLowerCase().replace(/-/g,'_') === 'novel') { nextIdx = k; break; }
+          }
         }
       }
+
+      const nextEl = EditorCore.getDomPagesList()[EditorCore.dbIndexToDomIndex(nextIdx)-1];
+      const nextStory = EditorCore.ensureStoryOnPageEl(nextEl, nextIdx);
+
+      // ★ 改成以 <br> 插入剩餘文字（避免產生 <div>/<p>）
+      const restHtml = plainToBrHtml(restPlain);
+      if (typeof nextStory.insertAdjacentHTML === 'function') {
+        nextStory.insertAdjacentHTML('afterbegin', restHtml);
+      } else {
+        // 後備：仍盡量保留 <br>
+        const tmp = document.createElement('div');
+        tmp.innerHTML = restHtml;
+        nextStory.insertBefore(tmp, nextStory.firstChild);
+      }
+
+      curIdx = nextIdx;
     }
 
-    // 把剩餘文字搬到 nextIdx 的開頭（或依你原本的策略放置）
-    const nextEl = EditorCore.getDomPagesList()[EditorCore.dbIndexToDomIndex(nextIdx)-1];
-    const nextStory = EditorCore.ensureStoryOnPageEl(nextEl, nextIdx);
-  if (restPlain) {
-  // 只在開頭塞入一個文字節點，不會動到原本的標籤/樣式
-  if (typeof nextStory.insertAdjacentText === 'function') {
-    nextStory.insertAdjacentText('afterbegin', restPlain);
-  } else {
-    // 老舊瀏覽器 fallback：盡量保守仍保留既有內容
-    nextStory.textContent = restPlain + (nextStory.textContent || '');
+    if (typeof window.lockToDbIndex === 'function') lockToDbIndex(startDb);
+    if (savedSel){
+      setTimeout(()=>{
+        const s = EditorCore.getStoryByDbIndex(startDb);
+        if (s){ try { EditorCore.setOffsets(s, savedSel.start, savedSel.end); s.focus?.(); } catch(_){ } }
+      }, 0);
+    }
   }
-}
-
-
-    // 繼續檢查下一頁是否還會再溢出
-    curIdx = nextIdx;
-  }
-
-  // ③ 收尾：鎖回原始頁並還原游標
-  if (typeof window.lockToDbIndex === 'function') lockToDbIndex(startDb);
-  if (savedSel){
-    setTimeout(()=>{
-      const s = EditorCore.getStoryByDbIndex(startDb);
-      if (s){ try { EditorCore.setOffsets(s, savedSel.start, savedSel.end); s.focus?.(); } catch(_){ } }
-    }, 0);
-  }
-}
 
   function bindTo(storyEl){
     const dbIndex = Number(storyEl.dataset.dbIndex||'0')|0;
     if (!dbIndex) return;
 
+    // ★ 貼上：取純文字 → 轉 <br> → insertHTML
     storyEl.addEventListener('paste', (e)=>{
       e.preventDefault();
       const t = (e.clipboardData || window.clipboardData).getData('text/plain') || '';
-      document.execCommand('insertText', false, t);
+      const html = plainToBrHtml(t);
+      document.execCommand('insertHTML', false, html);
       setTimeout(()=>{ flowOverflowFrom(dbIndex); }, 0);
     });
 
+    // ★ Enter：若沒被 editor-core 攔到，這裡也插入 <br>
     storyEl.addEventListener('keydown', (e)=>{
-     // if (e.key === 'Enter'){
-    //   e.preventDefault();
-     //   document.execCommand('insertText', false, '\n');
-    //    setTimeout(()=>{ flowOverflowFrom(dbIndex); }, 0);
-   //   }
-
-if (e.key === 'Enter'){
-    // editor-core 會先處理並呼叫 stopImmediatePropagation()
-    // 但保險起見這裡也尊重 defaultPrevented，避免雙重插入
-    if (e.defaultPrevented) return;
-    e.preventDefault();
-    document.execCommand('insertText', false, '\n');
-    setTimeout(()=>{ flowOverflowFrom(dbIndex); }, 0);
-  }
+      if (e.key === 'Enter'){
+        if (e.defaultPrevented) return; // editor-core 已處理
+        e.preventDefault();
+        document.execCommand('insertHTML', false, '<br>');
+        setTimeout(()=>{ flowOverflowFrom(dbIndex); }, 0);
+      }
     });
 
     storyEl.addEventListener('input', ()=>{
@@ -183,22 +185,15 @@ if (e.key === 'Enter'){
     });
   }
 
-  // 讓 B/I/U/字級改完也能觸發分頁（text-controls.js 會呼叫這支）
   window.PasteFlow = { bindTo, flowOverflowFrom };
 })();
-/* paste-flow.js 附加：提供 forceReflow(story)
- * 不影響你原本的 PasteFlow.bindTo(...) 分頁/推擠邏輯
- */
-(function(){
-  // 保留原物件
-  window.PasteFlow = window.PasteFlow || {};
 
-  // 若尚未實作，補一個簡單的 reflow 觸發器
+/* paste-flow.js 附加：提供 forceReflow(story)（保留你的原邏輯） */
+(function(){
+  window.PasteFlow = window.PasteFlow || {};
   if (typeof window.PasteFlow.forceReflow !== 'function') {
     window.PasteFlow.forceReflow = function(story){
       if (!story) return;
-      // 交給現有的 input 監聽去做「面積算 → 自動換頁 / 推擠」
-      // 用 raf 確保 DOM 更新順序
       requestAnimationFrame(()=>{
         story.dispatchEvent(new Event('input', { bubbles:true }));
       });
