@@ -1,4 +1,3 @@
-
 /* text-controls.js
  * 文字工具列：B / I / U / A+ / A-
  * - 只作用目前頁（EditorCore.getFocusedDbIndex）
@@ -75,7 +74,7 @@
   }
 
   function afterChange(story){
-    // 新增：先清掉空 b/i/u 與空的字級 span，避免殘留
+    // 清掉空 b/i/u 與空的字級 span，避免殘留
     sweepInlineGarbage(story);
 
     const db = Number(story.dataset.dbIndex||'0')|0;
@@ -87,22 +86,102 @@
     }
   }
 
-  /* ---------- B / I / U ---------- */
-  function wrapInline(tag){
+  /* ---------- B / I / U：真正切換（toggle） ---------- */
+
+  // 檢查 fragment 內「所有非空白文字節點」是否都在指定標籤內（例：B/I/U）
+  function allTextInsideTag(root, TAG){
+    const tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+    let hasText = false;
+    while (tw.nextNode()){
+      const t = tw.currentNode;
+      if (isWhitespaceText(t)) continue;
+      hasText = true;
+      let cur = t.parentElement;
+      let ok = false;
+      while (cur && cur !== root){
+        if (cur.tagName === TAG) { ok = true; break; }
+        cur = cur.parentElement;
+      }
+      if (!ok) return false;
+    }
+    return hasText ? true : false; // 沒文字就視為「都不在」，讓外層用 wrap
+  }
+
+  // 在一個 fragment 中把指定標籤完全移除（保留其子內容）
+  function unwrapTagDeep(root, TAG){
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, {
+      acceptNode: (el)=> (el.tagName === TAG ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP)
+    });
+    const targets = [];
+    while (walker.nextNode()) targets.push(walker.currentNode);
+    targets.forEach(el=>{
+      const parent = el.parentNode;
+      if (!parent) return;
+      while (el.firstChild) parent.insertBefore(el.firstChild, el);
+      parent.removeChild(el);
+    });
+  }
+
+  // 合併相鄰同標籤（<b></b><b> → <b>..</b>）
+  function mergeAdjacentTagAround(node, TAG){
+    if (!node || !node.parentNode) return;
+    const el = (node.nodeType===1) ? node : node.parentElement;
+    if (!el) return;
+
+    // 向左
+    let prev = el.previousSibling;
+    while (prev && isWhitespaceText(prev)) prev = prev.previousSibling;
+    if (prev && prev.nodeType===1 && prev.tagName === TAG && el.tagName === TAG){
+      while (el.firstChild) prev.appendChild(el.firstChild);
+      el.parentNode && el.parentNode.replaceChild(prev, el);
+    }
+
+    // 向右（如果向左已經把自己併進 prev，就以 prev 為基準再看右邊）
+    const base = (prev && prev.tagName===TAG) ? prev : el;
+    let next = base.nextSibling;
+    while (next && isWhitespaceText(next)) next = next.nextSibling;
+    if (next && next.nodeType===1 && next.tagName === TAG){
+      while (next.firstChild) base.appendChild(next.firstChild);
+      next.parentNode && next.parentNode.removeChild(next);
+    }
+  }
+
+  function toggleInline(tag){
+    const TAG = String(tag||'').toUpperCase();
     const ctx = getActiveStory(); if (!ctx) return false;
     const {story, range} = ctx;
 
     return EditorCore.keepSelectionAround(story, ()=>{
+      // 取出選取內容
       const frag = range.extractContents();
-      const el = document.createElement(tag);
-      el.appendChild(frag);
-      range.insertNode(el);
 
-      // 扁平化重複標籤（避免 <b><b>...）
-      const parent = el.parentElement;
-      if (parent && parent.tagName === tag.toUpperCase()){
-        while (el.firstChild) parent.insertBefore(el.firstChild, el);
-        parent.removeChild(el);
+      // 判斷是否全在該標籤內
+      const allInside = allTextInsideTag(frag, TAG);
+
+      let nodeToInsert;
+      if (allInside){
+        // 全在 → 取消：把所有該標籤拆掉
+        unwrapTagDeep(frag, TAG);
+        nodeToInsert = frag; // fragment 可直接插回去
+      }else{
+        // 非全在 → 套用：整段包一層
+        const el = document.createElement(TAG);
+        el.appendChild(frag);
+        nodeToInsert = el;
+      }
+
+      // 插回選取原位置
+      range.insertNode(nodeToInsert);
+
+      // 插入後，嘗試合併左右相鄰相同標籤，避免 <b>…</b><b>…</b>
+      if (nodeToInsert.nodeType === 1 && nodeToInsert.tagName === TAG){
+        mergeAdjacentTagAround(nodeToInsert, TAG);
+      } else if (nodeToInsert.nodeType === 11) { // DocumentFragment
+        // 找 fragment 邊界最外層元素合併
+        const firstEl = nodeToInsert.firstElementChild;
+        const lastEl  = nodeToInsert.lastElementChild;
+        if (firstEl && firstEl.tagName === TAG) mergeAdjacentTagAround(firstEl, TAG);
+        if (lastEl  && lastEl.tagName  === TAG) mergeAdjacentTagAround(lastEl, TAG);
       }
 
       afterChange(story);
@@ -223,9 +302,9 @@
     const btnUp = document.getElementById('btnFontUp');
     const btnDn = document.getElementById('btnFontDown');
 
-    btnB && btnB.addEventListener('click', ()=> wrapInline('b'));
-    btnI && btnI.addEventListener('click', ()=> wrapInline('i'));
-    btnU && btnU.addEventListener('click', ()=> wrapInline('u'));
+    btnB && btnB.addEventListener('click', ()=> toggleInline('b'));
+    btnI && btnI.addEventListener('click', ()=> toggleInline('i'));
+    btnU && btnU.addEventListener('click', ()=> toggleInline('u'));
 
     // 步進 0.1em（連按可持續放大/縮小）
     btnUp && btnUp.addEventListener('click', ()=> adjustFont(+0.1));
