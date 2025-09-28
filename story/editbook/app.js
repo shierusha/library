@@ -91,6 +91,41 @@ function toDbType(canon){
   return TYPE_DB_PREF[c] || 'novel';
 }
 
+
+/* ==== Editor-only 封面提示（不寫 DB） ==== */
+function ensureEditorHintCSS(){
+  if (document.getElementById('editorHintStyle')) return;
+  const css = `
+  .editor-hint{position:absolute;bottom:10px;right:10px;padding:.35em .6em;border-radius:6px;
+    background:rgba(0,0,0,.55);color:#fff;font-size:12px;letter-spacing:.5px;pointer-events:none;
+    user-select:none;z-index:10}
+  @media print{ .editor-hint{display:none !important;} }`;
+  const style = document.createElement('style');
+  style.id = 'editorHintStyle';
+  style.textContent = css;
+  document.head.appendChild(style);
+}
+
+function ensureCoverHint(target){
+  // 僅在編輯器環境顯示（避免純閱讀頁面也看到）
+  if (!window.EditorCore || !target) return;
+  ensureEditorHintCSS();
+  if (target.querySelector('.editor-hint.cover-hint')) return;
+  const hint = document.createElement('div');
+  hint.className = 'editor-hint cover-hint';
+  hint.textContent = '雙擊封面可輸入/編輯圖片網址';
+  target.appendChild(hint);
+}
+
+function removeCoverHint(target){
+  if (!target) return;
+  const h = target.querySelector('.editor-hint.cover-hint');
+  if (h) h.remove();
+}
+
+
+
+  
 // 提供給其他檔案共用（選用）
 window.TypeMap = { normalizeType, fromDbType, toDbType };
 
