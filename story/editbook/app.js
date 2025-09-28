@@ -18,6 +18,8 @@
   // TOC DOM
   const tocModal = document.getElementById('tocModal');
   const tocBody  = document.getElementById('tocBody');
+  const btnTOC   = document.getElementById('btnTOC');
+  let   __tocPrevFocus = null;
 
   /* ===== 狀態 ===== */
   window.state = {
@@ -153,7 +155,6 @@ function applyCoverFromBook(isFromTitleTyping = false) {
   }
 }
 
-
   // 封面雙擊：輸入封面 URL，空=移除
   function bindCoverEdit(){
     const target = (state.mode === 'spread')
@@ -218,7 +219,12 @@ function applyCoverFromBook(isFromTitleTyping = false) {
   function setPageTypeOnElement(el, p){
     const t = normalizeType(p.type);
     el.classList.remove('page--novel','page--divider_light','page--divider_dark','page--illustration');
+
+    // 先清舊背景（避免 shorthand 影響）
+    el.style.background = '';
+    el.style.backgroundColor = '';
     el.style.backgroundImage = '';
+
     el.dataset.type = t;
 
     if (t === 'divider_light') {
@@ -412,6 +418,27 @@ function lockToDbIndex(dbIndex){
     const clamped = Math.max(1, Math.min(totalDom, domIndex|0));
     const dbIndex = Math.max(1, clamped - 2);
     lockToDbIndex(dbIndex);
+  };
+
+  // ★ 新增：精準 DOM 跳頁（不經 DB → 錨點，封面專用）
+  window.gotoDomExact = function gotoDomExact(domIndex){
+    const isSpread = state.mode === 'spread';
+    const totalDom = isSpread
+      ? elBook.querySelectorAll('.paper').length * 2
+      : elBook.querySelectorAll('.single-page').length;
+    const clamped = Math.max(1, Math.min(totalDom, domIndex|0));
+    const zero = clamped - 1;
+
+    if (book){
+      book._cursorPage = zero;
+      if (typeof book._mountCurrent === 'function') book._mountCurrent();
+    }
+    // 同步最後互動頁
+    if (window.EditorCore){
+      const db = (typeof EditorCore.domIndexToDbIndex === 'function') ? (EditorCore.domIndexToDbIndex(clamped) || 1) : 1;
+      if (typeof EditorCore.setLastDbIndex === 'function') EditorCore.setLastDbIndex(db);
+    }
+    lightRedraw();
   };
 
   /* ===== 重建（動到頁數時） =====
@@ -667,8 +694,50 @@ window.rebuildTo = function rebuildTo(targetDbIndex){
   }
 
   /* ===== TOC（目錄） ===== */
-  function openTOC(){ buildTOC(); tocModal.classList.add('show'); tocModal.setAttribute('aria-hidden','false'); }
-  function closeTOC(){ tocModal.classList.remove('show'); tocModal.setAttribute('aria-hidden','true'); }
+  function openTOC(){
+    buildTOC();
+    // 可及性屬性
+    tocModal.setAttribute('role','dialog');
+    tocModal.setAttribute('aria-modal','true');
+
+    tocModal.classList.add('show');
+    tocModal.removeAttribute('inert');              // 開啟時可互動
+    tocModal.setAttribute('aria-hidden','false');
+
+    // 記住開啟前的焦點
+    __tocPrevFocus = document.activeElement;
+
+    // 把焦點移進對話框（提高可及性）
+    const first = document.getElementById('tocGotoCover') || tocModal.querySelector('.modal-content') || tocModal;
+    if (first) {
+      if (!first.hasAttribute('tabindex')) first.setAttribute('tabindex', '-1');
+      try { first.focus({ preventScroll: true }); } catch(_) {}
+    }
+  }
+
+  function closeTOC(){
+    // ★ 關閉前：若焦點在覆蓋層裡，先移到觸發鈕或 body（避免 aria-hidden 警告）
+    const focusedInside = tocModal.contains(document.activeElement);
+    const opener = btnTOC || __tocPrevFocus || null;
+    if (focusedInside) {
+      const fallback = opener || document.body;
+      if (fallback) {
+        if (!fallback.hasAttribute('tabindex')) fallback.setAttribute('tabindex','-1');
+        try { fallback.focus({ preventScroll: true }); } catch(_) {}
+        if (fallback !== document.body) fallback.removeAttribute('tabindex');
+      }
+    }
+
+    tocModal.classList.remove('show');
+    tocModal.setAttribute('aria-hidden','true');    // 然後再隱藏
+    tocModal.setAttribute('inert','');              // 隱藏時避免取得焦點/互動
+
+    // 關閉後把焦點還給開啟者
+    if (opener && opener.focus) {
+      try { opener.focus({ preventScroll: true }); } catch(_) {}
+    }
+  }
+
   function buildTOC(){
     if (!tocBody) return;
     const title = (ACTIVE_BOOK?.title || '未命名書籍').trim();
@@ -676,7 +745,7 @@ window.rebuildTo = function rebuildTo(targetDbIndex){
     const head = document.createElement('div');
     head.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin:2px 0 10px 0;';
     head.innerHTML = `<div style="font-weight:700;width: 11em;letter-spacing:1px">${escapeHTML(title)}</div>
-                      <button class="btn ghost" style="padding:2px 8px;border-color:#ffffff33;background:#ffffff00;color:#FFF;" id="tocGotoCover">去封面</button>`;
+                      <button type="button" class="btn ghost" style="padding:2px 8px;border-color:#ffffff33;background:#ffffff00;color:#FFF;" id="tocGotoCover">去封面</button>`;
     tocBody.innerHTML = '';
     tocBody.appendChild(head);
 
@@ -687,19 +756,22 @@ window.rebuildTo = function rebuildTo(targetDbIndex){
         <div class="toc-title">${escapeHTML(ch.title)}</div>
         <div class="toc-page">${ch.page_index}</div>`;
       row.addEventListener('click', ()=>{
-        gotoPageDomByDbIndex(ch.page_index);
+        // 先關 TOC，再跳頁（避免 aria-hidden 衝突）
         closeTOC();
+        requestAnimationFrame(()=> gotoPageDomByDbIndex(ch.page_index));
       });
       tocBody.appendChild(row);
     });
 
     document.getElementById('tocGotoCover')?.addEventListener('click', ()=>{
-      gotoDomPage(1);
+      // 先關 TOC，再「精準 DOM 跳頁」到封面（不受 PAGE_ANCHOR 影響）
       closeTOC();
+      requestAnimationFrame(()=> gotoDomExact(1));
     });
   }
+
   tocModal?.addEventListener('click', (e)=>{ if (e.target === tocModal) closeTOC(); });
-  document.getElementById('btnTOC')?.addEventListener('click', openTOC);
+  btnTOC?.addEventListener('click', openTOC);
 
   /* ===== 初始化 ===== */
   async function init(){
