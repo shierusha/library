@@ -1,464 +1,375 @@
-/* text-controls.js
- * 文字工具列：B / I / U / A+ / A-
- * - 只作用目前頁（EditorCore.getFocusedDbIndex）
- * - 只作用反白區段；保持選取（方便連按/連續切換）
- * - A+ / A-：只包「一層」 <span data-fs style="font-size:...em">；部分選取會切段只改選取
- * - B/I/U：部分選取只套未套用；全選已套用則取消；合併相鄰、清空殼
- * - 每次操作後：寫回 DB + 觸發 PasteFlow.forceReflow(story)
+
+/* editor-core.js
+ * - 自動在可編輯頁插入 .story[contenteditable]
+ * - 初始化 .story 優先用 content_json.text_html（不洗掉 B/I/U/字級 <span>）
+ * - 置中頁 sizing 修正 + 直排 padding，切回 novel 會還原父層
+ * - 記錄最後互動頁，工具列針對目前頁
+ * - Enter 修正：用「游標標記」跨重繪復位 + 觸發 PasteFlow 分頁
+ * - 導出選取保存/還原工具給其他模組用
  */
 (function(){
+  /* ---------- 基本工具 ---------- */
+  const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
 
-  /* ---------- 公用 ---------- */
-  const clamp = (v,min,max)=> Math.max(min, Math.min(max, v));
-
-  // 判斷是否為我們的字級 span
-  function isOurFsSpan(el){
-    return el && el.tagName === 'SPAN' &&
-           (el.dataset.fs || /em$/.test((el.style && el.style.fontSize) || ''));
-  }
-  // 文字節點是否只含空白（含 NBSP）
-  function isWhitespaceText(n){
-    return n && n.nodeType === 3 &&
-           !String(n.nodeValue||'').replace(/\u00a0/g,' ').trim();
-  }
-
-  // 清掃：移除沒有內容的 b/i/u 與空的字級 span（避免越按越累積空殼）
-  function sweepInlineGarbage(root){
-    if (!root) return;
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null);
-    const trash = [];
-
-    while (walker.nextNode()){
-      const el = walker.currentNode;
-      if (!el || el === root) continue;
-      if (el.getAttribute && el.getAttribute('data-caret') === '1') continue;
-
-      const tag = el.tagName;
-      const isInline = /^(B|I|U|EM|STRONG|S|SMALL|MARK|SUB|SUP|SPAN)$/i.test(tag);
-      if (!isInline) continue;
-      if (tag === 'SPAN' && !isOurFsSpan(el)) continue; // 只處理我們的 fs-span
-
-      const text = (el.textContent || '').replace(/\u00a0/g,' ').trim();
-      const onlyBr = el.children.length === 1 &&
-                     el.firstElementChild && el.firstElementChild.tagName === 'BR' &&
-                     text === '';
-      const noText = text === '';
-
-      if (onlyBr || noText){
-        trash.push(el);
-      }
-    }
-
-    trash.forEach(el=>{
-      const parent = el.parentNode;
-      if (!parent) return;
-      while (el.firstChild){
-        parent.insertBefore(el.firstChild, el);
-      }
-      parent.removeChild(el);
-    });
-  }
-
-  function getActiveStory(){
-    const dbIndex = EditorCore.getFocusedDbIndex();
-    if (!dbIndex) return null;
-    const story = EditorCore.getStoryByDbIndex(dbIndex);
-    if (!story) return null;
-    const sel = window.getSelection();
-    if (!sel || sel.rangeCount===0) return null;
-    const rng = sel.getRangeAt(0);
-    if (!story.contains(rng.startContainer)) return null;
-    if (rng.collapsed) return null;
-    return {story, range:rng, dbIndex};
-  }
-
-  function afterChange(story){
-    // 清掉空 b/i/u 與空的字級 span，避免殘留
-    sweepInlineGarbage(story);
-
-    const db = Number(story.dataset.dbIndex||'0')|0;
-    EditorCore.updatePageJsonFromStory(db, story);
-    if (window.PasteFlow && typeof window.PasteFlow.forceReflow === 'function') {
-      window.PasteFlow.forceReflow(story);
-    } else {
-      story.dispatchEvent(new Event('input', { bubbles:true }));
-    }
-  }
-
-  // === 選取輔助：把選取設定到某節點的內容 ===
-  function setSelectionToNodeContents(node){
-    if (!node) return;
-    const sel = window.getSelection();
-    if (!sel) return;
-    const rng = document.createRange();
-    rng.selectNodeContents(node);
-    sel.removeAllRanges();
-    sel.addRange(rng);
-  }
-
-  // === 選取輔助：用「註解節點」標記選取邊界，再恢復選取（適合多節點） ===
-  function setSelectionBetweenMarkers(startMarker, endMarker){
-    const sel = window.getSelection();
-    if (!sel || !startMarker || !endMarker) return;
-    const rng = document.createRange();
-    rng.setStartAfter(startMarker);
-    rng.setEndBefore(endMarker);
-    sel.removeAllRanges();
-    sel.addRange(rng);
-  }
-
-  /* ---------- B / I / U：部分選取只套未套用；全選已套用則取消 ---------- */
-
-  // 檢查 fragment 內「所有非空白文字節點」是否都在指定標籤內（例：B/I/U）
-  function allTextInsideTag(root, TAG){
-    const tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
-    let hasText = false;
-    while (tw.nextNode()){
-      const t = tw.currentNode;
-      if (isWhitespaceText(t)) continue;
-      hasText = true;
-      let cur = t.parentElement, ok = false;
-      while (cur && cur !== root){
-        if (cur.tagName === TAG) { ok = true; break; }
-        cur = cur.parentElement;
-      }
-      if (!ok) return false;
-    }
-    return hasText ? true : false; // 沒文字則視為「不是全在」
-  }
-
-  // 把 fragment 裡 **未在 TAG 內** 的文字節點包一層 TAG
-  function applyTagToUnstyledTextInFragment(root, TAG){
-    const tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
-    const targets = [];
-    while (tw.nextNode()){
-      const t = tw.currentNode;
-      if (isWhitespaceText(t)) continue;
-
-      // 判斷 t 在 fragment 內是否已有 TAG 祖先
-      let cur = t.parentElement, covered = false;
-      while (cur && cur !== root){
-        if (cur.tagName === TAG) { covered = true; break; }
-        cur = cur.parentElement;
-      }
-      if (!covered) targets.push(t);
-    }
-
-    // 分別包起來（之後再做相鄰合併）
-    targets.forEach(t=>{
-      const wrap = document.createElement(TAG);
-      const p = t.parentNode;
-      if (!p) return;
-      p.insertBefore(wrap, t);
-      wrap.appendChild(t);
-    });
-
-    // 合併 fragment 內相鄰同 TAG
-    mergeAdjacentTagsInFragment(root, TAG);
-  }
-
-  // 在 fragment 內把所有 TAG 拆掉（僅限 fragment 範圍）
-  function unwrapTagDeep(root, TAG){
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, {
-      acceptNode: (el)=> (el.tagName === TAG ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP)
-    });
-    const targets = [];
-    while (walker.nextNode()) targets.push(walker.currentNode);
-    targets.forEach(el=>{
-      const parent = el.parentNode;
-      if (!parent) return;
-      while (el.firstChild) parent.insertBefore(el.firstChild, el);
-      parent.removeChild(el);
-    });
-  }
-
-  // 合併相鄰同標籤（<b>..</b><b>..</b> → <b>....</b>）
-  function mergeAdjacentTagAround(node, TAG){
-    if (!node) return;
-    const el = (node.nodeType===1) ? node : node.parentElement;
-    if (!el || !el.parentNode) return;
-
-    // 向左
-    let prev = el.previousSibling;
-    while (prev && isWhitespaceText(prev)) prev = prev.previousSibling;
-    if (prev && prev.nodeType===1 && prev.tagName === TAG && el.tagName === TAG){
-      while (el.firstChild) prev.appendChild(el.firstChild);
-      el.parentNode && el.parentNode.replaceChild(prev, el);
-    }
-
-    // 基準點
-    const base = (prev && prev.tagName===TAG) ? prev : el;
-
-    // 向右
-    let next = base.nextSibling;
-    while (next && isWhitespaceText(next)) next = next.nextSibling;
-    if (next && next.nodeType===1 && next.tagName === TAG){
-      while (next.firstChild) base.appendChild(next.firstChild);
-      next.parentNode && next.parentNode.removeChild(next);
-    }
-  }
-
-  // 在指定 root 內遍歷所有 TAG，嘗試與左右鄰近 TAG 合併
-  function mergeAdjacentTagsInFragment(root, TAG){
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null);
+  function getDomPagesList(){
     const list = [];
-    while (walker.nextNode()){
-      const el = walker.currentNode;
-      if (el.tagName === TAG) list.push(el);
+    if (state.mode === 'spread') {
+      elBook.querySelectorAll('.paper').forEach(paper=>{
+        const f = paper.querySelector('.page.front');
+        const b = paper.querySelector('.page.back');
+        if (f) list.push(f);
+        if (b) list.push(b);
+      });
+    } else {
+      elBook.querySelectorAll('.single-page').forEach(n => list.push(n));
     }
-    list.forEach(el=> mergeAdjacentTagAround(el, TAG));
+    return list;
+  }
+  function domIndexToDbIndex(domIndex){ if (domIndex <= 2) return 0; return domIndex - 2; }
+  function dbIndexToDomIndex(dbIndex){ return dbIndex + 2; }
+
+  const typeStr = p => String(p?.type||'').toLowerCase().replace(/-/g,'_');
+  const isImagePage   = p => (typeStr(p) === 'image' || typeStr(p) === 'illustration');
+  const isDividerPage = p => (typeStr(p) === 'divider_white' || typeStr(p) === 'divider_light' || typeStr(p) === 'divider_dark' || typeStr(p) === 'divider_black');
+  const isNovelPage   = p => (typeStr(p) === 'novel');
+  const isEditablePage= p => (isNovelPage(p) || isDividerPage(p));
+
+  function lockMeta(){
+    elBook.querySelectorAll('.page-meta').forEach(m=>{
+      m.setAttribute('contenteditable','false');
+      m.style.pointerEvents='none';
+      m.style.userSelect='none';
+    });
   }
 
-  function toggleInline(tag){
-    const TAG = String(tag||'').toUpperCase();
-    const ctx = getActiveStory(); if (!ctx) return false;
-    const {story, range} = ctx;
+  function persist(){ try{ persistDraft && persistDraft(); }catch(_){} }
 
-    return EditorCore.keepSelectionAround(story, ()=>{
-      const frag = range.extractContents();
-      const allInside = allTextInsideTag(frag, TAG);
+  function textOf(nodes){
+    let s = '';
+    nodes.forEach(n => { s += (n.textContent || ''); });
+    return s.replace(/\u00a0/g, ' ');
+  }
 
-      // 用臨時容器包住 fragment，稍後好定位與恢復選取
-      const container = document.createElement('span');
-      container.setAttribute('data-tmp','1');
+  function updatePageJsonFromStory(dbIndex, storyEl){
+    const p = PAGES_DB[dbIndex - 1]; if (!p) return;
+    p.content_json = p.content_json || {};
+    p.content_json.text_plain = storyEl.textContent || '';
+    p.content_json.text_html  = storyEl.innerHTML  || '';
+    persist();
+  }
 
-      if (allInside){
-        // 整段都已套用 → 取消（只在選取範圍內拆掉）
-        unwrapTagDeep(frag, TAG);
-        container.appendChild(frag);
+  /* ---------- 選取保存/還原（以文字 offset 計算） ---------- */
+  function getOffsets(container){
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return null;
+    const rng = sel.getRangeAt(0);
+    if (!container.contains(rng.startContainer)) return null;
+
+    function off(node, offset, root){
+      let acc = 0;
+      const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+      while (w.nextNode()){
+        const t = w.currentNode, len = t.nodeValue.length;
+        if (t === node) return acc + offset;
+        acc += len;
+      }
+      return acc;
+    }
+    return { start: off(rng.startContainer, rng.startOffset, container),
+             end:   off(rng.endContainer,   rng.endOffset,   container) };
+  }
+  function setOffsets(container, start, end){
+    const rng = document.createRange();
+    let sNode=null, sOff=0, eNode=null, eOff=0, acc=0;
+    const w = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
+    while (w.nextNode()){
+      const t = w.currentNode, len = t.nodeValue.length;
+      if (sNode==null && acc + len >= start){ sNode=t; sOff=start-acc; }
+      if (eNode==null && acc + len >= end)  { eNode=t; eOff=end-acc; break; }
+      acc += len;
+    }
+    if (!sNode) { sNode = container; sOff = container.childNodes.length; }
+    if (!eNode) { eNode = sNode;     eOff = sOff; }
+    rng.setStart(sNode, sOff); rng.setEnd(eNode, eOff);
+    const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(rng);
+  }
+  function keepSelectionAround(story, fn){
+    const saved = getOffsets(story);
+    const ok = fn();
+    if (saved) setOffsets(story, saved.start, saved.end);
+    return ok;
+  }
+
+  /* ---------- 置中/一般頁 sizing ---------- */
+  function applySizingForStory(story, p){
+    if (!story || !p) return;
+
+    const vertical  = document.body.classList.contains('mode-rtl');
+    const padInline = vertical ? '0.6em' : '0';
+    const padBlock  = vertical ? '0.2em' : '0';
+
+    const pageEl = story.closest('.page, .single-page');
+
+    if (isDividerPage(p)) {
+      if (pageEl){
+        pageEl.style.display = 'flex';
+        pageEl.style.justifyContent = 'center';
+        pageEl.style.alignItems = 'center';
+        pageEl.style.textAlign = 'center';
+      }
+      story.style.width       = 'auto';
+      story.style.minHeight   = 'auto';
+      story.style.maxWidth    = '92%';
+      story.style.maxHeight   = '92%';
+      story.style.margin      = '0 auto';
+      story.style.alignSelf   = 'center';
+      story.style.textAlign   = 'center';
+      story.style.display     = 'inline-block';
+      story.style.overflow    = 'hidden';
+      story.style.paddingInline = padInline;
+      story.style.paddingBlock  = padBlock;
+    } else {
+      if (pageEl){
+        pageEl.style.display = '';
+        pageEl.style.justifyContent = '';
+        pageEl.style.alignItems = '';
+        pageEl.style.textAlign = '';
+      }
+      story.style.width       = '100%';
+      story.style.minHeight   = '100%';
+      story.style.maxWidth    = '';
+      story.style.maxHeight   = '';
+      story.style.margin      = '0';
+      story.style.alignSelf   = '';
+      story.style.textAlign   = '';
+      story.style.display     = '';
+      story.style.overflow    = 'hidden';
+      story.style.paddingInline = padInline;
+      story.style.paddingBlock  = padBlock;
+    }
+  }
+
+  /* ---------- Enter 修正：用「游標標記」跨重繪復位 ---------- */
+  function placeCaretMarker(story){
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return null;
+    const rng = sel.getRangeAt(0);
+
+    const marker = document.createElement('span');
+    marker.id = 'caret-' + Math.random().toString(36).slice(2);
+    marker.setAttribute('data-caret','1');
+    marker.style.cssText = 'display:inline-block;width:0;height:0;overflow:hidden;line-height:0;';
+    rng.insertNode(marker);
+
+    // caret 暫時放到標記後
+    rng.setStartAfter(marker);
+    rng.collapse(true);
+    sel.removeAllRanges(); sel.addRange(rng);
+    return marker.id;
+  }
+  function restoreCaretFromMarker(markerId){
+    const marker = document.getElementById(markerId);
+    if (!marker) return false;
+    const sel = window.getSelection();
+    const rng = document.createRange();
+    rng.setStartAfter(marker);
+    rng.collapse(true);
+    sel.removeAllRanges(); sel.addRange(rng);
+    marker.parentNode && marker.parentNode.removeChild(marker);
+    return true;
+  }
+  function bindEnterFix(story){
+    if (story.__enterFixBound) return;
+    story.__enterFixBound = true;
+
+    story.addEventListener('keydown', e=>{
+      if (e.key !== 'Enter') return;
+e.preventDefault();
+e.stopImmediatePropagation(); // ← 關鍵：避免 paste-flow 的 Enter 再跑一次
+
+      const sel = window.getSelection();
+      if (!sel || !sel.rangeCount) return;
+      const rng = sel.getRangeAt(0);
+      if (!story.contains(rng.startContainer)) return;
+
+      // 刪掉反白
+      if (!rng.collapsed) rng.deleteContents();
+
+      // 插入 <br> 並把 caret 放到 <br> 後
+      const br = document.createElement('br');
+      rng.insertNode(br);
+      rng.setStartAfter(br);
+      rng.collapse(true);
+      sel.removeAllRanges(); sel.addRange(rng);
+
+      // 下游標標記（跨重繪復位）
+      const markerId = placeCaretMarker(story);
+
+      // 寫回當前頁內容（此時 HTML 內含標記）
+      const db = Number(story.dataset.dbIndex||'0')|0;
+      updatePageJsonFromStory(db, story);
+
+      // 觸發你的分頁/推擠
+      if (window.PasteFlow && typeof window.PasteFlow.forceReflow === 'function') {
+        window.PasteFlow.forceReflow(story);
       } else {
-        // 部分未套用 → 只對「未套用」的文字節點加 TAG，不動已套用者
-        applyTagToUnstyledTextInFragment(frag, TAG);
-        container.appendChild(frag);
+        story.dispatchEvent(new Event('input', { bubbles:true }));
       }
 
-      // 插回原位置
-      range.insertNode(container);
-
-      // 先在容器內安置邊界標記，等會兒解除容器後再還原選取
-      const mStart = document.createComment('sel-start');
-      const mEnd   = document.createComment('sel-end');
-      container.insertBefore(mStart, container.firstChild);
-      container.appendChild(mEnd);
-
-      // 解除臨時容器（把孩子平鋪到原位置）
-      const parent = container.parentNode;
-      while (container.firstChild){
-        parent.insertBefore(container.firstChild, container);
-      }
-      parent.removeChild(container);
-
-      // 全文做一次合併同標籤（避免邊界殘留雙層）
-      mergeAdjacentTagsInFragment(story, TAG);
-
-      // 還原選取到標記之間，然後移除標記
-      setSelectionBetweenMarkers(mStart, mEnd);
-      mStart.parentNode && mStart.parentNode.removeChild(mStart);
-      mEnd.parentNode && mEnd.parentNode.removeChild(mEnd);
-
-      afterChange(story);
-      return true;
+      // 重繪後把 caret 復位並清掉標記，再回寫一次乾淨內容
+      let tries = 20;
+      (function tryRestore(){
+        requestAnimationFrame(()=>{
+          const ok = restoreCaretFromMarker(markerId);
+          if (!ok && --tries > 0) {
+            tryRestore();
+          } else if (ok) {
+            updatePageJsonFromStory(db, story);
+          }
+        });
+      })();
     });
   }
 
-  /* ---------- A+ / A-：只調整選取；若選取只在同一個 fs-span 內則切段 ---------- */
-  function parseEm(str){
-    if (!str) return NaN;
-    const m = String(str).match(/([0-9.]+)\s*em$/i);
-    return m ? parseFloat(m[1]) : NaN;
-  }
-  function getSpanSize(span){
-    if (!span) return NaN;
-    if (span.dataset.fs) return parseFloat(span.dataset.fs);
-    const p = parseEm(span.style.fontSize);
-    return isNaN(p) ? NaN : p;
-  }
-  function setSpanSize(span, valEm){
-    const fs = clamp(valEm, 0.2, 5);
-    span.dataset.fs = String(fs);
-    span.style.fontSize = fs.toFixed(2).replace(/\.00$/,'') + 'em';
-  }
-  function findFsWrapper(node){
-    let cur = (node && node.nodeType===1) ? node : (node ? node.parentElement : null);
-    while (cur && cur !== document){
-      if (cur.tagName === 'SPAN' && (cur.dataset.fs || /em$/.test(cur.style.fontSize||''))){
-        return cur;
-      }
-      cur = cur.parentElement;
-    }
-    return null;
-  }
-  function stripFsInFragment(node){
-    if (!node) return;
-    if (node.nodeType !== 1) { Array.from(node.childNodes).forEach(stripFsInFragment); return; }
-    const el = node;
-    if (el.tagName === 'SPAN' && (el.dataset.fs || /em$/.test(el.style.fontSize||''))){
-      const parent = el.parentNode;
-      while (el.firstChild) parent.insertBefore(el.firstChild, el);
-      parent.removeChild(el);
-      return;
-    }
-    Array.from(el.childNodes).forEach(stripFsInFragment);
-  }
-  function mergeAdjacentFs(span){
-    if (!span || span.nodeType !== 1 || span.tagName !== 'SPAN') return;
-    const sizeKey = span.dataset.fs || (span.style.fontSize||'').replace('em','');
-    if (!sizeKey) return;
+  /* ---------- story 的建立 ---------- */
+  let LAST_DB_INDEX = 1;
 
-    // 合併左：忽略純空白文字節點
-    let prev = span.previousSibling;
-    while (prev && isWhitespaceText(prev)) prev = prev.previousSibling;
-    if (prev && prev.nodeType===1 && prev.tagName==='SPAN'){
-      const prevKey = prev.dataset.fs || (prev.style.fontSize||'').replace('em','');
-      if (prevKey === sizeKey){
-        while (span.firstChild) prev.appendChild(span.firstChild);
-        span.parentNode && span.parentNode.replaceChild(prev, span);
-        span = prev;
+  function ensureStoryOnPageEl(pageEl, dbIndex){
+    const p = PAGES_DB[dbIndex - 1];
+    if (!p || !isEditablePage(p)) return null;
+
+    let story = pageEl.querySelector('.story');
+    if (!story){
+      const metas = new Set(Array.from(pageEl.querySelectorAll('.page-meta')));
+      const olds  = Array.from(pageEl.childNodes).filter(n => !(n.nodeType===1 && metas.has(n)));
+      const oldPlain = textOf(olds).trim();
+
+      story = document.createElement('div');
+      story.className = 'page-content story';
+      story.setAttribute('contenteditable','true');
+      story.dataset.dbIndex = String(dbIndex);
+
+      // 基礎編輯樣式
+      story.style.whiteSpace='pre-wrap';
+      story.style.wordBreak='break-word';
+      story.style.overflow='hidden';
+      story.style.userSelect='text';
+      story.style.webkitUserSelect='text';
+      story.style.msUserSelect='text';
+      story.style.caretColor='auto';
+      story.style.boxSizing='border-box';
+      story.style.width='100%';
+      story.style.minHeight = isNovelPage(p) ? '100%' : '1.2em';
+
+      pageEl.insertBefore(story, pageEl.firstChild);
+      olds.forEach(n=> n.parentNode && n.parentNode.removeChild(n));
+
+      // 優先用 DB 的 HTML；再退回 plain；再退舊 DOM 純文字
+      const htmlFromDb  = (p.content_json?.text_html  || '').trim();
+      const plainFromDb = (p.content_json?.text_plain || '').trim();
+
+      if (htmlFromDb) {
+        story.innerHTML = htmlFromDb;
+      } else if (plainFromDb) {
+        story.innerHTML = esc(plainFromDb).replace(/\n/g,'<br>');
+        p.content_json.text_html = story.innerHTML;
+      } else if (oldPlain) {
+        story.textContent = oldPlain;
+        p.content_json = p.content_json || {};
+        p.content_json.text_plain = oldPlain;
+        p.content_json.text_html  = esc(oldPlain).replace(/\n/g,'<br>');
       }
     }
-    // 合併右：忽略純空白文字節點
-    let next = span.nextSibling;
-    while (next && isWhitespaceText(next)) next = next.nextSibling;
-    if (next && next.nodeType===1 && next.tagName==='SPAN'){
-      const nextKey = next.dataset.fs || (next.style.fontSize||'').replace('em','');
-      if (nextKey === sizeKey){
-        while (next.firstChild) span.appendChild(next.firstChild);
-        next.parentNode && next.parentNode.removeChild(next);
-      }
-    }
-  }
 
-  // 幫手：建立一個 data-fs span
-  function createFsSpanWith(valEm){
-    const s = document.createElement('span');
-    setSpanSize(s, valEm);
-    return s;
-  }
+    // sizing + Enter 修正
+    applySizingForStory(story, p);
+    bindEnterFix(story);
 
-  // 幫手：把同一個 data-fs wrapper（wrap）切成 [左] [mid] [右] 三段
-  // 讓 mid（通常是新插入的選取段）從 wrap 裡「脫出」到與 wrap 同層，避免字級相乘
-  function splitFsWrapperAroundChild(wrap, mid){
-    if (!wrap || !mid || !wrap.parentNode) return;
-    const parent = wrap.parentNode;
-    const base = getSpanSize(wrap) || 1;
-
-    const left  = createFsSpanWith(base);
-    const right = createFsSpanWith(base);
-
-    // 把 mid 左邊的節點移到 left
-    while (wrap.firstChild && wrap.firstChild !== mid){
-      left.appendChild(wrap.firstChild);
+    // 記錄最後互動頁
+    if (!story.__lastBind){
+      story.__lastBind = true;
+      const setLast = ()=>{ LAST_DB_INDEX = dbIndex; };
+      story.addEventListener('focusin', setLast);
+      story.addEventListener('mousedown', setLast);
+      pageEl.addEventListener('mousedown', setLast, {capture:true});
+      pageEl.addEventListener('touchstart', setLast, {passive:true,capture:true});
     }
 
-    // 把 mid 自 wrap 中取出（若 mid 現在就在 wrap 內）
-    if (mid.parentNode === wrap) wrap.removeChild(mid);
-
-    // 把剩餘節點移到 right
-    while (wrap.firstChild){
-      right.appendChild(wrap.firstChild);
+    // 綁貼上/輸入（大量貼上與分頁邏輯在 paste-flow.js）
+    if (window.PasteFlow && typeof window.PasteFlow.bindTo === 'function' && !story.__pfBound){
+      story.__pfBound = true; window.PasteFlow.bindTo(story);
     }
-
-    // 用 [left?][mid][right?] 取代原 wrap
-    const ref = wrap.nextSibling;
-    parent.removeChild(wrap);
-    if (left.childNodes.length)  parent.insertBefore(left,  ref);
-    parent.insertBefore(mid,  ref);
-    if (right.childNodes.length) parent.insertBefore(right, ref);
-
-    // 合併相鄰 data-fs，避免碎片
-    if (left.childNodes.length)  mergeAdjacentFs(left);
-    if (right.childNodes.length) mergeAdjacentFs(right);
+    return story;
   }
 
-  function adjustFont(deltaStep){
-    const ctx = getActiveStory(); if (!ctx) return false;
-    const {story, range} = ctx;
+  function getStoryByDbIndex(dbIndex){
+    const domList = getDomPagesList();
+    const domIdx0 = dbIndexToDomIndex(dbIndex) - 1;
+    const pageEl = domList[domIdx0];
+    if (!pageEl) return null;
+    return pageEl.querySelector('.story') || null;
+  }
 
-    return EditorCore.keepSelectionAround(story, ()=>{
-      const startWrap = findFsWrapper(range.startContainer);
-      const endWrap   = findFsWrapper(range.endContainer);
+  function getFocusedDbIndex(){
+    const active = document.activeElement;
+    if (active && active.classList?.contains('story')){
+      return Number(active.dataset.dbIndex||'0')|0;
+    }
+    if (LAST_DB_INDEX && LAST_DB_INDEX > 0) return LAST_DB_INDEX;
+    const curDom = (window.book?._cursorPage || 0) + 1;
+    return domIndexToDbIndex(curDom) || 1;
+  }
 
-      // 若選取完全在同一個 data-fs 內
-      if (startWrap && startWrap === endWrap){
-        const wrap = startWrap;
-        const base = getSpanSize(wrap) || 1;
+  function hookAllStories(){
+    const list = getDomPagesList();
+    for (let i=0;i<list.length;i++){
+      const dbIndex = domIndexToDbIndex(i+1);
+      if (dbIndex <= 0) continue; // 封面不編輯
+      const p = PAGES_DB[dbIndex - 1];
+      if (isImagePage(p)) continue;
+      const story = ensureStoryOnPageEl(list[i], dbIndex);
+      applySizingForStory(story, p); // 保險
+    }
+    lockMeta();
+    try { window.PageStyle?.bindImageEditors?.(); } catch(_){}
+  }
 
-        // 是否剛好選到整個 wrapper 的全部內容
-        const fullyCoversWrapper =
-          range.startContainer === wrap && range.endContainer === wrap &&
-          range.startOffset === 0 && range.endOffset === wrap.childNodes.length;
-
-        if (fullyCoversWrapper){
-          // 整個 wrapper 同步放大/縮小
-          setSpanSize(wrap, base + deltaStep);
-          mergeAdjacentFs(wrap);
-          afterChange(story);
-          // 鎖回選取 → 可連續按 A+/A-
-          setSelectionToNodeContents(wrap);
-          return true;
-        }
-
-        // 只選到 wrapper 的一部分：抽出選取 → 只調整該段 → 把 wrapper 切成三段
-        const frag = range.extractContents();
-        stripFsInFragment(frag); // 先扁平化內部 fs，避免層層相乘
-
-        const selSpan = createFsSpanWith(base + deltaStep);
-        selSpan.appendChild(frag);
-
-        // 先插回（仍在 wrap 裡），再把 wrap 切成 [左][selSpan][右]
-        range.insertNode(selSpan);
-        splitFsWrapperAroundChild(wrap, selSpan);
-
-        // 兩側若出現相同大小的 fs 可再合併
-        const prev = selSpan.previousSibling;
-        const next = selSpan.nextSibling;
-        if (prev && prev.tagName === 'SPAN') mergeAdjacentFs(prev);
-        if (next && next.tagName === 'SPAN') mergeAdjacentFs(next);
-
-        afterChange(story);
-        // 鎖回選取到剛處理的區段
-        setSelectionToNodeContents(selSpan);
-        return true;
-      }
-
-      // 否則（跨多個 fs-span 或沒有 fs-span）：
-      // 取端點附近已存在的 data-fs 當基準，沒有就 1.0
-      let base = getSpanSize(startWrap);
-      if (isNaN(base)) base = getSpanSize(endWrap);
-      if (isNaN(base)) base = 1.0;
-
-      // 把選取抽出，扁平化裡面所有 data-fs，然後用一層新的包回
-      const frag = range.extractContents();
-      stripFsInFragment(frag);
-
-      const span = createFsSpanWith(base + deltaStep);
-      span.appendChild(frag);
-      range.insertNode(span);
-
-      mergeAdjacentFs(span);
-      afterChange(story);
-      // 鎖回選取
-      setSelectionToNodeContents(span);
-      return true;
+  // 觀察 BookFlip DOM 完成後再掛 .story
+  let mo;
+  function observeBook(){
+    if (mo) mo.disconnect();
+    mo = new MutationObserver(()=> {
+      clearTimeout(observeBook._t);
+      observeBook._t = setTimeout(()=>{ try{ hookAllStories(); }catch(e){} }, 30);
     });
+    mo.observe(document.getElementById('bookCanvas'), { childList:true, subtree:true });
   }
 
-  /* ---------- 綁定 ---------- */
-  function bind(){
-    const btnB  = document.getElementById('btnBold');
-    const btnI  = document.getElementById('btnItalic');
-    const btnU  = document.getElementById('btnUnderline');
-    const btnUp = document.getElementById('btnFontUp');
-    const btnDn = document.getElementById('btnFontDown');
-
-    btnB && btnB.addEventListener('click', ()=> toggleInline('b'));
-    btnI && btnI.addEventListener('click', ()=> toggleInline('i'));
-    btnU && btnU.addEventListener('click', ()=> toggleInline('u'));
-
-    // 步進 0.1em（連按可持續放大/縮小）
-    btnUp && btnUp.addEventListener('click', ()=> adjustFont(+0.1));
-    btnDn && btnDn.addEventListener('click', ()=> adjustFont(-0.1));
+  function applyStorySizingFor(dbIndex){
+    if (!dbIndex || dbIndex <= 0) return;
+    const p = PAGES_DB[dbIndex - 1]; if (!p) return;
+    const list = getDomPagesList();
+    const pageEl = list[dbIndexToDomIndex(dbIndex)-1];
+    if (!pageEl) return;
+    const story = pageEl.querySelector('.story') || ensureStoryOnPageEl(pageEl, dbIndex);
+    applySizingForStory(story, p);
   }
 
-  document.addEventListener('DOMContentLoaded', bind);
+  // export
+  window.EditorCore = {
+    getDomPagesList, domIndexToDbIndex, dbIndexToDomIndex,
+    isImagePage, isDividerPage, isNovelPage, isEditablePage,
+    lockMeta, ensureStoryOnPageEl, getStoryByDbIndex,
+    getFocusedDbIndex, updatePageJsonFromStory, hookAllStories,
+    setLastDbIndex(db){ LAST_DB_INDEX = db|0; },
+    applyStorySizingFor,
+    // 提供給外部使用的選取工具
+    getOffsets, setOffsets, keepSelectionAround
+  };
+  window.EditorFlow = { hookAllStories };
+
+  document.addEventListener('DOMContentLoaded', ()=>{
+    observeBook();
+    setTimeout(hookAllStories, 0);
+  });
 })();
