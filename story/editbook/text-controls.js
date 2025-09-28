@@ -1,8 +1,8 @@
 /* text-controls.js
  * 文字工具列：B / I / U / A+ / A-
  * - 只作用目前頁（EditorCore.getFocusedDbIndex）
- * - 只作用反白區段；保持選取（不會跳到第一字）
- * - A+ / A-：只包「一層」 <span data-fs style="font-size:...em">；連按持續累加；部分選取會切段只改選取
+ * - 只作用反白區段；保持選取（方便連按/連續切換）
+ * - A+ / A-：只包「一層」 <span data-fs style="font-size:...em">；部分選取會切段只改選取
  * - B/I/U：部分選取只套未套用；全選已套用則取消；合併相鄰、清空殼
  * - 每次操作後：寫回 DB + 觸發 PasteFlow.forceReflow(story)
  */
@@ -83,6 +83,28 @@
     } else {
       story.dispatchEvent(new Event('input', { bubbles:true }));
     }
+  }
+
+  // === 選取輔助：把選取設定到某節點的內容 ===
+  function setSelectionToNodeContents(node){
+    if (!node) return;
+    const sel = window.getSelection();
+    if (!sel) return;
+    const rng = document.createRange();
+    rng.selectNodeContents(node);
+    sel.removeAllRanges();
+    sel.addRange(rng);
+  }
+
+  // === 選取輔助：用「註解節點」標記選取邊界，再恢復選取（適合多節點） ===
+  function setSelectionBetweenMarkers(startMarker, endMarker){
+    const sel = window.getSelection();
+    if (!sel || !startMarker || !endMarker) return;
+    const rng = document.createRange();
+    rng.setStartAfter(startMarker);
+    rng.setEndBefore(endMarker);
+    sel.removeAllRanges();
+    sel.addRange(rng);
   }
 
   /* ---------- B / I / U：部分選取只套未套用；全選已套用則取消 ---------- */
@@ -176,7 +198,7 @@
     }
   }
 
-  // 在 fragment 內遍歷所有 TAG，嘗試與左右鄰近 TAG 合併
+  // 在指定 root 內遍歷所有 TAG，嘗試與左右鄰近 TAG 合併
   function mergeAdjacentTagsInFragment(root, TAG){
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null);
     const list = [];
@@ -196,7 +218,7 @@
       const frag = range.extractContents();
       const allInside = allTextInsideTag(frag, TAG);
 
-      // 用臨時容器包住 fragment，便於與外側節點做左右合併
+      // 用臨時容器包住 fragment，稍後好定位與恢復選取
       const container = document.createElement('span');
       container.setAttribute('data-tmp','1');
 
@@ -213,16 +235,26 @@
       // 插回原位置
       range.insertNode(container);
 
-      // 把容器內的第一/最後一個符合 TAG 的元素，與容器外側相鄰同 TAG 合併
-      const firstEl = container.firstElementChild;
-      const lastEl  = container.lastElementChild;
-      if (firstEl && firstEl.tagName === TAG) mergeAdjacentTagAround(firstEl, TAG);
-      if (lastEl  && lastEl.tagName  === TAG) mergeAdjacentTagAround(lastEl, TAG);
+      // 先在容器內安置邊界標記，等會兒解除容器後再還原選取
+      const mStart = document.createComment('sel-start');
+      const mEnd   = document.createComment('sel-end');
+      container.insertBefore(mStart, container.firstChild);
+      container.appendChild(mEnd);
 
-      // 解除臨時容器
+      // 解除臨時容器（把孩子平鋪到原位置）
       const parent = container.parentNode;
-      while (container.firstChild) parent.insertBefore(container.firstChild, container);
+      while (container.firstChild){
+        parent.insertBefore(container.firstChild, container);
+      }
       parent.removeChild(container);
+
+      // 全文做一次合併同標籤（避免邊界殘留雙層）
+      mergeAdjacentTagsInFragment(story, TAG);
+
+      // 還原選取到標記之間，然後移除標記
+      setSelectionBetweenMarkers(mStart, mEnd);
+      mStart.parentNode && mStart.parentNode.removeChild(mStart);
+      mEnd.parentNode && mEnd.parentNode.removeChild(mEnd);
 
       afterChange(story);
       return true;
@@ -361,6 +393,8 @@
           setSpanSize(wrap, base + deltaStep);
           mergeAdjacentFs(wrap);
           afterChange(story);
+          // 鎖回選取 → 可連續按 A+/A-
+          setSelectionToNodeContents(wrap);
           return true;
         }
 
@@ -382,6 +416,8 @@
         if (next && next.tagName === 'SPAN') mergeAdjacentFs(next);
 
         afterChange(story);
+        // 鎖回選取到剛處理的區段
+        setSelectionToNodeContents(selSpan);
         return true;
       }
 
@@ -401,6 +437,8 @@
 
       mergeAdjacentFs(span);
       afterChange(story);
+      // 鎖回選取
+      setSelectionToNodeContents(span);
       return true;
     });
   }
