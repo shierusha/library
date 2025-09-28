@@ -1,11 +1,15 @@
+
 /* text-controls.js
  * 文字工具列：B / I / U / A+ / A-
  * - 只作用目前頁（EditorCore.getFocusedDbIndex）
  * - 只作用反白區段；保持選取（不會跳到第一字）
- * - A+ / A-：只包「一層」 <span data-fs style="font-size:...em">；連按可持續累加
+ * - A+ / A-：只包「一層」 <span data-fs style="font-size:...em">；重複點持續累加
+ * - 跨多段時，以選取端點附近的 data-fs 當基準（無則 1.0）
+ * - 變更後合併左右同級的 data-fs，避免產生一堆 span
  * - 每次操作後：寫回 DB + 觸發 PasteFlow.forceReflow(story)
  */
 (function(){
+
   /* ---------- 公用 ---------- */
   const clamp = (v,min,max)=> Math.max(min, Math.min(max, v));
 
@@ -59,7 +63,7 @@
 
   function getActiveStory(){
     const dbIndex = EditorCore.getFocusedDbIndex();
-    if (dbIndex == null) return null; // 允許 0
+    if (!dbIndex) return null;
     const story = EditorCore.getStoryByDbIndex(dbIndex);
     if (!story) return null;
     const sel = window.getSelection();
@@ -71,7 +75,7 @@
   }
 
   function afterChange(story){
-    // 先清掉空 b/i/u 與空的字級 span，避免殘留
+    // 新增：先清掉空 b/i/u 與空的字級 span，避免殘留
     sweepInlineGarbage(story);
 
     const db = Number(story.dataset.dbIndex||'0')|0;
@@ -83,88 +87,23 @@
     }
   }
 
-  /* ---------- B / I / U：真正的 toggle ---------- */
-
-  // 在某 root/frag 範圍內，把指定標籤全部「解包」（保留內容、移除標籤）
-  function unwrapAllTagIn(root, upperTag){
-    if (!root || !upperTag) return;
-    const list = root.querySelectorAll(upperTag);
-    list.forEach(node=>{
-      const parent = node.parentNode;
-      if (!parent) return;
-      while (node.firstChild) parent.insertBefore(node.firstChild, node);
-      parent.removeChild(node);
-    });
-  }
-
-  // 合併左右相鄰、同標籤（避免 <b>..</b><b>..</b>）
-  function mergeAdjacentSameTag(el, upperTag){
-    if (!el || el.nodeType !== 1) return;
-
-    // 忽略純空白文字
-    const isWS = n => n && n.nodeType===3 && !String(n.nodeValue||'').replace(/\u00a0/g,' ').trim();
-
-    // 左合併
-    let prev = el.previousSibling;
-    while (prev && isWS(prev)) prev = prev.previousSibling;
-    if (prev && prev.nodeType===1 && prev.tagName===upperTag){
-      while (el.firstChild) prev.appendChild(el.firstChild);
-      el.parentNode && el.parentNode.replaceChild(prev, el);
-      el = prev;
-    }
-    // 右合併
-    let next = el.nextSibling;
-    while (next && isWS(next)) next = next.nextSibling;
-    if (next && next.nodeType===1 && next.tagName===upperTag){
-      while (next.firstChild) el.appendChild(next.firstChild);
-      next.parentNode && next.parentNode.removeChild(next);
-    }
-  }
-
-  // 一端端點最近的 <tag> 祖先（受限於 stop 容器）
-  function nearestAncestorTag(node, upperTag, stop){
-    let cur = (node && node.nodeType===1) ? node : (node ? node.parentElement : null);
-    while (cur && cur !== stop && cur !== document){
-      if (cur.tagName === upperTag) return cur;
-      cur = cur.parentElement;
-    }
-    return null;
-  }
-
-  // 若整個選取都落在同一組 <tag> 內，回傳那個承載的節點；否則回傳 null
-  function selectionHostTag(range, upperTag, stop){
-    const a = nearestAncestorTag(range.startContainer, upperTag, stop);
-    const b = nearestAncestorTag(range.endContainer, upperTag, stop);
-    if (!a || !b) return null;
-    if (a === b) return a;
-    if (a.contains(b)) return a;
-    if (b.contains(a)) return b;
-    return null;
-  }
-
+  /* ---------- B / I / U ---------- */
   function wrapInline(tag){
     const ctx = getActiveStory(); if (!ctx) return false;
     const {story, range} = ctx;
-    const U = String(tag||'').toUpperCase();
 
     return EditorCore.keepSelectionAround(story, ()=>{
-      // Toggle：如果整段都在 <tag> 內 → 解包
-      const host = selectionHostTag(range, U, story);
-      if (host){
-        const frag = range.extractContents();
-        unwrapAllTagIn(frag, U);
-        range.insertNode(frag);
-        afterChange(story);
-        return true;
-      }
-
-      // 否則加樣式：先扁平化內部同標籤，再外包一層，最後與左右相鄰同標籤合併
       const frag = range.extractContents();
-      unwrapAllTagIn(frag, U);
-      const el = document.createElement(U);
+      const el = document.createElement(tag);
       el.appendChild(frag);
       range.insertNode(el);
-      mergeAdjacentSameTag(el, U);
+
+      // 扁平化重複標籤（避免 <b><b>...）
+      const parent = el.parentElement;
+      if (parent && parent.tagName === tag.toUpperCase()){
+        while (el.firstChild) parent.insertBefore(el.firstChild, el);
+        parent.removeChild(el);
+      }
 
       afterChange(story);
       return true;
@@ -255,7 +194,8 @@
         return true;
       }
 
-      // 2) 跨多段或只有一端有 data-fs：以端點附近已存在的 data-fs 當基準，沒有就 1.0
+      // 2) 跨多段或只有一端有 data-fs：
+      //    以端點附近已存在的 data-fs 當基準，沒有就 1.0
       let base = getSpanSize(startWrap);
       if (isNaN(base)) base = getSpanSize(endWrap);
       if (isNaN(base)) base = 1.0;
