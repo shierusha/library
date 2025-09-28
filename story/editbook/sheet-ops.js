@@ -11,7 +11,7 @@
       if (!window.EditorCore) return;
       const domList = EditorCore.getDomPagesList();
       for (let i=0;i<domList.length;i++){
-        const dbIndex = EditorCore.domIndexToDomIndex ? EditorCore.domIndexToDbIndex(i+1)
+        const dbIndex = EditorCore.domIndexToDbIndex ? EditorCore.domIndexToDbIndex(i+1)
                       : (i+1 <= 2 ? 0 : (i+1) - 2); // 保險：無對應函式時的簡易換算
         if (dbIndex <= 0) continue;
         const story = domList[i].querySelector('.story');
@@ -33,58 +33,63 @@
   function shiftChaptersAfter(thresholdDb, delta){
     if (!Array.isArray(window.CHAPTERS_DB)) return;
     for (const ch of CHAPTERS_DB){
-      const pi = (ch.page_index|0);
-      if (pi >= thresholdDb) ch.page_index = Math.max(1, pi + delta);
+      const pi = ch?.page_index|0;
+      if (pi > thresholdDb) ch.page_index = pi + delta;
     }
   }
 
-  function normalizeType(t) {
-    const x = String(t || '').trim().toLowerCase().replace(/-/g, '_');
-    if (x === 'divider_black') return 'divider_dark';
-    if (x === 'divider_white') return 'divider_light';
-    if (x === 'image')        return 'illustration';
-    if (x === 'novel' || x === 'divider_light' || x === 'divider_dark' || x === 'illustration') return x;
-    return 'novel';
-  }
-
   /* --------------------------------------------------
-   * ① 固定末端插入，焦點/游標完全保留
+   * ① 在書末插入白紙（兩頁 novel），保留目前焦點頁
    * -------------------------------------------------- */
-  function insertBlankSheetAtEndKeepFocus(){
-    if (!window.EditorCore) return 0;
-    window.syncAllStoriesToDB(); // ← 改成全域呼叫，且有 fallback
+  window.insertBlankSheetAtEndKeepFocus = function insertBlankSheetAtEndKeepFocus(){
+    syncAllStoriesToDB();
 
     const focusBefore = EditorCore.getFocusedDbIndex() || 1;
+    const len = (Array.isArray(PAGES_DB) ? PAGES_DB.length : 0)|0;
 
-    // 保存原 story 與選取（若目前 focus 在其他地方則略過）
-    const activeStory =
-      (document.activeElement?.classList?.contains('story')
-        ? document.activeElement
-        : EditorCore.getStoryByDbIndex(focusBefore));
-    const savedSel = activeStory ? EditorCore.getOffsets(activeStory) : null;
-
-    // 找到最後頁碼
-    let last = 0;
-    for (const p of PAGES_DB){ const n = (p.page_index|0); if (n > last) last = n; }
-    const insertAt = Math.max(1, (last|0) + 1); // 新增紙張的 front dbIndex
-
-    // 兩頁皆 novel
-    const front = { id: genLocalId(), page_index: insertAt,   type:'novel', image_url:'', content_json:{ text_plain:'', text_html:'' } };
-    const back  = { id: genLocalId(), page_index: insertAt+1, type:'novel', image_url:'', content_json:{ text_plain:'', text_html:'' } };
-
+    // 追加兩頁
+    const front = { id: genLocalId(), page_index: len+1, type:'novel', content_json:{ text_html:'', text_plain:'' } };
+    const back  = { id: genLocalId(), page_index: len+2, type:'novel', content_json:{ text_html:'', text_plain:'' } };
     PAGES_DB.push(front, back);
-    PAGES_DB.sort((a,b)=> (a.page_index|0) - (b.page_index|0));
 
-    // 章節索引往後平移
-    shiftChaptersAfter(insertAt, +2);
-
-    // 重建並鎖回原頁（避免在最後一頁時視覺被往前帶）
     rebuildAndRedrawPreserveCursor(focusBefore);
-    if (typeof window.lockToDbIndex === 'function') lockToDbIndex(focusBefore);
+    persist();
+  };
 
-    // 還原游標/選取
+  /* --------------------------------------------------
+   * ② 在目前「紙張」後插入，回傳新 front
+   * -------------------------------------------------- */
+  window.insertBlankSheetAfterCurrentSheet = function insertBlankSheetAfterCurrentSheet(){
+    syncAllStoriesToDB();
+
+    const cur = EditorCore.getFocusedDbIndex() || 1;           // 例如 5
+    const start = getSheetStart(cur);                           // 紙張起點（奇數）
+    const insertAt = start + 2;                                 // 要插入的位置（新 front 的 dbIndex）
+
+    // 調整後面頁的 index
+    for (let i=PAGES_DB.length-1;i>=insertAt-1;i--){
+      const p = PAGES_DB[i]; if (!p) continue;
+      p.page_index = (p.page_index|0) + 2;
+    }
+
+    // 插入兩頁
+    const front = { id: genLocalId(), page_index: insertAt,   type:'novel', content_json:{ text_html:'', text_plain:'' } };
+    const back  = { id: genLocalId(), page_index: insertAt+1, type:'novel', content_json:{ text_html:'', text_plain:'' } };
+    PAGES_DB.splice(insertAt-1, 0, front, back);
+
+    // 章節 page_index 往後推
+    shiftChaptersAfter(insertAt-1, +2);
+
+    // 重建 & 還原游標
+    const savedSel = (function(){
+      const story = EditorCore.getStoryByDbIndex(cur);
+      return story ? EditorCore.getOffsets(story) : null;
+    })();
+
+    rebuildAndRedrawPreserveCursor(cur);
+
     setTimeout(()=>{
-      const storyAfter = EditorCore.getStoryByDbIndex(focusBefore);
+      const storyAfter = EditorCore.getStoryByDbIndex(cur);
       if (storyAfter && savedSel) {
         try { EditorCore.setOffsets(storyAfter, savedSel.start, savedSel.end); } catch(_){}
         storyAfter.focus?.();
@@ -94,90 +99,42 @@
 
     persist();
     return insertAt;
-  }
+  };
 
   /* --------------------------------------------------
-   * ② 在目前「紙張」後插入，回傳新 front 的 dbIndex（供 paste-flow 使用）
+   * ③ 刪除整張白紙（兩頁都是空 novel 時才允許）
    * -------------------------------------------------- */
-  function insertBlankSheetAfterCurrentSheet(){
-    window.syncAllStoriesToDB(); // ← 改成全域呼叫
+  window.deleteCurrentBlankSheetIfPossible = function deleteCurrentBlankSheetIfPossible(){
+    syncAllStoriesToDB();
 
     const cur = EditorCore.getFocusedDbIndex() || 1;
-    const sheetStart = getSheetStart(cur);
-    const insertAt = sheetStart + 2; // 下一張紙的 front
+    const start = getSheetStart(cur);
 
-    // 調整後面所有頁的 page_index（+2）
-    for (const p of PAGES_DB){ if ((p.page_index|0) >= insertAt) p.page_index = (p.page_index|0) + 2; }
-
-    const front = { id: genLocalId(), page_index: insertAt,   type:'novel', image_url:'', content_json:{ text_plain:'', text_html:'' } };
-    const back  = { id: genLocalId(), page_index: insertAt+1, type:'novel', image_url:'', content_json:{ text_plain:'', text_html:'' } };
-    PAGES_DB.push(front, back);
-    PAGES_DB.sort((a,b)=> (a.page_index|0) - (b.page_index|0));
-
-    // 章節索引平移
-    shiftChaptersAfter(insertAt, +2);
-
-    // 重建：維持原本的可視頁（cur）不跳動
-    rebuildAndRedrawPreserveCursor(cur);
-    if (typeof window.lockToDbIndex === 'function') lockToDbIndex(cur);
-
-    persist();
-    try{ renderMetaForAllPages(); EditorCore.lockMeta(); }catch(_){}
-
-    return insertAt;
-  }
-
-  /* --------------------------------------------------
-   * ③ 刪除空白「紙張」（兩頁皆為空 novel 才允許）
-   * -------------------------------------------------- */
-  function deleteBlankSheetIfPossible(){
-    window.syncAllStoriesToDB(); // ← 改成全域呼叫
-
-    const db = EditorCore.getFocusedDbIndex() || 1;
-    const sheetStart = getSheetStart(db);
-    const a = PAGES_DB[sheetStart - 1];
-    const b = PAGES_DB[sheetStart];
-
-    function isBlankNovel(p){
-      if (!p) return false;
-      if (normalizeType(p.type) !== 'novel') return false;
-      const txt = (p.content_json?.text_plain || '').trim();
-      const html = (p.content_json?.text_html || '').replace(/<br\s*\/?>/gi,'').replace(/\s+/g,'').trim();
-      return !txt && !html;
+    function isEmptyNovel(db){
+      const p = PAGES_DB[db-1];
+      if (!p || String(p.type).toLowerCase().replace(/-/g,'_') !== 'novel') return false;
+      const t = String(p?.content_json?.text_plain || '').trim();
+      const h = String(p?.content_json?.text_html  || '').replace(/<br\s*\/?>/gi,'').replace(/&nbsp;/g,' ').trim();
+      return (!t && !h);
     }
 
-    if (!isBlankNovel(a) || !isBlankNovel(b)) return false;
+    // 必須兩頁都是空 novel
+    if (!isEmptyNovel(start) || !isEmptyNovel(start+1)) return false;
 
-    const focusBefore = db;
+    // 移除兩頁
+    PAGES_DB.splice(start-1, 2);
 
-    // 先把後面全部往前 −2
-    const after = sheetStart + 2;
-    for (const p of PAGES_DB){ if ((p.page_index|0) >= after) p.page_index = (p.page_index|0) - 2; }
+    // 後面頁 index -2
+    for (let i=start-1;i<PAGES_DB.length;i++){
+      const p = PAGES_DB[i]; if (!p) continue;
+      p.page_index = Math.max(1, (p.page_index|0) - 2);
+    }
 
-    // 移除這兩頁
-    PAGES_DB = PAGES_DB.filter(p => (p !== a && p !== b));
+    // 章節 page_index 往前拉
+    shiftChaptersAfter(start+1, -2);
 
-    // 章節索引平移
-    shiftChaptersAfter(after, -2);
-
-    // 重建並鎖回原頁
-    rebuildAndRedrawPreserveCursor(focusBefore);
-    if (typeof window.lockToDbIndex === 'function') lockToDbIndex(focusBefore);
-
+    rebuildAndRedrawPreserveCursor(Math.max(1, start-1));
     persist();
-    try{ renderMetaForAllPages(); EditorCore.lockMeta(); }catch(_){}
     return true;
-  }
-
-  // 綁定按鈕
-  document.getElementById('btnInsertPage')?.addEventListener('click', insertBlankSheetAtEndKeepFocus);
-  document.getElementById('btnDeleteBlank')?.addEventListener('click', deleteBlankSheetIfPossible);
-
-  window.SheetOps = {
-    rebuildAndRedrawPreserveCursor,
-    insertBlankSheetAfterCurrentSheet,  // 給 paste-flow 使用
-    insertBlankSheetAtEndKeepFocus,
-    deleteBlankSheetIfPossible,
-    getSheetStart
   };
 })();
