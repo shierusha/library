@@ -348,7 +348,7 @@ const Store = {
       title: m.title,
       updatedAt: new Date(m.updated_at).getTime(),
       coverColor: m.cover_color || toFilterCssProp(FILTER_DEFAULT),
-      coverImage: m.cover_image,  
+      coverImage: m.cover_image,  // 仍取，但 UI 不使用
       page_count: m.page_count ?? 0,
       sort_order: m.sort_order ?? 1,
       student_id: m.student_id || null
@@ -401,7 +401,7 @@ const Store = {
     if(error) throw error;
   },
 
-  // ★★ 排序改為逐筆 UPDATE（避免 UPSERT 觸發 INSERT 的 RLS）
+  // 排序：逐筆 UPDATE（避免 UPSERT 觸發 INSERT 的 RLS）
   async move(id, newIndex){
     const list = await this.list();
     const from = list.findIndex(x => x.id === id);
@@ -412,7 +412,6 @@ const Store = {
     const [item] = arr.splice(from, 1);
     arr.splice(to, 0, item);
 
-    // 逐筆更新，只更新有變動的那幾筆
     for (let i = 0; i < arr.length; i++) {
       const b = arr[i];
       const desired = i + 1;
@@ -450,7 +449,7 @@ function renderCardList(list){
 
       <div class="corner-tools">
         <img alt="cover"
-             src="${escapeHtml(m.coverImage || DEFAULT_COVER_IMG)}"
+             src="${DEFAULT_COVER_IMG}"               <!-- ★ 不吃 DB 封面，固定預設圖 -->
              style="filter:${cssPropToFilterValue(m.coverColor)}">
       </div>
 
@@ -520,8 +519,8 @@ function renderCardList(list){
       $('#f_hue_range').value = vals.hue;
       $('#f_bri_range').value = Math.max(55, Math.min(200, vals.bri));
       $('#f_sat_range').value = Math.max(10, Math.min(1000, vals.sat));
-      $('#filterPreviewImg').src = b?.cover_image || DEFAULT_COVER_IMG;
-      $('#filterPreviewImg').style.filter = toFilterValue(vals);
+      document.getElementById('filterPreviewImg').src = DEFAULT_COVER_IMG;   // ★ 不吃 DB 封面，固定預設圖
+      document.getElementById('filterPreviewImg').style.filter = toFilterValue(vals);
       window.__FILTER_TARGET__ = { id, imgEl: img };
       $('#dlgFilter').showModal();
     });
