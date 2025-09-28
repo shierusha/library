@@ -1,33 +1,33 @@
-/* text-controls.js
+/* text-controls.js — v2 safe
  * 文字工具列：B / I / U / A+ / A-
- * - 只作用目前頁（EditorCore.getFocusedDbIndex）
- * - 只作用反白區段；保持選取（方便連按/連續切換）
- * - A+ / A-：只包「一層」 <span data-fs style="font-size:...em">；部分選取會切段只改選取
- * - B/I/U：部分選取只套未套用；全選已套用則取消；合併相鄰、清空殼
- * - 每次操作後：寫回 DB + 觸發 PasteFlow.forceReflow(story)
+ * - 部分選取只套未套用；全選已套用則取消
+ * - A+/A- 只調整反白段；同一 fs-span 內會切 [左][選取][右]
+ * - 操作後鎖回選取，方便連按
+ * - 自動合併相鄰同標籤/字級，清空殼
  */
 (function(){
+
+  /* ---------- 常數（具後備） ---------- */
+  const NF = (typeof NodeFilter !== 'undefined') ? NodeFilter : {
+    SHOW_ELEMENT: 1, SHOW_TEXT: 4, FILTER_ACCEPT: 1, FILTER_REJECT: 2, FILTER_SKIP: 3
+  };
 
   /* ---------- 公用 ---------- */
   const clamp = (v,min,max)=> Math.max(min, Math.min(max, v));
 
-  // 判斷是否為我們的字級 span
   function isOurFsSpan(el){
     return el && el.tagName === 'SPAN' &&
            (el.dataset.fs || /em$/.test((el.style && el.style.fontSize) || ''));
   }
-  // 文字節點是否只含空白（含 NBSP）
   function isWhitespaceText(n){
     return n && n.nodeType === 3 &&
            !String(n.nodeValue||'').replace(/\u00a0/g,' ').trim();
   }
 
-  // 清掃：移除沒有內容的 b/i/u 與空的字級 span（避免越按越累積空殼）
   function sweepInlineGarbage(root){
     if (!root) return;
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null);
+    const walker = document.createTreeWalker(root, NF.SHOW_ELEMENT, null);
     const trash = [];
-
     while (walker.nextNode()){
       const el = walker.currentNode;
       if (!el || el === root) continue;
@@ -36,7 +36,7 @@
       const tag = el.tagName;
       const isInline = /^(B|I|U|EM|STRONG|S|SMALL|MARK|SUB|SUP|SPAN)$/i.test(tag);
       if (!isInline) continue;
-      if (tag === 'SPAN' && !isOurFsSpan(el)) continue; // 只處理我們的 fs-span
+      if (tag === 'SPAN' && !isOurFsSpan(el)) continue;
 
       const text = (el.textContent || '').replace(/\u00a0/g,' ').trim();
       const onlyBr = el.children.length === 1 &&
@@ -44,25 +44,21 @@
                      text === '';
       const noText = text === '';
 
-      if (onlyBr || noText){
-        trash.push(el);
-      }
+      if (onlyBr || noText) trash.push(el);
     }
 
     trash.forEach(el=>{
       const parent = el.parentNode;
       if (!parent) return;
-      while (el.firstChild){
-        parent.insertBefore(el.firstChild, el);
-      }
+      while (el.firstChild) parent.insertBefore(el.firstChild, el);
       parent.removeChild(el);
     });
   }
 
   function getActiveStory(){
-    const dbIndex = EditorCore.getFocusedDbIndex();
+    const dbIndex = EditorCore.getFocusedDbIndex && EditorCore.getFocusedDbIndex();
     if (!dbIndex) return null;
-    const story = EditorCore.getStoryByDbIndex(dbIndex);
+    const story = EditorCore.getStoryByDbIndex && EditorCore.getStoryByDbIndex(dbIndex);
     if (!story) return null;
     const sel = window.getSelection();
     if (!sel || sel.rangeCount===0) return null;
@@ -73,11 +69,9 @@
   }
 
   function afterChange(story){
-    // 清掉空 b/i/u 與空的字級 span，避免殘留
     sweepInlineGarbage(story);
-
     const db = Number(story.dataset.dbIndex||'0')|0;
-    EditorCore.updatePageJsonFromStory(db, story);
+    if (EditorCore.updatePageJsonFromStory) EditorCore.updatePageJsonFromStory(db, story);
     if (window.PasteFlow && typeof window.PasteFlow.forceReflow === 'function') {
       window.PasteFlow.forceReflow(story);
     } else {
@@ -85,33 +79,33 @@
     }
   }
 
-  // === 選取輔助：把選取設定到某節點的內容 ===
+  /* === 選取輔助 === */
   function setSelectionToNodeContents(node){
-    if (!node) return;
-    const sel = window.getSelection();
-    if (!sel) return;
-    const rng = document.createRange();
-    rng.selectNodeContents(node);
-    sel.removeAllRanges();
-    sel.addRange(rng);
+    try {
+      if (!node) return;
+      const sel = window.getSelection(); if (!sel) return;
+      const rng = document.createRange();
+      rng.selectNodeContents(node);
+      sel.removeAllRanges();
+      sel.addRange(rng);
+    } catch(_){}
   }
 
-  // === 選取輔助：用「註解節點」標記選取邊界，再恢復選取（適合多節點） ===
   function setSelectionBetweenMarkers(startMarker, endMarker){
-    const sel = window.getSelection();
-    if (!sel || !startMarker || !endMarker) return;
-    const rng = document.createRange();
-    rng.setStartAfter(startMarker);
-    rng.setEndBefore(endMarker);
-    sel.removeAllRanges();
-    sel.addRange(rng);
+    try {
+      const sel = window.getSelection(); if (!sel) return;
+      const rng = document.createRange();
+      rng.setStartAfter(startMarker);
+      rng.setEndBefore(endMarker);
+      sel.removeAllRanges();
+      sel.addRange(rng);
+    } catch(_){}
   }
 
   /* ---------- B / I / U：部分選取只套未套用；全選已套用則取消 ---------- */
 
-  // 檢查 fragment 內「所有非空白文字節點」是否都在指定標籤內（例：B/I/U）
   function allTextInsideTag(root, TAG){
-    const tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+    const tw = document.createTreeWalker(root, NF.SHOW_TEXT, null);
     let hasText = false;
     while (tw.nextNode()){
       const t = tw.currentNode;
@@ -124,18 +118,16 @@
       }
       if (!ok) return false;
     }
-    return hasText ? true : false; // 沒文字則視為「不是全在」
+    return hasText ? true : false;
   }
 
-  // 把 fragment 裡 **未在 TAG 內** 的文字節點包一層 TAG
   function applyTagToUnstyledTextInFragment(root, TAG){
-    const tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+    const tw = document.createTreeWalker(root, NF.SHOW_TEXT, null);
     const targets = [];
     while (tw.nextNode()){
       const t = tw.currentNode;
       if (isWhitespaceText(t)) continue;
 
-      // 判斷 t 在 fragment 內是否已有 TAG 祖先
       let cur = t.parentElement, covered = false;
       while (cur && cur !== root){
         if (cur.tagName === TAG) { covered = true; break; }
@@ -144,41 +136,33 @@
       if (!covered) targets.push(t);
     }
 
-    // 分別包起來（之後再做相鄰合併）
     targets.forEach(t=>{
       const wrap = document.createElement(TAG);
-      const p = t.parentNode;
-      if (!p) return;
+      const p = t.parentNode; if (!p) return;
       p.insertBefore(wrap, t);
       wrap.appendChild(t);
     });
 
-    // 合併 fragment 內相鄰同 TAG
     mergeAdjacentTagsInFragment(root, TAG);
   }
 
-  // 在 fragment 內把所有 TAG 拆掉（僅限 fragment 範圍）
   function unwrapTagDeep(root, TAG){
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, {
-      acceptNode: (el)=> (el.tagName === TAG ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP)
-    });
+    const filter = el => (el.tagName === TAG ? NF.FILTER_ACCEPT : NF.FILTER_SKIP);
+    const walker = document.createTreeWalker(root, NF.SHOW_ELEMENT, filter);
     const targets = [];
     while (walker.nextNode()) targets.push(walker.currentNode);
     targets.forEach(el=>{
-      const parent = el.parentNode;
-      if (!parent) return;
+      const parent = el.parentNode; if (!parent) return;
       while (el.firstChild) parent.insertBefore(el.firstChild, el);
       parent.removeChild(el);
     });
   }
 
-  // 合併相鄰同標籤（<b>..</b><b>..</b> → <b>....</b>）
   function mergeAdjacentTagAround(node, TAG){
     if (!node) return;
     const el = (node.nodeType===1) ? node : node.parentElement;
     if (!el || !el.parentNode) return;
 
-    // 向左
     let prev = el.previousSibling;
     while (prev && isWhitespaceText(prev)) prev = prev.previousSibling;
     if (prev && prev.nodeType===1 && prev.tagName === TAG && el.tagName === TAG){
@@ -186,10 +170,8 @@
       el.parentNode && el.parentNode.replaceChild(prev, el);
     }
 
-    // 基準點
     const base = (prev && prev.tagName===TAG) ? prev : el;
 
-    // 向右
     let next = base.nextSibling;
     while (next && isWhitespaceText(next)) next = next.nextSibling;
     if (next && next.nodeType===1 && next.tagName === TAG){
@@ -198,9 +180,8 @@
     }
   }
 
-  // 在指定 root 內遍歷所有 TAG，嘗試與左右鄰近 TAG 合併
   function mergeAdjacentTagsInFragment(root, TAG){
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null);
+    const walker = document.createTreeWalker(root, NF.SHOW_ELEMENT, null);
     const list = [];
     while (walker.nextNode()){
       const el = walker.currentNode;
@@ -218,40 +199,32 @@
       const frag = range.extractContents();
       const allInside = allTextInsideTag(frag, TAG);
 
-      // 用臨時容器包住 fragment，稍後好定位與恢復選取
+      // 臨時容器 + 邊界標記，確保操作後能恢復原選取
       const container = document.createElement('span');
       container.setAttribute('data-tmp','1');
 
       if (allInside){
-        // 整段都已套用 → 取消（只在選取範圍內拆掉）
         unwrapTagDeep(frag, TAG);
         container.appendChild(frag);
       } else {
-        // 部分未套用 → 只對「未套用」的文字節點加 TAG，不動已套用者
         applyTagToUnstyledTextInFragment(frag, TAG);
         container.appendChild(frag);
       }
 
-      // 插回原位置
       range.insertNode(container);
 
-      // 先在容器內安置邊界標記，等會兒解除容器後再還原選取
       const mStart = document.createComment('sel-start');
       const mEnd   = document.createComment('sel-end');
       container.insertBefore(mStart, container.firstChild);
       container.appendChild(mEnd);
 
-      // 解除臨時容器（把孩子平鋪到原位置）
       const parent = container.parentNode;
-      while (container.firstChild){
-        parent.insertBefore(container.firstChild, container);
-      }
+      while (container.firstChild) parent.insertBefore(container.firstChild, container);
       parent.removeChild(container);
 
-      // 全文做一次合併同標籤（避免邊界殘留雙層）
+      // 全文合併一次，避免邊界雙層
       mergeAdjacentTagsInFragment(story, TAG);
 
-      // 還原選取到標記之間，然後移除標記
       setSelectionBetweenMarkers(mStart, mEnd);
       mStart.parentNode && mStart.parentNode.removeChild(mStart);
       mEnd.parentNode && mEnd.parentNode.removeChild(mEnd);
@@ -261,7 +234,7 @@
     });
   }
 
-  /* ---------- A+ / A-：只調整選取；若選取只在同一個 fs-span 內則切段 ---------- */
+  /* ---------- A+ / A-：只調整選取；同 fs-span 內切段 ---------- */
   function parseEm(str){
     if (!str) return NaN;
     const m = String(str).match(/([0-9.]+)\s*em$/i);
@@ -305,7 +278,6 @@
     const sizeKey = span.dataset.fs || (span.style.fontSize||'').replace('em','');
     if (!sizeKey) return;
 
-    // 合併左：忽略純空白文字節點
     let prev = span.previousSibling;
     while (prev && isWhitespaceText(prev)) prev = prev.previousSibling;
     if (prev && prev.nodeType===1 && prev.tagName==='SPAN'){
@@ -316,7 +288,6 @@
         span = prev;
       }
     }
-    // 合併右：忽略純空白文字節點
     let next = span.nextSibling;
     while (next && isWhitespaceText(next)) next = next.nextSibling;
     if (next && next.nodeType===1 && next.tagName==='SPAN'){
@@ -327,16 +298,11 @@
       }
     }
   }
-
-  // 幫手：建立一個 data-fs span
   function createFsSpanWith(valEm){
     const s = document.createElement('span');
     setSpanSize(s, valEm);
     return s;
   }
-
-  // 幫手：把同一個 data-fs wrapper（wrap）切成 [左] [mid] [右] 三段
-  // 讓 mid（通常是新插入的選取段）從 wrap 裡「脫出」到與 wrap 同層，避免字級相乘
   function splitFsWrapperAroundChild(wrap, mid){
     if (!wrap || !mid || !wrap.parentNode) return;
     const parent = wrap.parentNode;
@@ -345,27 +311,20 @@
     const left  = createFsSpanWith(base);
     const right = createFsSpanWith(base);
 
-    // 把 mid 左邊的節點移到 left
     while (wrap.firstChild && wrap.firstChild !== mid){
       left.appendChild(wrap.firstChild);
     }
-
-    // 把 mid 自 wrap 中取出（若 mid 現在就在 wrap 內）
     if (mid.parentNode === wrap) wrap.removeChild(mid);
-
-    // 把剩餘節點移到 right
     while (wrap.firstChild){
       right.appendChild(wrap.firstChild);
     }
 
-    // 用 [left?][mid][right?] 取代原 wrap
     const ref = wrap.nextSibling;
     parent.removeChild(wrap);
     if (left.childNodes.length)  parent.insertBefore(left,  ref);
     parent.insertBefore(mid,  ref);
     if (right.childNodes.length) parent.insertBefore(right, ref);
 
-    // 合併相鄰 data-fs，避免碎片
     if (left.childNodes.length)  mergeAdjacentFs(left);
     if (right.childNodes.length) mergeAdjacentFs(right);
   }
@@ -378,56 +337,43 @@
       const startWrap = findFsWrapper(range.startContainer);
       const endWrap   = findFsWrapper(range.endContainer);
 
-      // 若選取完全在同一個 data-fs 內
       if (startWrap && startWrap === endWrap){
         const wrap = startWrap;
         const base = getSpanSize(wrap) || 1;
 
-        // 是否剛好選到整個 wrapper 的全部內容
         const fullyCoversWrapper =
           range.startContainer === wrap && range.endContainer === wrap &&
           range.startOffset === 0 && range.endOffset === wrap.childNodes.length;
 
         if (fullyCoversWrapper){
-          // 整個 wrapper 同步放大/縮小
           setSpanSize(wrap, base + deltaStep);
           mergeAdjacentFs(wrap);
           afterChange(story);
-          // 鎖回選取 → 可連續按 A+/A-
           setSelectionToNodeContents(wrap);
           return true;
         }
 
-        // 只選到 wrapper 的一部分：抽出選取 → 只調整該段 → 把 wrapper 切成三段
         const frag = range.extractContents();
-        stripFsInFragment(frag); // 先扁平化內部 fs，避免層層相乘
-
+        stripFsInFragment(frag);
         const selSpan = createFsSpanWith(base + deltaStep);
         selSpan.appendChild(frag);
-
-        // 先插回（仍在 wrap 裡），再把 wrap 切成 [左][selSpan][右]
         range.insertNode(selSpan);
         splitFsWrapperAroundChild(wrap, selSpan);
 
-        // 兩側若出現相同大小的 fs 可再合併
         const prev = selSpan.previousSibling;
         const next = selSpan.nextSibling;
         if (prev && prev.tagName === 'SPAN') mergeAdjacentFs(prev);
         if (next && next.tagName === 'SPAN') mergeAdjacentFs(next);
 
         afterChange(story);
-        // 鎖回選取到剛處理的區段
         setSelectionToNodeContents(selSpan);
         return true;
       }
 
-      // 否則（跨多個 fs-span 或沒有 fs-span）：
-      // 取端點附近已存在的 data-fs 當基準，沒有就 1.0
       let base = getSpanSize(startWrap);
       if (isNaN(base)) base = getSpanSize(endWrap);
       if (isNaN(base)) base = 1.0;
 
-      // 把選取抽出，扁平化裡面所有 data-fs，然後用一層新的包回
       const frag = range.extractContents();
       stripFsInFragment(frag);
 
@@ -437,7 +383,6 @@
 
       mergeAdjacentFs(span);
       afterChange(story);
-      // 鎖回選取
       setSelectionToNodeContents(span);
       return true;
     });
@@ -454,8 +399,6 @@
     btnB && btnB.addEventListener('click', ()=> toggleInline('b'));
     btnI && btnI.addEventListener('click', ()=> toggleInline('i'));
     btnU && btnU.addEventListener('click', ()=> toggleInline('u'));
-
-    // 步進 0.1em（連按可持續放大/縮小）
     btnUp && btnUp.addEventListener('click', ()=> adjustFont(+0.1));
     btnDn && btnDn.addEventListener('click', ()=> adjustFont(-0.1));
   }
