@@ -1,11 +1,10 @@
-/* text-controls.js — B/I/U（OK）+ A+/A-（只動反白、統一尺寸、截斷邊界；且不產生 data-fs 巢狀）
- * - B/I/U：原生 toggle + 清理
- * - A+/A-：先包選取 → strip 內部 data-fs → 再把這個包「提」到外層 data-fs 之外（分成左右/中三段）
+/* text-controls.js — B/I/U（OK）+ A+/A-（只動反白、可連按、不擴選）
+ * 連按 A+ / A- 的祕訣：當選取覆蓋「單一 data-fs 區塊」時，直接改那個區塊的 font-size 並維持選取
  */
 (function () {
   if (!window.EditorCore) return;
 
-  /* ================== 小工具 ================== */
+  // ===== 工具 =====
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   const EM_MIN = 0.2, EM_MAX = 5, STEP = 0.1;
 
@@ -21,7 +20,6 @@
     if (!allowCollapsed && rng.collapsed) return null;
     return { story, range: rng, dbIndex };
   }
-
   function afterChange(story) {
     const db = Number(story.dataset.dbIndex || "0") | 0;
     EditorCore.updatePageJsonFromStory(db, story);
@@ -31,10 +29,8 @@
       story.dispatchEvent(new Event("input", { bubbles: true }));
     }
   }
-
   function unwrap(el) {
-    const p = el.parentNode;
-    if (!p) return;
+    const p = el.parentNode; if (!p) return;
     while (el.firstChild) p.insertBefore(el.firstChild, el);
     p.removeChild(el);
   }
@@ -49,14 +45,12 @@
     el && el.nodeType === 1 && el.tagName === 'SPAN' &&
     (el.dataset.fs || /font-size/i.test(el.getAttribute('style') || ''));
 
-  /* ========== B/I/U 清理 ========== */
+  // ===== B/I/U 清理與切換（略） =====
   function sanitizeInlineBUI(root) {
     if (!root) return;
     root.querySelectorAll("strong").forEach((n) => replaceTag(n, "b"));
     root.querySelectorAll("em").forEach((n) => replaceTag(n, "i"));
-
     ["b","i","u"].forEach(tag=>{
-      // 移除空標（只有空白或沒有子節點）
       Array.from(root.querySelectorAll(tag)).forEach(el=>{
         let hasText = false;
         const tw = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
@@ -65,8 +59,6 @@
         }
         if (!hasText) unwrap(el);
       });
-
-      // 去巢狀 + 合併相鄰
       let changed = true;
       while (changed) {
         changed = false;
@@ -75,33 +67,21 @@
           if (p && p.tagName.toLowerCase() === tag) { unwrap(el); changed = true; }
         });
       }
-      Array.from(root.querySelectorAll(tag)).forEach(el=>{
-        let next = el.nextSibling;
-        while (next && next.nodeType === 3 && !(next.nodeValue||"").trim()) next = next.nextSibling;
-        if (next && next.nodeType === 1 && next.tagName.toLowerCase() === tag) {
-          while (next.firstChild) el.appendChild(next.firstChild);
-          next.remove();
-        }
-      });
     });
   }
-
   function toggleCommand(cmd) {
-    const ctx = getStoryAndRange(true);
-    if (!ctx) return false;
+    const ctx = getStoryAndRange(true); if (!ctx) return false;
     const { story } = ctx;
-    return EditorCore.keepSelectionAround(story, () => {
-      document.execCommand(cmd, false);
-      sanitizeInlineBUI(story);
-      afterChange(story);
-      return true;
-    });
+    document.execCommand(cmd, false);
+    sanitizeInlineBUI(story);
+    afterChange(story);
+    return true;
   }
   function onBold(){ return toggleCommand("bold"); }
   function onItalic(){ return toggleCommand("italic"); }
   function onUnderline(){ return toggleCommand("underline"); }
 
-  /* ========== A+/A- 工具 ========== */
+  // ===== 字級工具 =====
   function parseEm(str) {
     if (!str) return NaN;
     const m = String(str).match(/([0-9.]+)\s*em$/i);
@@ -118,26 +98,12 @@
     span.dataset.fs = String(fs);
     span.style.fontSize = fs.toFixed(2).replace(/\.00$/, "") + "em";
   }
+  function stripFsInFragment(node) {
+    if (!node) return;
+    if (node.nodeType !== 1) { Array.from(node.childNodes).forEach(stripFsInFragment); return; }
+    const el = node;
+    if (isFsSpan(el)) { const p = el.parentNode; while (el.firstChild) p.insertBefore(el.firstChild, el); p.removeChild(el); return; }
     Array.from(el.childNodes).forEach(stripFsInFragment);
-  }
-  function mergeAdjacentFs(span) {
-    if (!span || span.nodeType !== 1 || span.tagName !== "SPAN") return;
-    const key = span.dataset.fs || (span.style.fontSize || "").replace("em", "");
-    if (!key) return;
-    // 左
-    let prev = span.previousSibling;
-    while (prev && prev.nodeType === 3 && !prev.nodeValue) prev = prev.previousSibling;
-    if (prev && prev.nodeType === 1 && prev.tagName === "SPAN") {
-      const k = prev.dataset.fs || (prev.style.fontSize || "").replace("em","");
-      if (k === key) { while (span.firstChild) prev.appendChild(span.firstChild); span.replaceWith(prev); span = prev; }
-    }
-    // 右
-    let next = span.nextSibling;
-    while (next && next.nodeType === 3 && !next.nodeValue) next = next.nextSibling;
-    if (next && next.nodeType === 1 && next.tagName === "SPAN") {
-      const k = next.dataset.fs || (next.style.fontSize || "").replace("em","");
-      if (k === key) { while (next.firstChild) span.appendChild(next.firstChild); next.remove(); }
-    }
   }
   function cleanupEmptyFs(root){
     Array.from(root.querySelectorAll('span[data-fs],span[style*="font-size"]')).forEach(el=>{
@@ -150,12 +116,12 @@
       if (!hasText && !hasElement) unwrap(el);
     });
   }
+  function findFsWrapper(node) {
+    let cur = node && node.nodeType === 1 ? node : node ? node.parentElement : null;
+    while (cur && cur !== document) { if (isFsSpan(cur)) return cur; cur = cur.parentElement; }
+    return null;
+  }
   function computeBaseEmForSelection(range){
-    const findFsWrapper = (node)=>{
-      let cur = node && node.nodeType === 1 ? node : node ? node.parentElement : null;
-      while (cur && cur !== document) { if (isFsSpan(cur)) return cur; cur = cur.parentElement; }
-      return null;
-    };
     const sw = findFsWrapper(range.startContainer);
     const ew = findFsWrapper(range.endContainer);
     if (sw && sw === ew) {
@@ -165,8 +131,6 @@
     const base2 = sw ? getSpanSize(sw) : NaN;
     return isNaN(base2) ? 1.0 : base2;
   }
-
-  /* ========== 把選取包「提級」出外層 data-fs（避免巢狀） ========== */
   function liftOutFromFs(wrapper) {
     let w = wrapper;
     while (w.parentElement && isFsSpan(w.parentElement)) {
@@ -175,8 +139,7 @@
 
       // 左段
       const rL = document.createRange();
-      rL.setStart(p, 0);
-      rL.setEndBefore(w);
+      rL.setStart(p, 0); rL.setEndBefore(w);
       const leftFrag = rL.extractContents();
       if (leftFrag.childNodes.length) {
         const sL = document.createElement('span');
@@ -185,11 +148,9 @@
         sL.appendChild(leftFrag);
         gp.insertBefore(sL, p);
       }
-
       // 右段
       const rR = document.createRange();
-      rR.setStartAfter(w);
-      rR.setEnd(p, p.childNodes.length);
+      rR.setStartAfter(w); rR.setEnd(p, p.childNodes.length);
       const rightFrag = rR.extractContents();
       if (rightFrag.childNodes.length) {
         const sR = document.createElement('span');
@@ -198,126 +159,84 @@
         sR.appendChild(rightFrag);
         gp.insertBefore(sR, p.nextSibling);
       }
-
-      // 把 wrapper 提到 p 的位置
+      // 提級
       gp.replaceChild(w, p);
     }
-    // 清一下相鄰同字級
-    mergeAdjacentFs(w);
   }
-
-  /* ========== A+/A-（只動反白、分開而不包在舊 data-fs 裡） ========== */
-  function collectTextBaseMap(range, story){
-    const map = new Map();
-    const walker = document.createTreeWalker(
-      range.commonAncestorContainer,
-      NodeFilter.SHOW_TEXT,
-      {
-        acceptNode(node){
-          if (!range.intersectsNode(node)) return NodeFilter.FILTER_REJECT;
-          if (!story.contains(node)) return NodeFilter.FILTER_REJECT;
-          if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_SKIP;
-          return NodeFilter.FILTER_ACCEPT;
-        }
-      }
+  function selectionCoversWhole(el, range) {
+    // 選取是否「完整覆蓋」某個元素的內容
+    const r2 = document.createRange();
+    r2.selectNodeContents(el);
+    return (
+      range.startContainer === r2.startContainer &&
+      range.startOffset   === r2.startOffset   &&
+      range.endContainer  === r2.endContainer  &&
+      range.endOffset     === r2.endOffset
     );
-
-    while (walker.nextNode()) {
-      const text = walker.currentNode;
-      let base = NaN;
-      let cur = text.parentNode;
-      while (cur && cur !== story) {
-        if (isFsSpan(cur)) {
-          const size = getSpanSize(cur);
-          if (!isNaN(size)) { base = size; break; }
-        }
-        cur = cur.parentNode;
-      }
-      if (isNaN(base)) base = 1.0;
-      map.set(text, base);
-    }
-    return map;
   }
+
+  // ===== A+ / A-：只動反白、可連按、不擴選 =====
   function adjustFont(deltaStep) {
     const ctx = getStoryAndRange(false /* 必須有選取 */);
     if (!ctx) return false;
     const { story, range } = ctx;
 
-    return EditorCore.keepSelectionAround(story, () => {
-    const defaultBase = computeBaseEmForSelection(range);
-      const textBaseMap = collectTextBaseMap(range, story);
-      const frag = range.extractContents();
- if (!frag || !frag.childNodes.length) return false;
+    // 情況 A：選取完整覆蓋「單一 data-fs 區塊」→ 直接就地調整，並保持選取
+    const directWrapper = (()=>{
+      const sw = findFsWrapper(range.startContainer);
+      const ew = findFsWrapper(range.endContainer);
+      if (sw && sw === ew && selectionCoversWhole(sw, range)) return sw;
+      return null;
+    })();
 
-      const spansToNormalize = [];
+    if (directWrapper) {
+      const base = getSpanSize(directWrapper) || 1;
+      const target = clamp( +(base + deltaStep).toFixed(2), EM_MIN, EM_MAX );
+      setSpanSize(directWrapper, target);
 
-      function applyDelta(node, inheritedBase) {
-        if (node.nodeType === 1) {
-          const el = node;
-          if (isFsSpan(el)) {
-            const current = getSpanSize(el);
-            const base = isNaN(current) ? inheritedBase : current;
-            const target = clamp( +(base + deltaStep).toFixed(2), EM_MIN, EM_MAX );
-            setSpanSize(el, target);
-            spansToNormalize.push(el);
-            // 仍須處理巢狀字級
-            Array.from(el.childNodes).forEach(child => applyDelta(child, target));
-            return;
-          }
-          Array.from(el.childNodes).forEach(child => applyDelta(child, inheritedBase));
-          return;
-        }
-
-        if (node.nodeType === 3) {
-          const text = node;
-          if (!text.nodeValue || !text.nodeValue.trim()) return;
-
-          let cur = text.parentNode;
-          while (cur && cur !== frag && cur !== story) {
-            if (isFsSpan(cur)) return; // 由外層處理
-            cur = cur.parentNode;
-          }
-
-          const base = textBaseMap.has(text) ? textBaseMap.get(text) : inheritedBase;
-          const target = clamp( +(base + deltaStep).toFixed(2), EM_MIN, EM_MAX );
-          const span = document.createElement('span');
-          setSpanSize(span, target);
-          text.parentNode.insertBefore(span, text);
-          span.appendChild(text);
-          spansToNormalize.push(span);
-          return;
-        }
-      }
-
-      Array.from(frag.childNodes).forEach(child => applyDelta(child, defaultBase));
-
-      const inserted = Array.from(frag.childNodes);
-      const extraSpans = frag.querySelectorAll ? Array.from(frag.querySelectorAll('span[data-fs],span[style*="font-size"]')) : [];
-      extraSpans.forEach(span => spansToNormalize.push(span));
-
-      const marker = document.createTextNode('');
-      range.insertNode(marker);
-      inserted.forEach(node => marker.parentNode.insertBefore(node, marker));
-      marker.remove();
-
-      const uniqueSpans = Array.from(new Set(spansToNormalize.filter(span => span && span.nodeType === 1)));
-      
-      uniqueSpans
-        .filter(span => span.parentElement)
-        .forEach(span => liftOutFromFs(span));
-
-      uniqueSpans
-        .filter(span => span.parentElement)
-        .forEach(span => mergeAdjacentFs(span));
-
-        cleanupEmptyFs(story);
+      // 維持選取在這個 wrapper，支援連按
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      const nr = document.createRange();
+      nr.selectNodeContents(directWrapper);
+      sel.addRange(nr);
 
       afterChange(story);
       return true;
-    });
+    }
+
+    // 情況 B：選取是混雜內容 → 抽出、清掉內部 fs、包新 fs、提級、不合併鄰居，最後把選取鎖到新包
+    const base = computeBaseEmForSelection(range);
+    const target = clamp( +(base + deltaStep).toFixed(2), EM_MIN, EM_MAX );
+
+    // 抽出 fragment 並清掉 fs（保留 B/I/U）
+    const frag = range.extractContents();
+    stripFsInFragment(frag);
+
+    // 包目標字級
+    const newSpan = document.createElement("span");
+    setSpanSize(newSpan, target);
+    newSpan.appendChild(frag);
+    range.insertNode(newSpan);
+
+    // 提級到任何外層 fs 之外（切成左/中/右三段，避免影響未選取）
+    liftOutFromFs(newSpan);
+
+    // 清掉空 wrapper（不和左右合併，避免擴選）
+    cleanupEmptyFs(story);
+
+    // 鎖定選取在新包 → 可以一直連按
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    const nr = document.createRange();
+    nr.selectNodeContents(newSpan);
+    sel.addRange(nr);
+
+    afterChange(story);
+    return true;
   }
 
-  /* ========== 綁定 ========== */
+  // ===== 綁定 =====
   function bindButtons() {
     const btnB = document.getElementById("btnBold");
     const btnI = document.getElementById("btnItalic");
@@ -325,21 +244,20 @@
     const btnUp = document.getElementById("btnFontUp");
     const btnDn = document.getElementById("btnFontDown");
 
-    btnB && btnB.addEventListener("click", () => toggleCommand("bold"));
-    btnI && btnI.addEventListener("click", () => toggleCommand("italic"));
-    btnU && btnU.addEventListener("click", () => toggleCommand("underline"));
+    btnB && btnB.addEventListener("click", onBold);
+    btnI && btnI.addEventListener("click", onItalic);
+    btnU && btnU.addEventListener("click", onUnderline);
 
     btnUp && btnUp.addEventListener("click", () => adjustFont(+STEP));
     btnDn && btnDn.addEventListener("click", () => adjustFont(-STEP));
   }
-
   function bindShortcuts() {
     document.addEventListener("keydown", (e) => {
       const meta = e.ctrlKey || e.metaKey;
       if (!meta) return;
-      if (e.key === "b" || e.key === "B") { e.preventDefault(); toggleCommand("bold"); }
-      if (e.key === "i" || e.key === "I") { e.preventDefault(); toggleCommand("italic"); }
-      if (e.key === "u" || e.key === "U") { e.preventDefault(); toggleCommand("underline"); }
+      if (e.key === "b" || e.key === "B") { e.preventDefault(); onBold(); }
+      if (e.key === "i" || e.key === "I") { e.preventDefault(); onItalic(); }
+      if (e.key === "u" || e.key === "U") { e.preventDefault(); onUnderline(); }
       if (e.key === "=" || e.key === "+") { e.preventDefault(); adjustFont(+STEP); }
       if (e.key === "-") { e.preventDefault(); adjustFont(-STEP); }
     });
