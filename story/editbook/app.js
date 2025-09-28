@@ -84,7 +84,7 @@
 
       if (coverURL) {
         coverFront.classList.add('page--illustration');
-        coverFront.style.background-image = `url("${coverURL}")`;
+        coverFront.style.backgroundImage = `url("${coverURL}")`;
         coverFront.innerHTML = '';
       } else {
         coverFront.classList.remove('page--illustration');
@@ -103,7 +103,7 @@
 
       if (coverURL) {
         front.classList.add('page--illustration');
-        front.style.background-image = `url("${coverURL}")`;
+        front.style.backgroundImage = `url("${coverURL}")`;
         front.innerHTML = '';
       } else {
         front.classList.remove('page--illustration');
