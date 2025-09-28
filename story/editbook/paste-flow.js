@@ -152,9 +152,12 @@
 
     storyEl.addEventListener('paste', (e)=>{
       e.preventDefault();
-      const t = (e.clipboardData || window.clipboardData).getData('text/plain') || '';
-      document.execCommand('insertText', false, t);
-      setTimeout(()=>{ flowOverflowFrom(dbIndex); }, 0);
+  const plain = (e.clipboardData || window.clipboardData).getData('text/plain') || '';
+  // 轉義 & <>，再把換行轉成 <br>
+  const esc = plain.replace(/[&<>]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[ch]));
+  const html = esc.replace(/\r\n|\r|\n/g, '<br>');
+  document.execCommand('insertHTML', false, html);
+  setTimeout(()=>{ flowOverflowFrom(dbIndex); }, 0);
     });
 
     storyEl.addEventListener('keydown', (e)=>{
