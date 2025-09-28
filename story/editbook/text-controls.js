@@ -1,11 +1,12 @@
 
-/* text-controls.js — Fix A+/A-: single-layer data-fs, no empty spans, precise rounding
- * This file keeps previous B/I/U toggle behavior and replaces A+/A- with a safer pipeline.
- * Key improvements:
- * - Round to 1 decimal (e.g., 1.2) to avoid 1.2000000000000002
- * - Never insert empty <span data-fs> (guard on fragment.hasChildNodes())
- * - Normalize & merge adjacent same-size spans; unwrap empty spans
- * - Collapsed-caret: adjust the current wrapper if present; otherwise expand to word
+/* 928text-controls.js — FS boundary-safe A+/A-, selection-only (no spillover), with B/I/U fixed
+ * 改善點：
+ * 1) 在選取兩端插入「邊界註解節點」(<!--fs-boundary-->)，包裝/合併時絕不跨越邊界
+ * 2) A+/A- 僅變更反白選取，後面的文字不會被一併放大（避免越界合併）
+ * 3) 一位小數的字級（避免 1.2000000002），相鄰同字級合併且不穿越邊界
+ * 4) 不產生空 data-fs；游標狀態時會擴到「一個字詞」再調整
+ *
+ * 依賴：EditorCore.getFocusedDbIndex / getStoryByDbIndex / keepSelectionAround / updatePageJsonFromStory
  */
 (function(){
   if (!window.EditorCore) return;
@@ -13,6 +14,7 @@
   /* ===== Helpers ===== */
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   const round1 = (v) => Math.round(v * 10) / 10;
+  const BOUNDARY_TOKEN = 'fs-boundary';
 
   function getStoryAndRange(allowCollapsed = true) {
     const dbIndex = EditorCore.getFocusedDbIndex();
@@ -37,7 +39,7 @@
     }
   }
 
-  /* ====== Inline B/I/U toggle stays from previous fixed version ====== */
+  /* ===== B/I/U (同上版) ===== */
   function unwrap(el) {
     const p = el.parentNode;
     if (!p) return;
@@ -57,19 +59,14 @@
     root.querySelectorAll("em").forEach(n => replaceTag(n, "i"));
     ["b","i","u"].forEach(tag=>{
       Array.from(root.querySelectorAll(tag)).forEach(el=>{
-        // remove if no visible text and no <br>
         let hasRenderable = false;
         for (let n=el.firstChild;n;n=n.nextSibling){
           if (n.nodeType===3 && (n.nodeValue||"").replace(/\u00a0/g,' ').trim()){ hasRenderable=true; break; }
-          if (n.nodeType===1){ // element
-            if (n.tagName==='BR'){ hasRenderable=true; break; }
-            // nested wrappers will be handled by flatten/merge; don't count them
-          }
+          if (n.nodeType===1 && n.tagName==='BR'){ hasRenderable=true; break; }
         }
         if (!hasRenderable) unwrap(el);
       });
     });
-    // flatten nested
     ["b","i","u"].forEach(tag=>{
       let changed=true;
       while(changed){
@@ -80,7 +77,6 @@
         });
       }
     });
-    // merge adjacent
     ["b","i","u"].forEach(tag=>{
       Array.from(root.querySelectorAll(tag)).forEach(el=>{
         let next = el.nextSibling;
@@ -107,11 +103,14 @@
   function onItalic(){ return toggleCommand("italic"); }
   function onUnderline(){ return toggleCommand("underline"); }
 
-  /* ====== FS (A+/A-) utilities ====== */
+  /* ===== FS utilities ===== */
   function parseEm(str){
     if (!str) return NaN;
     const m = String(str).match(/([0-9.]+)\s*em$/i);
     return m ? parseFloat(m[1]) : NaN;
+  }
+  function isFsSpan(el){
+    return el && el.nodeType===1 && el.tagName==='SPAN' && (el.dataset.fs || /em$/.test(el.style.fontSize||''));
   }
   function getSpanSize(span){
     if (!span) return NaN;
@@ -122,19 +121,18 @@
   function setSpanSize(span, valEm){
     const fs = clamp(round1(valEm), 0.2, 5.0);
     span.dataset.fs = String(fs);
-    // keep 1 decimal (avoid long floats)
     span.style.fontSize = (Math.round(fs*10)/10).toFixed(1).replace(/\.0$/,'') + 'em';
   }
-  function isFsSpan(el){
-    return el && el.nodeType===1 && el.tagName==='SPAN' && (el.dataset.fs || /em$/.test(el.style.fontSize||''));
-  }
-  function findFsWrapper(node){
-    let cur = (node && node.nodeType===1) ? node : (node ? node.parentElement : null);
-    while(cur && cur!==document){
-      if (isFsSpan(cur)) return cur;
-      cur = cur.parentElement;
+  function normalizeFsSpan(el){
+    if (!isFsSpan(el)) return;
+    if (!el.dataset.fs){
+      const v = parseEm(el.style.fontSize);
+      if (!isNaN(v)) setSpanSize(el, v);
+    }else{
+      setSpanSize(el, parseFloat(el.dataset.fs));
     }
-    return null;
+    // remove if empty
+    if (!hasRenderableContent(el)) unwrap(el);
   }
   function hasRenderableContent(el){
     let tw = document.createTreeWalker(el, NodeFilter.SHOW_ALL, null);
@@ -145,48 +143,59 @@
     }
     return false;
   }
-  function normalizeFsSpan(el){
-    if (!isFsSpan(el)) return;
-    // If style has em but no data-fs, set data-fs
-    if (!el.dataset.fs){
-      const v = parseEm(el.style.fontSize);
-      if (!isNaN(v)) setSpanSize(el, v);
-    }else{
-      setSpanSize(el, parseFloat(el.dataset.fs));
-    }
-    // remove empty
-    if (!hasRenderableContent(el)) unwrap(el);
+
+  function isBoundaryNode(n){
+    return n && n.nodeType === 8 && String(n.nodeValue||'').indexOf(BOUNDARY_TOKEN) >= 0;
   }
+  function nextSiblingSkipWSStopBoundary(n){
+    let s = n && n.nextSibling;
+    while (s){
+      if (s.nodeType===8 && isBoundaryNode(s)) return null; // hit boundary → stop
+      if (s.nodeType===3 && !(s.nodeValue||'').trim()){ s = s.nextSibling; continue; }
+      return s;
+    }
+    return null;
+  }
+  function prevSiblingSkipWSStopBoundary(n){
+    let s = n && n.previousSibling;
+    while (s){
+      if (s.nodeType===8 && isBoundaryNode(s)) return null; // hit boundary → stop
+      if (s.nodeType===3 && !(s.nodeValue||'').trim()){ s = s.previousSibling; continue; }
+      return s;
+    }
+    return null;
+  }
+
   function mergeAdjacentFs(root){
     const spans = Array.from(root.querySelectorAll('span[data-fs], span[style*="font-size"]'));
     spans.forEach(normalizeFsSpan);
-    // merge left-right equal
+
     Array.from(root.querySelectorAll('span[data-fs]')).forEach(span=>{
       if (!span.isConnected) return;
       const key = span.dataset.fs;
-      // left
-      let prev = span.previousSibling;
-      while (prev && prev.nodeType===3 && !(prev.nodeValue||"").trim()) prev = prev.previousSibling;
-      if (prev && prev.nodeType===1 && prev.tagName==='SPAN' && isFsSpan(prev)){
-        normalizeFsSpan(prev);
-        if (prev.dataset.fs === key){
-          while (span.firstChild) prev.appendChild(span.firstChild);
-          span.replaceWith(prev);
-          span = prev;
+
+      // LEFT merge if no boundary in-between
+      const left = prevSiblingSkipWSStopBoundary(span);
+      if (left && left.nodeType===1 && left.tagName==='SPAN' && isFsSpan(left)){
+        normalizeFsSpan(left);
+        if (left.dataset.fs === key){
+          while (span.firstChild) left.appendChild(span.firstChild);
+          span.replaceWith(left);
+          span = left;
         }
       }
-      // right
-      let next = span.nextSibling;
-      while (next && next.nodeType===3 && !(next.nodeValue||"").trim()) next = next.nextSibling;
-      if (next && next.nodeType===1 && next.tagName==='SPAN' && isFsSpan(next)){
-        normalizeFsSpan(next);
-        if (next.dataset.fs === key){
-          while (next.firstChild) span.appendChild(next.firstChild);
-          next.remove();
+      // RIGHT merge if no boundary in-between
+      const right = nextSiblingSkipWSStopBoundary(span);
+      if (right && right.nodeType===1 && right.tagName==='SPAN' && isFsSpan(right)){
+        normalizeFsSpan(right);
+        if (right.dataset.fs === key){
+          while (right.firstChild) span.appendChild(right.firstChild);
+          right.remove();
         }
       }
     });
   }
+
   function stripFsInFragment(node){
     if (!node) return;
     if (node.nodeType!==1){ Array.from(node.childNodes).forEach(stripFsInFragment); return; }
@@ -199,6 +208,7 @@
     }
     Array.from(el.childNodes).forEach(stripFsInFragment);
   }
+
   function expandRangeToWord(range){
     const node = range.startContainer;
     if (!node || node.nodeType!==3) return false;
@@ -215,7 +225,29 @@
     return true;
   }
 
-  /* ====== A+/A- main ====== */
+  function placeBoundaryMarkers(range){
+    // Insert end then start to avoid offset shift
+    const endMarker = document.createComment(BOUNDARY_TOKEN);
+    const endRange = range.cloneRange();
+    endRange.collapse(false);
+    endRange.insertNode(endMarker);
+
+    const startMarker = document.createComment(BOUNDARY_TOKEN);
+    const startRange = range.cloneRange();
+    startRange.collapse(true);
+    startRange.insertNode(startMarker);
+
+    return { startMarker, endMarker };
+  }
+
+  function removeBoundaryMarkers(markers){
+    if (!markers) return;
+    const { startMarker, endMarker } = markers;
+    if (startMarker && startMarker.parentNode) startMarker.parentNode.removeChild(startMarker);
+    if (endMarker && endMarker.parentNode) endMarker.parentNode.removeChild(endMarker);
+  }
+
+  /* ===== A+/A- main ===== */
   function adjustFont(deltaStep){
     let ctx = getStoryAndRange(false);
     if (!ctx){
@@ -225,45 +257,66 @@
       const wrap = findFsWrapper(range.startContainer);
       if (!wrap){
         const ok = expandRangeToWord(range);
-        if (!ok) return false; // caret on boundary w/o word: ignore
+        if (!ok) return false;
       }
     }
     const { story, range } = ctx;
 
     return EditorCore.keepSelectionAround(story, ()=>{
-      const startWrap = findFsWrapper(range.startContainer);
-      const endWrap   = findFsWrapper(range.endContainer);
+      // Put boundary markers so merge never crosses selection ends
+      const markers = placeBoundaryMarkers(range);
 
-      // Case 1: inside the same fs wrapper => just adjust it.
+      // Build an innerRange from start->end markers
+      const inner = document.createRange();
+      inner.setStartAfter(markers.startMarker);
+      inner.setEndBefore(markers.endMarker);
+
+      const startWrap = findFsWrapper(inner.startContainer);
+      const endWrap   = findFsWrapper(inner.endContainer);
+
+      // Same wrapper case
       if (startWrap && startWrap === endWrap){
         const cur = getSpanSize(startWrap) || 1.0;
         setSpanSize(startWrap, cur + deltaStep);
+        // Keep markers to block cross-boundary merge, then cleanup
         mergeAdjacentFs(story);
+        removeBoundaryMarkers(markers);
         afterChange(story);
         return true;
       }
 
-      // Case 2: selection spanning multiple runs => wrap whole selection to a single fs span
+      // Multi-run selection
       const baseA = getSpanSize(startWrap);
       const baseB = getSpanSize(endWrap);
       const base = !isNaN(baseA) ? baseA : (!isNaN(baseB) ? baseB : 1.0);
 
-      const frag = range.extractContents();
+      const frag = inner.extractContents();
       stripFsInFragment(frag);
       if (!frag.hasChildNodes()){
-        // nothing selected (avoid creating empty spans)
+        removeBoundaryMarkers(markers);
         return false;
       }
       const span = document.createElement('span');
       setSpanSize(span, base + deltaStep);
       span.appendChild(frag);
-      range.insertNode(span);
+      inner.insertNode(span);
 
-      // Normalize: merge neighbors with same fs and cleanup empties
+      // 邊界仍在新 span 左右 → 合併時不會越界
       mergeAdjacentFs(story);
+      removeBoundaryMarkers(markers);
       afterChange(story);
       return true;
     });
+  }
+
+  /* Helper: find FS wrapper from node (used before definition) */
+  function findFsWrapper(node){
+    let cur = (node && node.nodeType===1) ? node : (node ? node.parentElement : null);
+    while(cur && cur!==document){
+      if (isFsSpan(cur)) return cur;
+      cur = cur.parentElement;
+    }
+    return null;
   }
 
   /* ===== Bindings ===== */
