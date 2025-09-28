@@ -405,15 +405,12 @@ body::-webkit-scrollbar { width:0; height:0; }
 
   /* === 新增：成功儲存後要送的通知 === */
   async function notifyDiscordAfterSave() {
-    // 從現有資料拿學生名與書名（saveAll 成功後 ACTIVE_BOOK 已是最新）
     const studentName = localStorage.getItem('player_username') || '未命名學生';
     const title = (window.ACTIVE_BOOK?.title || '未命名書籍').trim();
     const bookUrl = `https://shierusha.github.io/library/story/book?book=${encodeURIComponent(title)}`;
 
-    // 7 秒超時避免卡住
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 7000);
-
     try {
       const res = await fetch(NOTIFY_ENDPOINT, {
         method: 'POST',
@@ -446,7 +443,17 @@ body::-webkit-scrollbar { width:0; height:0; }
     if (x==='image')         return 'illustration';
     return (['novel','divider_light','divider_dark','illustration'].includes(x) ? x : 'novel');
   };
-  const stripId = (obj)=>{ const { id, ...rest } = obj || {}; return rest; }; // <-- 關鍵：插入時移除 id
+  const stripId = (obj)=>{ const { id, ...rest } = obj || {}; return rest; }; // 插入時移除 id
+
+  // 內部 → DB ENUM（優先用 app.js 的 TypeMap；否則用後備轉換）
+  const toDbTypeForPages = (t)=>{
+    if (window.TypeMap?.toDbType) return window.TypeMap.toDbType(t);
+    const x = String(t||'').trim().toLowerCase().replace(/-/g,'_');
+    if (x==='divider_light' || x==='divider_white') return 'divider_white';
+    if (x==='divider_dark'  || x==='divider_black') return 'divider_black';
+    if (x==='illustration'  || x==='image')         return 'image';
+    return 'novel';
+  };
 
   async function saveAll({ navigateAfter = false } = {}) {
     if (!window.SB)      { alert('尚未登入或 SB 未建立'); return false; }
@@ -481,18 +488,6 @@ body::-webkit-scrollbar { width:0; height:0; }
         if (r.error) return die('update-books', r.error);
       }
 
-
-// 內部 → DB ENUM（優先用 app.js 暴露的 toDbType；沒有就用後備對映）
-const toDbTypeForPages = (t)=>{
-  if (window.TypeMap?.toDbType) return window.TypeMap.toDbType(t);
-  const x = String(t||'').trim().toLowerCase().replace(/-/g,'_');
-  if (x==='divider_light' || x==='divider_white') return 'divider_white';
-  if (x==='divider_dark'  || x==='divider_black') return 'divider_black';
-  if (x==='illustration'  || x==='image')         return 'image';
-  return 'novel';
-};
-
-      
       // 2) 讀 DB 現況
       const [dbPagesRes, dbChRes] = await Promise.all([
         SB.from('pages').select('id,page_index').eq('book_id', bookId).order('page_index', { ascending: true }),
@@ -506,13 +501,15 @@ const toDbTypeForPages = (t)=>{
       const dbChapters = (dbChRes.data || []).map(r => ({ id:r.id, page_id:r.page_id, title:r.title, page_index:r.pages?.page_index||1 }));
 
       // 3) 新狀態（畫面上的頁）
-const desiredPages = (window.PAGES_DB || []).map((p, i) => ({
-  id: p.id || null,
+      const desiredPages = (window.PAGES_DB || []).map((p, i) => ({
+        id: p.id || null,
         book_id: window.BOOK_ID,
         page_index: i + 1,
         type: toDbTypeForPages(p.type),
         image_url: p.image_url || null,
-        content_json: p.content_json ? p.content_json : { text_plain:'', text_html:'' }
+        content_json: p.content_json
+          ? p.content_json
+          : { text_plain:'', text_html:'' } // 保底，避免 null 撞 schema
       }));
 
       const toUpdate = [];
@@ -524,20 +521,18 @@ const desiredPages = (window.PAGES_DB || []).map((p, i) => ({
         if (dp.id) {
           const old = dbPagesById.get(dp.id);
           if (!old) {
-            // 本地有 id 但 DB 找不到 → 視為新頁（插入時移除 id）
-            toInsertRaw.push(stripId(dp));
+            toInsertRaw.push(stripId(dp)); // 本地有 id 但 DB 找不到 → 視為新頁（插入時移除 id）
           } else {
             desiredOldIds.add(dp.id);
             if ((old.page_index|0) === (dp.page_index|0)) {
               toUpdate.push(dp); // 索引不變 → 直接 upsert
             } else {
-              // 換位：插入新列（不帶 id），稍後刪舊列
-              toInsertRaw.push(stripId(dp));
-              toDeleteIds.push(old.id);
+              toInsertRaw.push(stripId(dp)); // 換位 → 新列（不帶 id）
+              toDeleteIds.push(old.id);      // 稍後刪舊列
             }
           }
         } else {
-          toInsertRaw.push(stripId(dp)); // 全新：不帶 id
+          toInsertRaw.push(stripId(dp));     // 全新 → 插入（不帶 id）
         }
       });
 
@@ -550,20 +545,9 @@ const desiredPages = (window.PAGES_DB || []).map((p, i) => ({
         if (r.error) return die('upsert-pages(stable)', r.error);
       }
 
-      // 5) 插入新頁（絕不含 id 欄位，交給 DB 產生）
-      let inserted = [];
-      if (toInsertRaw.length) {
-        const r = await SB.from('pages').insert(toInsertRaw).select('id,page_index');
-        if (r.error) return die('insert-pages', r.error);
-        inserted = r.data || [];
-        // 把新 id 寫回本地
-        inserted.forEach(row => {
-          const p = window.PAGES_DB[row.page_index - 1];
-          if (p) p.id = row.id;
-        });
-      }
+      // ===== 關鍵調整：先刪後插，清出 (book_id, page_index) 唯一鍵空間 =====
 
-      // 6) 章節：先刪掉指向「待刪舊頁」的章節，避免外鍵擋住下一步
+      // 5) 章節：先刪掉指向「待刪舊頁」的章節（避免外鍵擋住下一步刪頁）
       const existingByPid = new Map(dbChapters.map(c => [c.page_id, c]));
       const toDeleteChIds = [];
       toDeleteIds.forEach(pid => { const ch = existingByPid.get(pid); if (ch) toDeleteChIds.push(ch.id); });
@@ -572,10 +556,23 @@ const desiredPages = (window.PAGES_DB || []).map((p, i) => ({
         if (r.error) return die('delete-chapters(for-old-pages)', r.error);
       }
 
-      // 7) 刪掉舊頁
+      // 6) 刪掉舊頁（釋放唯一索引）
       if (toDeleteIds.length) {
         const r = await SB.from('pages').delete().in('id', toDeleteIds);
         if (r.error) return die('delete-pages', r.error);
+      }
+
+      // 7) 再插入新頁（絕不含 id 欄位，交給 DB 產生）
+      let inserted = [];
+      if (toInsertRaw.length) {
+        const r = await SB.from('pages').insert(toInsertRaw).select('id,page_index');
+        if (r.error) return die('insert-pages', r.error);
+        inserted = r.data || [];
+        // 把新 id 寫回本地（之後章節要用）
+        inserted.forEach(row => {
+          const p = window.PAGES_DB[row.page_index - 1];
+          if (p) p.id = row.id;
+        });
       }
 
       // 8) 重建 page_index → page_id 對應
@@ -638,11 +635,10 @@ const desiredPages = (window.PAGES_DB || []).map((p, i) => ({
         .sort((a,b)=> a.page_index - b.page_index);
 
       window.ACTIVE_BOOK = freshBook.data;
-window.PAGES_DB = (freshPages.data || []).map(p => ({
-   ...p,
-   // 用 app.js 的 fromDbType；沒有就用現成的 normType 做降級轉換
-   type: (window.TypeMap?.fromDbType ? window.TypeMap.fromDbType(p.type) : normType(p.type))
- })); 
+      window.PAGES_DB = (freshPages.data || []).map(p => ({
+        ...p,
+        type: (window.TypeMap?.fromDbType ? window.TypeMap.fromDbType(p.type) : normType(p.type))
+      }));
       window.CHAPTERS_DB = chapters;
       try { window.persistDraft && window.persistDraft(); } catch(_) {}
 
@@ -666,24 +662,23 @@ window.PAGES_DB = (freshPages.data || []).map(p => ({
 
   // 綁定按鈕
   document.getElementById('btnSave')?.addEventListener('click', ()=> {
-    // 單純存檔不通知
     saveAll({ navigateAfter: false });
   });
 
   document.getElementById('btnBack')?.addEventListener('click', async ()=> {
-    // ← 修改點：先存檔成功 → 送 Discord 通知 → 導頁
     const btnBack = document.getElementById('btnBack');
-    if (btnBack) btnBack.disabled = true; // 避免重複點擊
+    if (btnBack) btnBack.disabled = true;
     const ok = await saveAll({ navigateAfter: false });
     if (ok) {
-      await notifyDiscordAfterSave();     // ★ 在這裡通知
-      location.href = BACK_URL;           // 再導回書單
+      await notifyDiscordAfterSave();
+      location.href = BACK_URL;
     } else if (btnBack) {
       btnBack.disabled = false;
     }
   });
 })();
 </script>
+
 
 
 <!-- A 站連動登出（玩家中心登出時，這頁自動跳回玩家中心） -->
