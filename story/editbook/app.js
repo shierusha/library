@@ -206,7 +206,7 @@ function applyCoverFromBook(isFromTitleTyping = false) {
       front.style.alignItems = 'center';
       front.style.justifyContent = 'center';
       front.innerHTML = `<div class="cover-title" style="font-size:1.8em;font-weight:700">${escapeHTML(title)}</div>`;
-      ensureCoverHint(coverFront);  
+      ensureCoverHint(front);  
     }
     if (back) {
       back.style.background = '';
