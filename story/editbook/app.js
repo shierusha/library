@@ -385,7 +385,14 @@ function lockToDbIndex(dbIndex){
     const dbIndex = Math.max(1, clamped - 2);
     lockToDbIndex(dbIndex);
   };
-
+// ★ 新增：回封面（DOM 第 1 頁，0-based=0）
+window.gotoCover = function gotoCover(){
+  if (!window.book) return;
+  window.book._cursorPage = 0;
+  if (typeof window.book._mountCurrent === 'function') window.book._mountCurrent();
+  // 同步一下 UI（可選）
+  try { window.lightRedraw?.(); } catch(_){}
+};
   /* ===== 重建（動到頁數時） =====
  * 關鍵：new BookFlip 後，不做任何推算；直接鎖到 targetDbIndex（含雙 rAF 硬鎖）
  */
@@ -639,8 +646,28 @@ window.rebuildTo = function rebuildTo(targetDbIndex){
   }
 
   /* ===== TOC（目錄） ===== */
-  function openTOC(){ buildTOC(); tocModal.classList.add('show'); tocModal.setAttribute('aria-hidden','false'); }
-  function closeTOC(){ tocModal.classList.remove('show'); tocModal.setAttribute('aria-hidden','true'); }
+function openTOC(){
+  buildTOC();
+  tocModal.classList.add('show');
+  tocModal.removeAttribute('inert');
+  tocModal.setAttribute('aria-hidden','false');
+  // 打開後把焦點放進 modal（第一個可聚焦元素）
+  const first = tocModal.querySelector('button, [href], [tabindex]:not([tabindex="-1"])');
+  first?.focus();
+}
+  
+function closeTOC(){
+  // 若焦點還在 modal 裡，先把焦點移回開啟鈕或 body
+  const opener = document.getElementById('btnTOC');
+  if (tocModal.contains(document.activeElement)) {
+    (opener || document.body).focus();
+  }
+  tocModal.classList.remove('show');
+  tocModal.setAttribute('aria-hidden','true');
+  tocModal.setAttribute('inert',''); // 徹底禁止被聚焦/點擊
+}
+  
+  
   function buildTOC(){
     if (!tocBody) return;
     const title = (ACTIVE_BOOK?.title || '未命名書籍').trim();
@@ -666,7 +693,7 @@ window.rebuildTo = function rebuildTo(targetDbIndex){
     });
 
     document.getElementById('tocGotoCover')?.addEventListener('click', ()=>{
-      gotoDomPage(1);
+  gotoCover(); 
       closeTOC();
     });
   }
