@@ -45,9 +45,7 @@
                      text === '';
       const noText = text === '';
 
-      if (onlyBr || noText){
-        trash.push(el);
-      }
+      if (onlyBr || noText) trash.push(el);
     }
 
     trash.forEach(el=>{
@@ -106,7 +104,7 @@
     return hasText ? true : false; // 沒文字則當作「非全在」
   }
 
-  // 只在 fragment 裡把 **未在 TAG 內** 的文字節點包一層 TAG
+  // 在 fragment 中，把 **未在 TAG 內** 的文字節點包一層 TAG
   function applyTagToUnstyledTextInFragment(root, TAG){
     const tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
     const targets = [];
@@ -114,7 +112,6 @@
       const t = tw.currentNode;
       if (isWhitespaceText(t)) continue;
 
-      // 判斷 t 在 fragment 內是否已有 TAG 祖先
       let cur = t.parentElement, covered = false;
       while (cur && cur !== root){
         if (cur.tagName === TAG) { covered = true; break; }
@@ -123,7 +120,7 @@
       if (!covered) targets.push(t);
     }
 
-    // 分別包起來（之後再做相鄰合併）
+    // 分別包起來
     targets.forEach(t=>{
       const wrap = document.createElement(TAG);
       const p = t.parentNode;
@@ -188,6 +185,20 @@
     list.forEach(el=> mergeAdjacentTagAround(el, TAG));
   }
 
+  // 找出 fragment 內「最左/最右」的頂層 TAG（插回去後用於邊界合併）
+  function findEdgeTagsInFragment(root, TAG){
+    let firstTag = null, lastTag = null;
+    for (let i=0;i<root.childNodes.length;i++){
+      const n = root.childNodes[i];
+      if (n.nodeType===1 && n.tagName===TAG){ firstTag = n; break; }
+    }
+    for (let i=root.childNodes.length-1;i>=0;i--){
+      const n = root.childNodes[i];
+      if (n.nodeType===1 && n.tagName===TAG){ lastTag = n; break; }
+    }
+    return { firstTag, lastTag };
+  }
+
   function toggleInline(tag){
     const TAG = String(tag||'').toUpperCase();
     const ctx = getActiveStory(); if (!ctx) return false;
@@ -204,17 +215,12 @@
       } else {
         // 部分未套用 → 只對「未套用」的文字節點加 TAG，不動已套用者
         applyTagToUnstyledTextInFragment(frag, TAG);
+        const { firstTag, lastTag } = findEdgeTagsInFragment(frag, TAG);
         range.insertNode(frag);
 
         // 嘗試把 fragment 邊界與外側同 TAG 合併，避免邊界出現兩個 TAG
-        const firstEl = (range.startContainer && range.startContainer.nodeType===1)
-          ? range.startContainer.firstElementChild
-          : null;
-        const lastEl = (range.startContainer && range.startContainer.nodeType===1)
-          ? range.startContainer.lastElementChild
-          : null;
-        if (firstEl && firstEl.tagName === TAG) mergeAdjacentTagAround(firstEl, TAG);
-        if (lastEl  && lastEl.tagName  === TAG) mergeAdjacentTagAround(lastEl, TAG);
+        if (firstTag) mergeAdjacentTagAround(firstTag, TAG);
+        if (lastTag && lastTag !== firstTag) mergeAdjacentTagAround(lastTag, TAG);
       }
 
       afterChange(story);
@@ -222,7 +228,8 @@
     });
   }
 
-  /* ---------- A+ / A- 專用（維持你的原邏輯） ---------- */
+  /* ---------- A+ / A-：只調整選取；若在同一 fs-span 內則切段 ---------- */
+
   function parseEm(str){
     if (!str) return NaN;
     const m = String(str).match(/([0-9.]+)\s*em$/i);
@@ -289,6 +296,48 @@
     }
   }
 
+  // 幫手：建立一個 data-fs span
+  function createFsSpanWith(valEm){
+    const s = document.createElement('span');
+    setSpanSize(s, valEm);
+    return s;
+  }
+
+  // 幫手：把同一個 data-fs wrapper（wrap）切成 [左] [mid] [右] 三段
+  // 讓 mid（通常是新插入的選取段）從 wrap 裡「脫出」到與 wrap 同層，避免字級相乘
+  function splitFsWrapperAroundChild(wrap, mid){
+    if (!wrap || !mid || !wrap.parentNode) return;
+    const parent = wrap.parentNode;
+    const base = getSpanSize(wrap) || 1;
+
+    const left  = createFsSpanWith(base);
+    const right = createFsSpanWith(base);
+
+    // 把 mid 左邊的節點移到 left
+    while (wrap.firstChild && wrap.firstChild !== mid){
+      left.appendChild(wrap.firstChild);
+    }
+
+    // 把 mid 自 wrap 中取出（若 mid 現在就在 wrap 內）
+    if (mid.parentNode === wrap) wrap.removeChild(mid);
+
+    // 把剩餘節點移到 right
+    while (wrap.firstChild){
+      right.appendChild(wrap.firstChild);
+    }
+
+    // 用 [left?][mid][right?] 取代原 wrap
+    const ref = wrap.nextSibling;
+    parent.removeChild(wrap);
+    if (left.childNodes.length)  parent.insertBefore(left,  ref);
+    parent.insertBefore(mid,  ref);
+    if (right.childNodes.length) parent.insertBefore(right, ref);
+
+    // 合併相鄰 data-fs，避免碎片
+    if (left.childNodes.length)  mergeAdjacentFs(left);
+    if (right.childNodes.length) mergeAdjacentFs(right);
+  }
+
   function adjustFont(deltaStep){
     const ctx = getActiveStory(); if (!ctx) return false;
     const {story, range} = ctx;
@@ -297,17 +346,34 @@
       const startWrap = findFsWrapper(range.startContainer);
       const endWrap   = findFsWrapper(range.endContainer);
 
-      // 1) 如果選取完全在同一個 data-fs 裡 → 直接在那一層累加
+      // 若選取完全在同一個 data-fs 內 → 只切選取段，單獨調整那段大小
       if (startWrap && startWrap === endWrap){
-        const cur = getSpanSize(startWrap) || 1;
-        setSpanSize(startWrap, cur + deltaStep);
-        mergeAdjacentFs(startWrap);
+        const wrap = startWrap;
+        const base = getSpanSize(wrap) || 1;
+
+        // 把選取抽出，扁平化內部 fs，包回一個新的 fs span
+        const frag = range.extractContents();
+        stripFsInFragment(frag);
+
+        const selSpan = createFsSpanWith(base + deltaStep);
+        selSpan.appendChild(frag);
+        range.insertNode(selSpan);
+
+        // 把原 wrapper 切三段，讓選取段脫離原 wrapper，避免相乘
+        splitFsWrapperAroundChild(wrap, selSpan);
+
+        // 合併左右可能相同大小的 fs
+        const prev = selSpan.previousSibling;
+        const next = selSpan.nextSibling;
+        if (prev && prev.tagName === 'SPAN') mergeAdjacentFs(prev);
+        if (next && next.tagName === 'SPAN') mergeAdjacentFs(next);
+
         afterChange(story);
         return true;
       }
 
-      // 2) 跨多段或只有一端有 data-fs：
-      //    以端點附近已存在的 data-fs 當基準，沒有就 1.0
+      // 否則（跨多個 fs-span 或沒有 fs-span）：
+      // 取端點附近已存在的 data-fs 當基準，沒有就 1.0
       let base = getSpanSize(startWrap);
       if (isNaN(base)) base = getSpanSize(endWrap);
       if (isNaN(base)) base = 1.0;
@@ -316,8 +382,7 @@
       const frag = range.extractContents();
       stripFsInFragment(frag);
 
-      const span = document.createElement('span');
-      setSpanSize(span, base + deltaStep);
+      const span = createFsSpanWith(base + deltaStep);
       span.appendChild(frag);
       range.insertNode(span);
 
