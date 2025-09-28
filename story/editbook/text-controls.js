@@ -1,64 +1,21 @@
-/* text-controls.js — v2 safe
+/* text-controls.js
  * 文字工具列：B / I / U / A+ / A-
- * - 部分選取只套未套用；全選已套用則取消
- * - A+/A- 只調整反白段；同一 fs-span 內會切 [左][選取][右]
- * - 操作後鎖回選取，方便連按
- * - 自動合併相鄰同標籤/字級，清空殼
+ * - 只作用目前頁（EditorCore.getFocusedDbIndex）
+ * - 只作用反白區段；保持選取（不會跳到第一字）
+ * - A+ / A-：只包「一層」 <span data-fs style="font-size:...em">；重複點持續累加
+ * - 跨多段時，以選取端點附近的 data-fs 當基準（無則 1.0）
+ * - 變更後合併左右同級的 data-fs，避免產生一堆 span
+ * - 每次操作後：寫回 DB + 觸發 PasteFlow.forceReflow(story)
  */
 (function(){
-
-  /* ---------- 常數（具後備） ---------- */
-  const NF = (typeof NodeFilter !== 'undefined') ? NodeFilter : {
-    SHOW_ELEMENT: 1, SHOW_TEXT: 4, FILTER_ACCEPT: 1, FILTER_REJECT: 2, FILTER_SKIP: 3
-  };
 
   /* ---------- 公用 ---------- */
   const clamp = (v,min,max)=> Math.max(min, Math.min(max, v));
 
-  function isOurFsSpan(el){
-    return el && el.tagName === 'SPAN' &&
-           (el.dataset.fs || /em$/.test((el.style && el.style.fontSize) || ''));
-  }
-  function isWhitespaceText(n){
-    return n && n.nodeType === 3 &&
-           !String(n.nodeValue||'').replace(/\u00a0/g,' ').trim();
-  }
-
-  function sweepInlineGarbage(root){
-    if (!root) return;
-    const walker = document.createTreeWalker(root, NF.SHOW_ELEMENT, null);
-    const trash = [];
-    while (walker.nextNode()){
-      const el = walker.currentNode;
-      if (!el || el === root) continue;
-      if (el.getAttribute && el.getAttribute('data-caret') === '1') continue;
-
-      const tag = el.tagName;
-      const isInline = /^(B|I|U|EM|STRONG|S|SMALL|MARK|SUB|SUP|SPAN)$/i.test(tag);
-      if (!isInline) continue;
-      if (tag === 'SPAN' && !isOurFsSpan(el)) continue;
-
-      const text = (el.textContent || '').replace(/\u00a0/g,' ').trim();
-      const onlyBr = el.children.length === 1 &&
-                     el.firstElementChild && el.firstElementChild.tagName === 'BR' &&
-                     text === '';
-      const noText = text === '';
-
-      if (onlyBr || noText) trash.push(el);
-    }
-
-    trash.forEach(el=>{
-      const parent = el.parentNode;
-      if (!parent) return;
-      while (el.firstChild) parent.insertBefore(el.firstChild, el);
-      parent.removeChild(el);
-    });
-  }
-
   function getActiveStory(){
-    const dbIndex = EditorCore.getFocusedDbIndex && EditorCore.getFocusedDbIndex();
+    const dbIndex = EditorCore.getFocusedDbIndex();
     if (!dbIndex) return null;
-    const story = EditorCore.getStoryByDbIndex && EditorCore.getStoryByDbIndex(dbIndex);
+    const story = EditorCore.getStoryByDbIndex(dbIndex);
     if (!story) return null;
     const sel = window.getSelection();
     if (!sel || sel.rangeCount===0) return null;
@@ -69,9 +26,8 @@
   }
 
   function afterChange(story){
-    sweepInlineGarbage(story);
     const db = Number(story.dataset.dbIndex||'0')|0;
-    if (EditorCore.updatePageJsonFromStory) EditorCore.updatePageJsonFromStory(db, story);
+    EditorCore.updatePageJsonFromStory(db, story);
     if (window.PasteFlow && typeof window.PasteFlow.forceReflow === 'function') {
       window.PasteFlow.forceReflow(story);
     } else {
@@ -79,162 +35,30 @@
     }
   }
 
-  /* === 選取輔助 === */
-  function setSelectionToNodeContents(node){
-    try {
-      if (!node) return;
-      const sel = window.getSelection(); if (!sel) return;
-      const rng = document.createRange();
-      rng.selectNodeContents(node);
-      sel.removeAllRanges();
-      sel.addRange(rng);
-    } catch(_){}
-  }
-
-  function setSelectionBetweenMarkers(startMarker, endMarker){
-    try {
-      const sel = window.getSelection(); if (!sel) return;
-      const rng = document.createRange();
-      rng.setStartAfter(startMarker);
-      rng.setEndBefore(endMarker);
-      sel.removeAllRanges();
-      sel.addRange(rng);
-    } catch(_){}
-  }
-
-  /* ---------- B / I / U：部分選取只套未套用；全選已套用則取消 ---------- */
-
-  function allTextInsideTag(root, TAG){
-    const tw = document.createTreeWalker(root, NF.SHOW_TEXT, null);
-    let hasText = false;
-    while (tw.nextNode()){
-      const t = tw.currentNode;
-      if (isWhitespaceText(t)) continue;
-      hasText = true;
-      let cur = t.parentElement, ok = false;
-      while (cur && cur !== root){
-        if (cur.tagName === TAG) { ok = true; break; }
-        cur = cur.parentElement;
-      }
-      if (!ok) return false;
-    }
-    return hasText ? true : false;
-  }
-
-  function applyTagToUnstyledTextInFragment(root, TAG){
-    const tw = document.createTreeWalker(root, NF.SHOW_TEXT, null);
-    const targets = [];
-    while (tw.nextNode()){
-      const t = tw.currentNode;
-      if (isWhitespaceText(t)) continue;
-
-      let cur = t.parentElement, covered = false;
-      while (cur && cur !== root){
-        if (cur.tagName === TAG) { covered = true; break; }
-        cur = cur.parentElement;
-      }
-      if (!covered) targets.push(t);
-    }
-
-    targets.forEach(t=>{
-      const wrap = document.createElement(TAG);
-      const p = t.parentNode; if (!p) return;
-      p.insertBefore(wrap, t);
-      wrap.appendChild(t);
-    });
-
-    mergeAdjacentTagsInFragment(root, TAG);
-  }
-
-  function unwrapTagDeep(root, TAG){
-    const filter = el => (el.tagName === TAG ? NF.FILTER_ACCEPT : NF.FILTER_SKIP);
-    const walker = document.createTreeWalker(root, NF.SHOW_ELEMENT, filter);
-    const targets = [];
-    while (walker.nextNode()) targets.push(walker.currentNode);
-    targets.forEach(el=>{
-      const parent = el.parentNode; if (!parent) return;
-      while (el.firstChild) parent.insertBefore(el.firstChild, el);
-      parent.removeChild(el);
-    });
-  }
-
-  function mergeAdjacentTagAround(node, TAG){
-    if (!node) return;
-    const el = (node.nodeType===1) ? node : node.parentElement;
-    if (!el || !el.parentNode) return;
-
-    let prev = el.previousSibling;
-    while (prev && isWhitespaceText(prev)) prev = prev.previousSibling;
-    if (prev && prev.nodeType===1 && prev.tagName === TAG && el.tagName === TAG){
-      while (el.firstChild) prev.appendChild(el.firstChild);
-      el.parentNode && el.parentNode.replaceChild(prev, el);
-    }
-
-    const base = (prev && prev.tagName===TAG) ? prev : el;
-
-    let next = base.nextSibling;
-    while (next && isWhitespaceText(next)) next = next.nextSibling;
-    if (next && next.nodeType===1 && next.tagName === TAG){
-      while (next.firstChild) base.appendChild(next.firstChild);
-      next.parentNode && next.parentNode.removeChild(next);
-    }
-  }
-
-  function mergeAdjacentTagsInFragment(root, TAG){
-    const walker = document.createTreeWalker(root, NF.SHOW_ELEMENT, null);
-    const list = [];
-    while (walker.nextNode()){
-      const el = walker.currentNode;
-      if (el.tagName === TAG) list.push(el);
-    }
-    list.forEach(el=> mergeAdjacentTagAround(el, TAG));
-  }
-
-  function toggleInline(tag){
-    const TAG = String(tag||'').toUpperCase();
+  /* ---------- B / I / U ---------- */
+  function wrapInline(tag){
     const ctx = getActiveStory(); if (!ctx) return false;
     const {story, range} = ctx;
 
     return EditorCore.keepSelectionAround(story, ()=>{
       const frag = range.extractContents();
-      const allInside = allTextInsideTag(frag, TAG);
+      const el = document.createElement(tag);
+      el.appendChild(frag);
+      range.insertNode(el);
 
-      // 臨時容器 + 邊界標記，確保操作後能恢復原選取
-      const container = document.createElement('span');
-      container.setAttribute('data-tmp','1');
-
-      if (allInside){
-        unwrapTagDeep(frag, TAG);
-        container.appendChild(frag);
-      } else {
-        applyTagToUnstyledTextInFragment(frag, TAG);
-        container.appendChild(frag);
+      // 扁平化重複標籤（避免 <b><b>...）
+      const parent = el.parentElement;
+      if (parent && parent.tagName === tag.toUpperCase()){
+        while (el.firstChild) parent.insertBefore(el.firstChild, el);
+        parent.removeChild(el);
       }
-
-      range.insertNode(container);
-
-      const mStart = document.createComment('sel-start');
-      const mEnd   = document.createComment('sel-end');
-      container.insertBefore(mStart, container.firstChild);
-      container.appendChild(mEnd);
-
-      const parent = container.parentNode;
-      while (container.firstChild) parent.insertBefore(container.firstChild, container);
-      parent.removeChild(container);
-
-      // 全文合併一次，避免邊界雙層
-      mergeAdjacentTagsInFragment(story, TAG);
-
-      setSelectionBetweenMarkers(mStart, mEnd);
-      mStart.parentNode && mStart.parentNode.removeChild(mStart);
-      mEnd.parentNode && mEnd.parentNode.removeChild(mEnd);
 
       afterChange(story);
       return true;
     });
   }
 
-  /* ---------- A+ / A-：只調整選取；同 fs-span 內切段 ---------- */
+  /* ---------- A+ / A- 專用 ---------- */
   function parseEm(str){
     if (!str) return NaN;
     const m = String(str).match(/([0-9.]+)\s*em$/i);
@@ -278,8 +102,9 @@
     const sizeKey = span.dataset.fs || (span.style.fontSize||'').replace('em','');
     if (!sizeKey) return;
 
+    // 合併左
     let prev = span.previousSibling;
-    while (prev && isWhitespaceText(prev)) prev = prev.previousSibling;
+    while (prev && prev.nodeType===3 && !prev.nodeValue) prev = prev.previousSibling;
     if (prev && prev.nodeType===1 && prev.tagName==='SPAN'){
       const prevKey = prev.dataset.fs || (prev.style.fontSize||'').replace('em','');
       if (prevKey === sizeKey){
@@ -288,8 +113,9 @@
         span = prev;
       }
     }
+    // 合併右
     let next = span.nextSibling;
-    while (next && isWhitespaceText(next)) next = next.nextSibling;
+    while (next && next.nodeType===3 && !next.nodeValue) next = next.nextSibling;
     if (next && next.nodeType===1 && next.tagName==='SPAN'){
       const nextKey = next.dataset.fs || (next.style.fontSize||'').replace('em','');
       if (nextKey === sizeKey){
@@ -297,36 +123,6 @@
         next.parentNode && next.parentNode.removeChild(next);
       }
     }
-  }
-  function createFsSpanWith(valEm){
-    const s = document.createElement('span');
-    setSpanSize(s, valEm);
-    return s;
-  }
-  function splitFsWrapperAroundChild(wrap, mid){
-    if (!wrap || !mid || !wrap.parentNode) return;
-    const parent = wrap.parentNode;
-    const base = getSpanSize(wrap) || 1;
-
-    const left  = createFsSpanWith(base);
-    const right = createFsSpanWith(base);
-
-    while (wrap.firstChild && wrap.firstChild !== mid){
-      left.appendChild(wrap.firstChild);
-    }
-    if (mid.parentNode === wrap) wrap.removeChild(mid);
-    while (wrap.firstChild){
-      right.appendChild(wrap.firstChild);
-    }
-
-    const ref = wrap.nextSibling;
-    parent.removeChild(wrap);
-    if (left.childNodes.length)  parent.insertBefore(left,  ref);
-    parent.insertBefore(mid,  ref);
-    if (right.childNodes.length) parent.insertBefore(right, ref);
-
-    if (left.childNodes.length)  mergeAdjacentFs(left);
-    if (right.childNodes.length) mergeAdjacentFs(right);
   }
 
   function adjustFont(deltaStep){
@@ -337,53 +133,32 @@
       const startWrap = findFsWrapper(range.startContainer);
       const endWrap   = findFsWrapper(range.endContainer);
 
+      // 1) 如果選取完全在同一個 data-fs 裡 → 直接在那一層累加
       if (startWrap && startWrap === endWrap){
-        const wrap = startWrap;
-        const base = getSpanSize(wrap) || 1;
-
-        const fullyCoversWrapper =
-          range.startContainer === wrap && range.endContainer === wrap &&
-          range.startOffset === 0 && range.endOffset === wrap.childNodes.length;
-
-        if (fullyCoversWrapper){
-          setSpanSize(wrap, base + deltaStep);
-          mergeAdjacentFs(wrap);
-          afterChange(story);
-          setSelectionToNodeContents(wrap);
-          return true;
-        }
-
-        const frag = range.extractContents();
-        stripFsInFragment(frag);
-        const selSpan = createFsSpanWith(base + deltaStep);
-        selSpan.appendChild(frag);
-        range.insertNode(selSpan);
-        splitFsWrapperAroundChild(wrap, selSpan);
-
-        const prev = selSpan.previousSibling;
-        const next = selSpan.nextSibling;
-        if (prev && prev.tagName === 'SPAN') mergeAdjacentFs(prev);
-        if (next && next.tagName === 'SPAN') mergeAdjacentFs(next);
-
+        const cur = getSpanSize(startWrap) || 1;
+        setSpanSize(startWrap, cur + deltaStep);
+        mergeAdjacentFs(startWrap);
         afterChange(story);
-        setSelectionToNodeContents(selSpan);
         return true;
       }
 
+      // 2) 跨多段或只有一端有 data-fs：
+      //    以端點附近已存在的 data-fs 當基準，沒有就 1.0
       let base = getSpanSize(startWrap);
       if (isNaN(base)) base = getSpanSize(endWrap);
       if (isNaN(base)) base = 1.0;
 
+      // 把選取抽出，扁平化裡面所有 data-fs，然後用一層新的包回
       const frag = range.extractContents();
       stripFsInFragment(frag);
 
-      const span = createFsSpanWith(base + deltaStep);
+      const span = document.createElement('span');
+      setSpanSize(span, base + deltaStep);
       span.appendChild(frag);
       range.insertNode(span);
 
       mergeAdjacentFs(span);
       afterChange(story);
-      setSelectionToNodeContents(span);
       return true;
     });
   }
@@ -396,9 +171,11 @@
     const btnUp = document.getElementById('btnFontUp');
     const btnDn = document.getElementById('btnFontDown');
 
-    btnB && btnB.addEventListener('click', ()=> toggleInline('b'));
-    btnI && btnI.addEventListener('click', ()=> toggleInline('i'));
-    btnU && btnU.addEventListener('click', ()=> toggleInline('u'));
+    btnB && btnB.addEventListener('click', ()=> wrapInline('b'));
+    btnI && btnI.addEventListener('click', ()=> wrapInline('i'));
+    btnU && btnU.addEventListener('click', ()=> wrapInline('u'));
+
+    // 步進 0.1em（連按可持續放大/縮小）
     btnUp && btnUp.addEventListener('click', ()=> adjustFont(+0.1));
     btnDn && btnDn.addEventListener('click', ()=> adjustFont(-0.1));
   }
