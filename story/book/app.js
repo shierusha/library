@@ -1,10 +1,12 @@
-/* app.js — 輕量穩定版（配合你的 CSS 基準）
+/* app.js — 輕量穩定版（一致化：.story > .story-inner 包裹 + 內層置中 + 行分隔正規化）
  * 規則：
  * - 封面（第一張 .paper 的 front/back）不算頁碼、不顯角標
  * - DB 的 page_index 從 1 起算，直接作為顯示頁碼（divider/image 也算頁）
  * - 頁型 enum：novel / divider_white / divider_black / image
  *   會正規化為：novel / divider_light / divider_dark / illustration（背景滿版）
  * - 單頁/雙頁、左右開切換，手勢：單頁內建、雙頁這裡加
+ * - 與編輯器一致：文字輸出一律用 .story > .story-inner，白/黑置中頁用 .is-center
+ * - 行分隔統一：\n → <br>；僅以 <div> 當斷行的 HTML 也轉為 <br>
  */
 
 /* ===== DOM ===== */
@@ -39,6 +41,42 @@ function normalizeType(t) {
   if (x === 'image')        return 'illustration';
   if (x === 'novel' || x === 'divider_light' || x === 'divider_dark' || x === 'illustration') return x;
   return 'novel';
+}
+
+/* === 行分隔正規化 ===
+ * - 僅用 <div> 當斷行時：<div>…</div> → \n
+ * - 最終將所有 \n → <br>
+ */
+function normalizeHtmlLinebreaks(raw) {
+  if (raw == null) return '';
+  let s = String(raw);
+
+  const hasDiv = /<div[\s>]/i.test(s);
+  const hasOtherBlocks = /<\/?(p|h[1-6]|ul|ol|li|table|thead|tbody|tr|td|blockquote|pre|section|article|figure)\b/i.test(s);
+  if (hasDiv && !hasOtherBlocks) {
+    s = s
+      .replace(/<div[^>]*>/gi, '')   // 去開 div
+      .replace(/<\/div>/gi, '\n');   // 關 div → \n
+  }
+
+  // 統一換行
+  s = s.replace(/\r\n|\n\r|\r/g, '\n').replace(/\n/g, '<br>');
+  return s;
+}
+
+/* 純文字 → 安全 HTML + <br> */
+function plainToHtmlWithBr(text) {
+  const safe = String(text || '')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;');
+  return safe.replace(/\r\n|\n\r|\r|\n/g, '<br>');
+}
+
+/* 與編輯器一致的輸出：.story > .story-inner（置中交由 .is-center） */
+function renderStoryHTML(raw, { center = false } = {}) {
+  const html = raw || '';
+  const cls  = center ? 'story-inner is-center' : 'story-inner';
+  return `<div class="story"><div class="${cls}">${html}</div></div>`;
 }
 
 /* ===== Supabase 讀取 ===== */
@@ -142,7 +180,17 @@ function htmlFromPage(p) {
   if (!p) return '';
   const t = normalizeType(p.type);
   if (t === 'illustration') return ''; // 圖片頁改以背景顯示
-  return (p.content_json && p.content_json.text_html) ? p.content_json.text_html : '';
+
+  const rawHtml  = p?.content_json?.text_html || '';
+  const rawPlain = p?.content_json?.text_plain || '';
+
+  // 行分隔統一
+  const html = rawHtml.trim()
+    ? normalizeHtmlLinebreaks(rawHtml)
+    : plainToHtmlWithBr(rawPlain);
+
+  const center = (t === 'divider_light' || t === 'divider_dark');
+  return renderStoryHTML(html, { center });
 }
 function buildPairsFromPages() {
   const pairs = [];
@@ -188,11 +236,17 @@ function setPageTypeOnElement(el, p){
 
   if (t === 'divider_light') {
     el.classList.add('page--divider_light');
-    if (p.content_json?.text_html) el.innerHTML = p.content_json.text_html;
+    const rawHtml  = p?.content_json?.text_html || '';
+    const rawPlain = p?.content_json?.text_plain || '';
+    const html = rawHtml.trim() ? normalizeHtmlLinebreaks(rawHtml) : plainToHtmlWithBr(rawPlain);
+    el.innerHTML = renderStoryHTML(html, { center: true });
 
   } else if (t === 'divider_dark') {
     el.classList.add('page--divider_dark');
-    if (p.content_json?.text_html) el.innerHTML = p.content_json.text_html;
+    const rawHtml  = p?.content_json?.text_html || '';
+    const rawPlain = p?.content_json?.text_plain || '';
+    const html = rawHtml.trim() ? normalizeHtmlLinebreaks(rawHtml) : plainToHtmlWithBr(rawPlain);
+    el.innerHTML = renderStoryHTML(html, { center: true });
 
   } else if (t === 'illustration') {
     el.classList.add('page--illustration');
@@ -206,7 +260,10 @@ function setPageTypeOnElement(el, p){
 
   } else {
     el.classList.add('page--novel');
-    if (p.content_json?.text_html) el.innerHTML = p.content_json.text_html;
+    const rawHtml  = p?.content_json?.text_html || '';
+    const rawPlain = p?.content_json?.text_plain || '';
+    const html = rawHtml.trim() ? normalizeHtmlLinebreaks(rawHtml) : plainToHtmlWithBr(rawPlain);
+    el.innerHTML = renderStoryHTML(html);
   }
 }
 
@@ -413,7 +470,7 @@ function ensureSwipeBinding(){
 /* ===== 共同重繪 ===== */
 function afterLayoutRedraw(){
   applyCoverFromBook();     // 封面不顯角標
-  applyPageTypesNow();      // 四種頁型
+  applyPageTypesNow();      // 四種頁型（含 .story-inner 包裝 + 行分隔統一）
   renderMetaForAllPages();  // 內容頁角標（頁碼 = DB.page_index）
   updateCount();            // 計數：封面不算，其他都算
 }
