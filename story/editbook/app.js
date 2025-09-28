@@ -1,4 +1,4 @@
-/* app.js — 本地化編輯模式 + BookFlip 掛載（完整版，含 TOC、章節初始化、游標同步）
+/* app1.0.js — 本地化編輯模式 + BookFlip 掛載（完整版，含 TOC、章節初始化、游標同步）
  * 重點：
  * - 以 ?bookid=UUID 讀一次 Supabase → 寫進 localStorage
  * - 後續操作都走 LOCAL（persistDraft() 只寫 localStorage）
@@ -60,58 +60,44 @@
   }
 
   /* ===== 封面（第一張 .paper，不算頁碼） ===== */
-  function applyCoverFromBook(isFromTitleTyping = false) {
-    const title = ACTIVE_BOOK?.title || '未命名書籍';
-    const coverURL = (ACTIVE_BOOK?.cover_image || '').trim();
+// app.js
+function applyCoverFromBook(isFromTitleTyping = false) {
+  const coverURL = (ACTIVE_BOOK?.cover_image || '').trim();
 
-    if (state.mode === 'spread') {
-      const coverFront = elBook.querySelector('.paper .page.front');
-      const coverBack  = elBook.querySelector('.paper .page.back');
-      if (!coverFront) return;
+  // 只做一件事：把封面節點的 backgroundImage 設為 URL 或清空
+  const setOnlyBg = (node) => {
+    if (!node) return;
+    // 清掉先前可能殘留的 inline 樣式與類名
+    node.classList.remove('page--illustration');
+    node.style.backgroundImage = coverURL ? `url("${coverURL}")` : '';
+    node.style.background = '';
+    node.style.display = '';
+    node.style.alignItems = '';
+    node.style.justifyContent = '';
+    // 不插任何內文
+    node.innerHTML = '';
+  };
 
-      if (coverURL) {
-        coverFront.classList.add('page--illustration');
-        coverFront.style.backgroundImage = `url("${coverURL}")`;
-        coverFront.innerHTML = '';
-      } else {
-        coverFront.classList.remove('page--illustration');
-        coverFront.style.backgroundImage = '';
-        coverFront.style.background = '#fff';
-        coverFront.style.display = 'flex';
-        coverFront.style.alignItems = 'center';
-        coverFront.style.justifyContent = 'center';
-        coverFront.innerHTML = `<div class="cover-title" style="font-size:1.8em;font-weight:700">${escapeHTML(title)}</div>`;
-      }
-      if (coverBack) coverBack.style.background = '#fff';
-    } else {
-      const sp = elBook.querySelectorAll('.single-page');
-      const front = sp[0], back = sp[1];
-      if (!front) return;
+  if (state.mode === 'spread') {
+    const coverFront = elBook.querySelector('.paper .page.front');
+    const coverBack  = elBook.querySelector('.paper .page.back');
+    setOnlyBg(coverFront);
+    if (coverBack) coverBack.style.background = ''; // 不強制白底
+  } else {
+    const sp = elBook.querySelectorAll('.single-page');
+    setOnlyBg(sp[0]);
+    if (sp[1]) sp[1].style.background = ''; // 不強制白底
+  }
 
-      if (coverURL) {
-        front.classList.add('page--illustration');
-        front.style.backgroundImage = `url("${coverURL}")`;
-        front.innerHTML = '';
-      } else {
-        front.classList.remove('page--illustration');
-        front.style.backgroundImage = '';
-        front.style.background = '#fff';
-        front.style.display = 'flex';
-        front.style.alignItems = 'center';
-        front.style.justifyContent = 'center';
-        front.innerHTML = `<div class="cover-title" style="font-size:1.8em;font-weight:700">${escapeHTML(title)}</div>`;
-      }
-      if (back) back.style.background = '#fff';
-    }
-
-    // ★ 修正：輸入期間不要回寫 #bookTitle，避免游標跳到第一字
-    if (!isFromTitleTyping) {
-      const titleNode = document.getElementById('bookTitle');
-      if (titleNode && titleNode.textContent !== title) {
-        titleNode.textContent = title;
-      }
+  // 書名輸入同步邏輯保留（不影響樣式）
+  if (!isFromTitleTyping) {
+    const titleNode = document.getElementById('bookTitle');
+    if (titleNode && ACTIVE_BOOK?.title && titleNode.textContent !== ACTIVE_BOOK.title) {
+      titleNode.textContent = ACTIVE_BOOK.title;
     }
   }
+}
+
 
   // 封面雙擊：輸入封面 URL，空=移除
   function bindCoverEdit(){
