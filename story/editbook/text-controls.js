@@ -1,20 +1,18 @@
 
-/* 928text-controls.js — FS boundary-safe A+/A-, selection-only (no spillover), with B/I/U fixed
- * 改善點：
- * 1) 在選取兩端插入「邊界註解節點」(<!--fs-boundary-->)，包裝/合併時絕不跨越邊界
- * 2) A+/A- 僅變更反白選取，後面的文字不會被一併放大（避免越界合併）
- * 3) 一位小數的字級（避免 1.2000000002），相鄰同字級合併且不穿越邊界
- * 4) 不產生空 data-fs；游標狀態時會擴到「一個字詞」再調整
+/* text-controls.js 0928— Word-like toggle for B/I/U + safe A+/A-
+ * 目標：
+ * 1) B/I/U 真的「切換」，不會一直製造 <b><b>…
+ * 2) 反白/游標皆可用（游標狀態＝之後輸入沿用）
+ * 3) 操作後自動清理：合併相鄰、解除巢狀、移除空標籤（保留 <br>）
+ * 4) A+ / A- 維持單層 <span data-fs style="font-size:…em">，避免碎片
  *
- * 依賴：EditorCore.getFocusedDbIndex / getStoryByDbIndex / keepSelectionAround / updatePageJsonFromStory
+ * 相依：EditorCore.getFocusedDbIndex / getStoryByDbIndex / keepSelectionAround / updatePageJsonFromStory
  */
-(function(){
+(function () {
   if (!window.EditorCore) return;
 
-  /* ===== Helpers ===== */
+  /* ================== 工具 ================== */
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-  const round1 = (v) => Math.round(v * 10) / 10;
-  const BOUNDARY_TOKEN = 'fs-boundary';
 
   function getStoryAndRange(allowCollapsed = true) {
     const dbIndex = EditorCore.getFocusedDbIndex();
@@ -39,13 +37,19 @@
     }
   }
 
-  /* ===== B/I/U (同上版) ===== */
+  /* ========== 內聯清理（重點） ==========
+   * - strong→b / em→i 統一標籤
+   * - 解除巢狀：<b><b>…</b></b> → <b>…</b>
+   * - 合併相鄰：</b><b> → 直接拼接
+   * - 空標籤移除：<b></b> / <i> 只有空白 → 拆掉（保留裡面的 <br>）
+   */
   function unwrap(el) {
     const p = el.parentNode;
     if (!p) return;
     while (el.firstChild) p.insertBefore(el.firstChild, el);
     p.removeChild(el);
   }
+
   function replaceTag(el, newTag) {
     if (el.tagName === newTag.toUpperCase()) return el;
     const newEl = document.createElement(newTag);
@@ -53,299 +57,327 @@
     el.parentNode.replaceChild(newEl, el);
     return newEl;
   }
+
   function sanitizeInlineBUI(root) {
     if (!root) return;
-    root.querySelectorAll("strong").forEach(n => replaceTag(n, "b"));
-    root.querySelectorAll("em").forEach(n => replaceTag(n, "i"));
-    ["b","i","u"].forEach(tag=>{
-      Array.from(root.querySelectorAll(tag)).forEach(el=>{
-        let hasRenderable = false;
-        for (let n=el.firstChild;n;n=n.nextSibling){
-          if (n.nodeType===3 && (n.nodeValue||"").replace(/\u00a0/g,' ').trim()){ hasRenderable=true; break; }
-          if (n.nodeType===1 && n.tagName==='BR'){ hasRenderable=true; break; }
+
+    // 1) 統一標籤
+    root.querySelectorAll("strong").forEach((n) => replaceTag(n, "b"));
+    root.querySelectorAll("em").forEach((n) => replaceTag(n, "i"));
+
+    // 2) 移除空標籤（僅空白或完全無子節點）
+    ["b", "i", "u"].forEach((tag) => {
+      Array.from(root.querySelectorAll(tag)).forEach((el) => {
+        // 有非空白文字就保留
+        let hasText = false;
+        const tw = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
+        while (tw.nextNode()) {
+          if ((tw.currentNode.nodeValue || "").replace(/\u00a0/g, " ").trim()) {
+            hasText = true;
+            break;
+          }
         }
-        if (!hasRenderable) unwrap(el);
+        if (!hasText) {
+          // 只保留結構（例如 <br>），外框拆掉
+          unwrap(el);
+        }
       });
     });
-    ["b","i","u"].forEach(tag=>{
-      let changed=true;
-      while(changed){
-        changed=false;
-        root.querySelectorAll(tag).forEach(el=>{
-          const p=el.parentElement;
-          if (p && p.tagName.toLowerCase()===tag){ unwrap(el); changed=true; }
+
+    // 3) 去巢狀：反覆將父子同標籤展平
+    ["b", "i", "u"].forEach((tag) => {
+      let changed = true;
+      while (changed) {
+        changed = false;
+        root.querySelectorAll(tag).forEach((el) => {
+          const p = el.parentElement;
+          if (p && p.tagName.toLowerCase() === tag) {
+            unwrap(el);
+            changed = true;
+          }
         });
       }
     });
-    ["b","i","u"].forEach(tag=>{
-      Array.from(root.querySelectorAll(tag)).forEach(el=>{
+
+    // 4) 合併相鄰同標籤（略過空白文字節點）
+    ["b", "i", "u"].forEach((tag) => {
+      Array.from(root.querySelectorAll(tag)).forEach((el) => {
+        // 向右合併一次（外圈多次呼叫即可逐步收斂）
         let next = el.nextSibling;
-        while (next && next.nodeType===3 && !(next.nodeValue||"").trim()) next = next.nextSibling;
-        if (next && next.nodeType===1 && next.tagName.toLowerCase()===tag){
-          while(next.firstChild) el.appendChild(next.firstChild);
+        while (next && next.nodeType === 3 && !(next.nodeValue || "").trim()) {
+          next = next.nextSibling;
+        }
+        if (next && next.nodeType === 1 && next.tagName.toLowerCase() === tag) {
+          while (next.firstChild) el.appendChild(next.firstChild);
           next.remove();
         }
       });
     });
   }
-  function toggleCommand(cmd){
+
+  /* ================== B/I/U：純用 execCommand 切換 ==================
+   * - 讓瀏覽器處理「已有→取消、沒有→套用」的邏輯
+   * - 之後立刻做 sanitize，杜絕殘留巢狀/空標籤
+   */
+  function toggleCommand(cmd) {
     const ctx = getStoryAndRange(true);
     if (!ctx) return false;
-    const {story} = ctx;
-    return EditorCore.keepSelectionAround(story, ()=>{
-      document.execCommand(cmd,false);
+    const { story } = ctx;
+    return EditorCore.keepSelectionAround(story, () => {
+      document.execCommand(cmd, false); // 反白/游標皆可
       sanitizeInlineBUI(story);
       afterChange(story);
       return true;
     });
   }
-  function onBold(){ return toggleCommand("bold"); }
-  function onItalic(){ return toggleCommand("italic"); }
-  function onUnderline(){ return toggleCommand("underline"); }
 
-  /* ===== FS utilities ===== */
-  function parseEm(str){
+  function onBold() { return toggleCommand("bold"); }
+  function onItalic() { return toggleCommand("italic"); }
+  function onUnderline() { return toggleCommand("underline"); }
+
+  /* ================== A+ / A-：單層 data-fs ================== */
+  function parseEm(str) {
     if (!str) return NaN;
     const m = String(str).match(/([0-9.]+)\s*em$/i);
     return m ? parseFloat(m[1]) : NaN;
   }
-  function isFsSpan(el){
-    return el && el.nodeType===1 && el.tagName==='SPAN' && (el.dataset.fs || /em$/.test(el.style.fontSize||''));
-  }
-  function getSpanSize(span){
+
+  function getSpanSize(span) {
     if (!span) return NaN;
     if (span.dataset.fs) return parseFloat(span.dataset.fs);
     const p = parseEm(span.style.fontSize);
     return isNaN(p) ? NaN : p;
   }
-  function setSpanSize(span, valEm){
-    const fs = clamp(round1(valEm), 0.2, 5.0);
+
+  function setSpanSize(span, valEm) {
+    const fs = clamp(valEm, 0.2, 5);
     span.dataset.fs = String(fs);
-    span.style.fontSize = (Math.round(fs*10)/10).toFixed(1).replace(/\.0$/,'') + 'em';
-  }
-  function normalizeFsSpan(el){
-    if (!isFsSpan(el)) return;
-    if (!el.dataset.fs){
-      const v = parseEm(el.style.fontSize);
-      if (!isNaN(v)) setSpanSize(el, v);
-    }else{
-      setSpanSize(el, parseFloat(el.dataset.fs));
-    }
-    // remove if empty
-    if (!hasRenderableContent(el)) unwrap(el);
-  }
-  function hasRenderableContent(el){
-    let tw = document.createTreeWalker(el, NodeFilter.SHOW_ALL, null);
-    while (tw.nextNode()){
-      const n = tw.currentNode;
-      if (n.nodeType===3 && (n.nodeValue||"").replace(/\u00a0/g,' ').trim()) return true;
-      if (n.nodeType===1 && n.tagName==='BR') return true;
-    }
-    return false;
+    span.style.fontSize = fs.toFixed(2).replace(/\.00$/, "") + "em";
   }
 
-  function isBoundaryNode(n){
-    return n && n.nodeType === 8 && String(n.nodeValue||'').indexOf(BOUNDARY_TOKEN) >= 0;
-  }
-  function nextSiblingSkipWSStopBoundary(n){
-    let s = n && n.nextSibling;
-    while (s){
-      if (s.nodeType===8 && isBoundaryNode(s)) return null; // hit boundary → stop
-      if (s.nodeType===3 && !(s.nodeValue||'').trim()){ s = s.nextSibling; continue; }
-      return s;
-    }
-    return null;
-  }
-  function prevSiblingSkipWSStopBoundary(n){
-    let s = n && n.previousSibling;
-    while (s){
-      if (s.nodeType===8 && isBoundaryNode(s)) return null; // hit boundary → stop
-      if (s.nodeType===3 && !(s.nodeValue||'').trim()){ s = s.previousSibling; continue; }
-      return s;
-    }
-    return null;
-  }
-
-  function mergeAdjacentFs(root){
-    const spans = Array.from(root.querySelectorAll('span[data-fs], span[style*="font-size"]'));
-    spans.forEach(normalizeFsSpan);
-
-    Array.from(root.querySelectorAll('span[data-fs]')).forEach(span=>{
-      if (!span.isConnected) return;
-      const key = span.dataset.fs;
-
-      // LEFT merge if no boundary in-between
-      const left = prevSiblingSkipWSStopBoundary(span);
-      if (left && left.nodeType===1 && left.tagName==='SPAN' && isFsSpan(left)){
-        normalizeFsSpan(left);
-        if (left.dataset.fs === key){
-          while (span.firstChild) left.appendChild(span.firstChild);
-          span.replaceWith(left);
-          span = left;
-        }
+  function findFsWrapper(node) {
+    let cur = node && node.nodeType === 1 ? node : node ? node.parentElement : null;
+    while (cur && cur !== document) {
+      if (cur.tagName === "SPAN" && (cur.dataset.fs || /em$/.test(cur.style.fontSize || ""))) {
+        return cur;
       }
-      // RIGHT merge if no boundary in-between
-      const right = nextSiblingSkipWSStopBoundary(span);
-      if (right && right.nodeType===1 && right.tagName==='SPAN' && isFsSpan(right)){
-        normalizeFsSpan(right);
-        if (right.dataset.fs === key){
-          while (right.firstChild) span.appendChild(right.firstChild);
-          right.remove();
-        }
-      }
-    });
-  }
-
-  function stripFsInFragment(node){
-    if (!node) return;
-    if (node.nodeType!==1){ Array.from(node.childNodes).forEach(stripFsInFragment); return; }
-    const el = node;
-    if (isFsSpan(el)){
-      const p = el.parentNode;
-      while (el.firstChild) p.insertBefore(el.firstChild, el);
-      p.removeChild(el);
-      return;
-    }
-    Array.from(el.childNodes).forEach(stripFsInFragment);
-  }
-
-  function expandRangeToWord(range){
-    const node = range.startContainer;
-    if (!node || node.nodeType!==3) return false;
-    const text = node.nodeValue, i = range.startOffset;
-    let L=i, R=i;
-    const isWord = c => /[^\s.,;:!?()\[\]{}"'\u3000\u3001\u3002]/.test(c||"");
-    while (L>0 && isWord(text[L-1])) L--;
-    while (R<text.length && isWord(text[R])) R++;
-    if (L===R) return false;
-    const sel = window.getSelection();
-    range.setStart(node, L);
-    range.setEnd(node, R);
-    sel.removeAllRanges(); sel.addRange(range);
-    return true;
-  }
-
-  function placeBoundaryMarkers(range){
-    // Insert end then start to avoid offset shift
-    const endMarker = document.createComment(BOUNDARY_TOKEN);
-    const endRange = range.cloneRange();
-    endRange.collapse(false);
-    endRange.insertNode(endMarker);
-
-    const startMarker = document.createComment(BOUNDARY_TOKEN);
-    const startRange = range.cloneRange();
-    startRange.collapse(true);
-    startRange.insertNode(startMarker);
-
-    return { startMarker, endMarker };
-  }
-
-  function removeBoundaryMarkers(markers){
-    if (!markers) return;
-    const { startMarker, endMarker } = markers;
-    if (startMarker && startMarker.parentNode) startMarker.parentNode.removeChild(startMarker);
-    if (endMarker && endMarker.parentNode) endMarker.parentNode.removeChild(endMarker);
-  }
-
-  /* ===== A+/A- main ===== */
-  function adjustFont(deltaStep){
-    let ctx = getStoryAndRange(false);
-    if (!ctx){
-      ctx = getStoryAndRange(true);
-      if (!ctx) return false;
-      const { range } = ctx;
-      const wrap = findFsWrapper(range.startContainer);
-      if (!wrap){
-        const ok = expandRangeToWord(range);
-        if (!ok) return false;
-      }
-    }
-    const { story, range } = ctx;
-
-    return EditorCore.keepSelectionAround(story, ()=>{
-      // Put boundary markers so merge never crosses selection ends
-      const markers = placeBoundaryMarkers(range);
-
-      // Build an innerRange from start->end markers
-      const inner = document.createRange();
-      inner.setStartAfter(markers.startMarker);
-      inner.setEndBefore(markers.endMarker);
-
-      const startWrap = findFsWrapper(inner.startContainer);
-      const endWrap   = findFsWrapper(inner.endContainer);
-
-      // Same wrapper case
-      if (startWrap && startWrap === endWrap){
-        const cur = getSpanSize(startWrap) || 1.0;
-        setSpanSize(startWrap, cur + deltaStep);
-        // Keep markers to block cross-boundary merge, then cleanup
-        mergeAdjacentFs(story);
-        removeBoundaryMarkers(markers);
-        afterChange(story);
-        return true;
-      }
-
-      // Multi-run selection
-      const baseA = getSpanSize(startWrap);
-      const baseB = getSpanSize(endWrap);
-      const base = !isNaN(baseA) ? baseA : (!isNaN(baseB) ? baseB : 1.0);
-
-      const frag = inner.extractContents();
-      stripFsInFragment(frag);
-      if (!frag.hasChildNodes()){
-        removeBoundaryMarkers(markers);
-        return false;
-      }
-      const span = document.createElement('span');
-      setSpanSize(span, base + deltaStep);
-      span.appendChild(frag);
-      inner.insertNode(span);
-
-      // 邊界仍在新 span 左右 → 合併時不會越界
-      mergeAdjacentFs(story);
-      removeBoundaryMarkers(markers);
-      afterChange(story);
-      return true;
-    });
-  }
-
-  /* Helper: find FS wrapper from node (used before definition) */
-  function findFsWrapper(node){
-    let cur = (node && node.nodeType===1) ? node : (node ? node.parentElement : null);
-    while(cur && cur!==document){
-      if (isFsSpan(cur)) return cur;
       cur = cur.parentElement;
     }
     return null;
   }
 
-  /* ===== Bindings ===== */
-  function bindButtons(){
-    const btnB = document.getElementById("btnBold");
-    const btnI = document.getElementById("btnItalic");
-    const btnU = document.getElementById("btnUnderline");
-    const btnUp= document.getElementById("btnFontUp");
-    const btnDn= document.getElementById("btnFontDown");
-
-    btnB && btnB.addEventListener("click", ()=>toggleCommand("bold"));
-    btnI && btnI.addEventListener("click", ()=>toggleCommand("italic"));
-    btnU && btnU.addEventListener("click", ()=>toggleCommand("underline"));
-    btnUp&& btnUp.addEventListener("click", ()=>adjustFont(+0.1));
-    btnDn&& btnDn.addEventListener("click", ()=>adjustFont(-0.1));
+  function stripFsInFragment(node) {
+    if (!node) return;
+    if (node.nodeType !== 1) {
+      Array.from(node.childNodes).forEach(stripFsInFragment);
+      return;
+    }
+    const el = node;
+    if (el.tagName === "SPAN" && (el.dataset.fs || /em$/.test(el.style.fontSize || ""))) {
+      const parent = el.parentNode;
+      while (el.firstChild) parent.insertBefore(el.firstChild, el);
+      parent.removeChild(el);
+      return;
+    }
+    Array.from(el.childNodes).forEach(stripFsInFragment);
   }
-  function bindShortcuts(){
-    document.addEventListener("keydown", (e)=>{
-      const meta = e.ctrlKey || e.metaKey;
-      if (!meta) return;
-      if (e.key==='b'||e.key==='B'){ e.preventDefault(); toggleCommand("bold"); }
-      if (e.key==='i'||e.key==='I'){ e.preventDefault(); toggleCommand("italic"); }
-      if (e.key==='u'||e.key==='U'){ e.preventDefault(); toggleCommand("underline"); }
-      if (e.key==='='||e.key==='+'){ e.preventDefault(); adjustFont(+0.1); }
-      if (e.key==='-'){ e.preventDefault(); adjustFont(-0.1); }
+
+  function mergeAdjacentFs(span) {
+    if (!span || span.nodeType !== 1 || span.tagName !== "SPAN") return;
+    const sizeKey = span.dataset.fs || (span.style.fontSize || "").replace("em", "");
+    if (!sizeKey) return;
+    // 左
+    let prev = span.previousSibling;
+    while (prev && prev.nodeType === 3 && !prev.nodeValue) prev = prev.previousSibling;
+    if (prev && prev.nodeType === 1 && prev.tagName === "SPAN") {
+      const prevKey = prev.dataset.fs || (prev.style.fontSize || "").replace("em", "");
+      if (prevKey === sizeKey) {
+        while (span.firstChild) prev.appendChild(span.firstChild);
+        span.parentNode && span.parentNode.replaceChild(prev, span);
+        span = prev;
+      }
+    }
+    // 右
+    let next = span.nextSibling;
+    while (next && next.nodeType === 3 && !next.nodeValue) next = next.nextSibling;
+    if (next && next.nodeType === 1 && next.tagName === "SPAN") {
+      const nextKey = next.dataset.fs || (next.style.fontSize || "").replace("em", "");
+      if (nextKey === sizeKey) {
+        while (next.firstChild) span.appendChild(next.firstChild);
+        next.parentNode && next.parentNode.removeChild(next);
+      }
+    }
+  }
+
+  function expandRangeToWord(range) {
+    const node = range.startContainer;
+    if (!node || node.nodeType !== 3) return false;
+    const text = node.nodeValue;
+    const i = range.startOffset;
+    let L = i, R = i;
+    const isWord = (c) => /[^\s.,;:!?()\[\]{}"'\u3000\u3001\u3002]/.test(c || "");
+    while (L > 0 && isWord(text[L - 1])) L--;
+    while (R < text.length && isWord(text[R])) R++;
+    if (L === R) return false;
+    const sel = window.getSelection();
+    range.setStart(node, L);
+    range.setEnd(node, R);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    return true;
+  }
+
+  function adjustFont(deltaStep) {
+    // 只動「反白選取」的字；沒選取就不處理（避免誤觸整段）
+    let ctx = getStoryAndRange(false);
+    if (!ctx) return false;
+    const { story, range } = ctx;
+
+    // 基準：從選取起點的「實際像素字級 / story 像素字級」換算成 em
+    function getBaseEmAt(node) {
+      const el = (node.nodeType === 1 ? node : node.parentElement) || story;
+      const csNode = window.getComputedStyle(el);
+      const csStory = window.getComputedStyle(story);
+      const nodePx = parseFloat(csNode.fontSize || '16') || 16;
+      const storyPx = parseFloat(csStory.fontSize || '16') || 16;
+      return nodePx / storyPx;
+    }
+
+    return EditorCore.keepSelectionAround(story, () => {
+      // 1) 算出新的 em 值（以起點的實際字級為基準）
+      const base = getBaseEmAt(range.startContainer);
+      const nextEm = Math.max(0.2, Math.min(5, base + deltaStep));
+      const fmt = parseFloat(nextEm.toFixed(2));
+
+      // 2) 擷取選取片段 → 清掉片段裡的 data-fs / fontSize → 重新包一層統一字級
+      const frag = range.extractContents();
+
+      (function stripFs(node){
+        if (!node) return;
+        if (node.nodeType !== 1) { Array.from(node.childNodes).forEach(stripFs); return; }
+        const el = node;
+        const tag = el.tagName;
+        if (tag === 'SPAN') {
+          if (el.dataset && el.dataset.fs) delete el.dataset.fs;
+          if (el.style && el.style.fontSize) el.style.fontSize = '';
+          // 若這個 span 被清空 style 且沒有屬性，保留結構不移除（避免破壞 B/I/U）
+        }
+        Array.from(el.childNodes).forEach(stripFs);
+      })(frag);
+
+      const span = document.createElement('span');
+      span.dataset.fs = String(fmt);
+      span.style.fontSize = fmt.toString() + 'em';
+      span.appendChild(frag);
+      range.insertNode(span);
+
+      // 3) 合併與自身相鄰、同字級的 data-fs
+      (function mergeAdjacentFs(s){
+        if (!s || !s.parentNode) return;
+        const key = s.dataset.fs || (s.style.fontSize || '').replace('em','');
+        // 左
+        let prev = s.previousSibling;
+        while (prev && prev.nodeType === 3 && !(prev.nodeValue||'').trim()) prev = prev.previousSibling;
+        if (prev && prev.nodeType === 1 && prev.tagName === 'SPAN') {
+          const prevKey = prev.dataset.fs || (prev.style.fontSize || '').replace('em','');
+          if (prevKey === key) { while (s.firstChild) prev.appendChild(s.firstChild); s.replaceWith(prev); s = prev; }
+        }
+        // 右
+        let next = s.nextSibling;
+        while (next && next.nodeType === 3 && !(next.nodeValue||'').trim()) next = next.nextSibling;
+        if (next && next.nodeType === 1 && next.tagName === 'SPAN') {
+          const nextKey = next.dataset.fs || (next.style.fontSize || '').replace('em','');
+          if (nextKey === key) { while (next.firstChild) s.appendChild(next.firstChild); next.remove(); }
+        }
+      })(span);
+
+      // 4) 移除 story 內空的 data-fs span（只剩空白或完全無內容）
+      Array.from(story.querySelectorAll('span[data-fs]')).forEach(el => {
+        let hasText = false, tw = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
+        while (tw.nextNode()) { if ((tw.currentNode.nodeValue||'').replace('\u00a0',' ').trim()) { hasText = true; break; } }
+        if (!hasText) {
+          // unwrap：保留內部結構（如 <br>），移除外層
+          const p = el.parentNode; if (!p) return;
+          while (el.firstChild) p.insertBefore(el.firstChild, el);
+          p.removeChild(el);
+        }
+      });
+
+      afterChange(story);
+      return true;
+    });
+  }
+    let ctx = getStoryAndRange(false);
+    if (!ctx) {
+      ctx = getStoryAndRange(true);
+      if (!ctx) return false;
+      const { range } = ctx;
+      const wrap = findFsWrapper(range.startContainer);
+      if (!wrap) {
+        const ok = expandRangeToWord(range);
+        if (!ok) return false;
+      }
+    }
+
+    const { story, range } = ctx;
+    return EditorCore.keepSelectionAround(story, () => {
+      const startWrap = findFsWrapper(range.startContainer);
+      const endWrap = findFsWrapper(range.endContainer);
+
+      if (startWrap && startWrap === endWrap) {
+        const cur = getSpanSize(startWrap) || 1;
+        setSpanSize(startWrap, cur + deltaStep);
+        mergeAdjacentFs(startWrap);
+        afterChange(story);
+        return true;
+      }
+
+      let base = getSpanSize(startWrap);
+      if (isNaN(base)) base = getSpanSize(endWrap);
+      if (isNaN(base)) base = 1.0;
+
+      const frag = range.extractContents();
+      stripFsInFragment(frag);
+      const span = document.createElement("span");
+      setSpanSize(span, base + deltaStep);
+      span.appendChild(frag);
+      range.insertNode(span);
+
+      mergeAdjacentFs(span);
+      afterChange(story);
+      return true;
     });
   }
 
-  document.addEventListener("DOMContentLoaded", ()=>{
+  /* ================== 綁定 ================== */
+  function bindButtons() {
+    const btnB = document.getElementById("btnBold");
+    const btnI = document.getElementById("btnItalic");
+    const btnU = document.getElementById("btnUnderline");
+    const btnUp = document.getElementById("btnFontUp");
+    const btnDn = document.getElementById("btnFontDown");
+
+    btnB && btnB.addEventListener("click", onBold);
+    btnI && btnI.addEventListener("click", onItalic);
+    btnU && btnU.addEventListener("click", onUnderline);
+
+    btnUp && btnUp.addEventListener("click", () => adjustFont(+0.1));
+    btnDn && btnDn.addEventListener("click", () => adjustFont(-0.1));
+  }
+
+  function bindShortcuts() {
+    document.addEventListener("keydown", (e) => {
+      const meta = e.ctrlKey || e.metaKey;
+      if (!meta) return;
+      if (e.key === "b" || e.key === "B") { e.preventDefault(); onBold(); }
+      if (e.key === "i" || e.key === "I") { e.preventDefault(); onItalic(); }
+      if (e.key === "u" || e.key === "U") { e.preventDefault(); onUnderline(); }
+      if (e.key === "=" || e.key === "+") { e.preventDefault(); adjustFont(+0.1); }
+      if (e.key === "-") { e.preventDefault(); adjustFont(-0.1); }
+    });
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
     bindButtons();
     bindShortcuts();
   });
