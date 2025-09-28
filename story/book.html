@@ -348,43 +348,117 @@ style="
   <script src="book-flip.js"></script>
   <!-- 應用層（沿用你現有的 app.js；無需改動） -->
   <script src="book/app.js"></script>
+
+  <script>
+/* === 解析學號：優先取網址 ?stu；否則用本書 student_id 反查學生學號 === */
+const A_URL  = 'https://wfhwhvodgikpducrhgda.supabase.co';
+const A_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmaHdodm9kZ2lrcGR1Y3JoZ2RhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgwMTAwNjEsImV4cCI6MjA2MzU4NjA2MX0.P6P-x4SxjiR4VdWH6VFgY_ktgMac_OzuI4Bl7HWskz8';
+let AClient = null;
+
+function getStuFromUrl(){
+  const u = new URL(location.href);
+  const code = (u.searchParams.get('stu') || '').trim();
+  return code || null;
+}
+
+async function resolveStuCodeForBack(){
+  // 1) 先用網址上的 ?stu
+  const fromUrl = getStuFromUrl();
+  if (fromUrl) return fromUrl;
+
+  // 2) 其次用 ACTIVE_BOOK.student_id；若沒有，再用 URL 的 book_id / bookid / 全域 BOOK_ID
+  let studentId = window.ACTIVE_BOOK?.student_id || null;
+
+  if (!studentId) {
+    const q = new URL(location.href).searchParams;
+    const bookId = q.get('book_id') || q.get('bookid') || (window.BOOK_ID || '').trim();
+    if (!bookId) return null;
+
+    try {
+      const r = await SB.from('books').select('student_id').eq('id', bookId).maybeSingle();
+      if (r.error) { console.warn('[books.student_id] select error:', r.error); return null; }
+      studentId = r.data?.student_id || null;
+    } catch(e) {
+      console.warn('[books.student_id] exception:', e);
+      return null;
+    }
+  }
+
+  if (!studentId) return null;
+
+  try{
+    if (!AClient) AClient = window.supabase.createClient(A_URL, A_ANON, { auth:{ persistSession:false } });
+    const r2 = await AClient.from('students').select('student_code').eq('student_id', studentId).maybeSingle();
+    const code = (r2.data?.student_code || '').trim();
+    return code || null;
+  }catch(e){
+    console.warn('[students.student_code] exception:', e);
+    return null;
+  }
+}
+</script>
+
+
+  
 <script>
 (function () {
-  // 這裡改成你「書單頁」的固定網址做保底，例如：/books 或 /library
+  // 固定回到的頁（你的休息室路徑）
   const FALLBACK_URL = 'story';
 
   const btn = document.getElementById('btnBack');
   if (!btn) return;
 
-  btn.addEventListener('click', function (e) {
+  btn.addEventListener('click', async function (e) {
     e.preventDefault();
 
-    // 情況 1：有可回的歷史紀錄（通常 history.length > 1）
+    // 先解出學號，組成帶參數的 fallback 目標
+    const stu = await resolveStuCodeForBack();
+    const suffix = stu ? `?stu=${encodeURIComponent(stu)}` : '';
+    const fallbackTarget = FALLBACK_URL + suffix;
+
+    // 情況 1：有可回的歷史紀錄 → 先嘗試 back，0.4 秒後保底導到 fallbackTarget
     if (window.history.length > 1) {
-      const before = document.referrer;
+      const ref = document.referrer || '';
       window.history.back();
 
-      // 保底：有些環境 back 可能無效（或回到同頁），0.4 秒後檢查
       setTimeout(function () {
-        // 若無 referrer（或 referrer 與當前相同），直接去 FALLBACK
-        if (!before || before === location.href) {
-          window.location.assign(FALLBACK_URL);
+        try{
+          const sameAsNow = (ref === '' || ref === location.href);
+          const hasStu = ref && (new URL(ref, location.href)).searchParams.get('stu');
+          // 沒 referrer、或 referrer 沒帶 stu、或 back 失效 → 導到 fallbackTarget
+          if (sameAsNow || (stu && (!hasStu || hasStu !== stu))) {
+            window.location.assign(fallbackTarget);
+          }
+        }catch(_){
+          window.location.assign(fallbackTarget);
         }
       }, 400);
       return;
     }
 
-    // 情況 2：沒有 history，但有 referrer（可能跨網域）
+    // 情況 2：沒有 history，但有 referrer
     if (document.referrer) {
-      window.location.href = document.referrer;
+      try{
+        const u = new URL(document.referrer, location.href);
+        if (stu && !u.searchParams.get('stu')) {
+          // referrer 沒有 stu → 直接去 fallbackTarget（確保帶上）
+          window.location.assign(fallbackTarget);
+        } else {
+          // referrer 已有 stu 或不需 stu → 回 referrer
+          window.location.href = document.referrer;
+        }
+      }catch(_){
+        window.location.assign(fallbackTarget);
+      }
       return;
     }
 
-    // 情況 3：兩者都沒有 → 走保底固定頁
-    window.location.assign(FALLBACK_URL);
+    // 情況 3：兩者都沒有 → 走保底
+    window.location.assign(fallbackTarget);
   });
 })();
 </script>
+
 <script>
 (function () {
   // 取得左右大按鈕
