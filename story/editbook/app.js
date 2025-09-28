@@ -1,4 +1,3 @@
-
 /* app.js — 本地化編輯模式 + BookFlip 掛載（完整版，含 TOC、章節初始化、游標同步）
  * 重點：
  * - 以 ?bookid=UUID 讀一次 Supabase → 寫進 localStorage
