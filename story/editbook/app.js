@@ -153,30 +153,25 @@ function applyCoverFromBook(isFromTitleTyping = false) {
 
     if (coverURL) {
       coverFront.classList.add('page--illustration');
-      // 先清掉可能殘留的 shorthand
       coverFront.style.background = '';
       coverFront.style.backgroundColor = '';
-      // 僅設定 backgroundImage
       coverFront.style.backgroundImage = `url("${coverURL}")`;
-      // 還原可能被「無圖」狀態設定的排版
       coverFront.style.display = '';
       coverFront.style.alignItems = '';
       coverFront.style.justifyContent = '';
       coverFront.innerHTML = '';
     } else {
       coverFront.classList.remove('page--illustration');
-      // 清掉圖片，只留底色
-      coverFront.style.background = '';          // 清 shorthand（保險）
+      coverFront.style.background = '';
       coverFront.style.backgroundImage = '';
-      coverFront.style.backgroundColor = '#fff'; // 用 backgroundColor 取代 shorthand
+      coverFront.style.backgroundColor = '#fff';
       coverFront.style.display = 'flex';
       coverFront.style.alignItems = 'center';
       coverFront.style.justifyContent = 'center';
       coverFront.innerHTML = `<div class="cover-title" style="font-size:1.8em;font-weight:700">${escapeHTML(title)}</div>`;
-      ensureCoverHint(coverFront);  
+      ensureCoverHint(coverFront); // ✅ spread 用 coverFront
     }
     if (coverBack) {
-      // 背面只設底色，避免用 shorthand
       coverBack.style.background = '';
       coverBack.style.backgroundImage = '';
       coverBack.style.backgroundColor = '#fff';
@@ -188,10 +183,8 @@ function applyCoverFromBook(isFromTitleTyping = false) {
 
     if (coverURL) {
       front.classList.add('page--illustration');
-      // 先清掉可能殘留的 shorthand
       front.style.background = '';
       front.style.backgroundColor = '';
-      // 僅設定 backgroundImage
       front.style.backgroundImage = `url("${coverURL}")`;
       front.style.display = '';
       front.style.alignItems = '';
@@ -206,7 +199,7 @@ function applyCoverFromBook(isFromTitleTyping = false) {
       front.style.alignItems = 'center';
       front.style.justifyContent = 'center';
       front.innerHTML = `<div class="cover-title" style="font-size:1.8em;font-weight:700">${escapeHTML(title)}</div>`;
-      ensureCoverHint(coverFront);  
+      ensureCoverHint(front); // ✅ single 用 front
     }
     if (back) {
       back.style.background = '';
@@ -214,6 +207,8 @@ function applyCoverFromBook(isFromTitleTyping = false) {
       back.style.backgroundColor = '#fff';
     }
   }
+}
+
 
   // ★ 修正：輸入期間不要回寫 #bookTitle，避免游標跳到第一字
   if (!isFromTitleTyping) {
