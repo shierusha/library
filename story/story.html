@@ -433,6 +433,7 @@ async function runDiagnostics(){
 }
 
 /* ============ ★ 改成 fetch()：跳轉到「電子書櫃」（交換長簽） ============ */
+/* ============ ★ 改成 fetch()：跳轉到「電子書櫃」（交換長簽） ============ */
 async function goToBookChest(e){
   if (e) e.preventDefault();
 
@@ -448,13 +449,26 @@ async function goToBookChest(e){
     const out = await resp.json().catch(()=>null);
     if (!resp.ok || !out?.token) throw new Error(out?.error || out?.detail || 'exchange-token 失敗');
 
+    // 存入 B 專案用的 JWT（書櫃頁會從 localStorage 讀）
     localStorage.setItem('xer_b_jwt', out.token);
-    location.href = BOOK_CHEST_URL;  // 不再帶 id / stu
+
+    // 依目前下拉帶 ?stu=學號；選「其他」或找不到學號 → 不帶參數
+    let suffix = '';
+    const sel = document.getElementById('student-filter');
+    if (sel && sel.value && sel.value !== 'OTHER') {
+      const stu = (Array.isArray(PLAYER_STUDENTS) ? PLAYER_STUDENTS : []).find(s => s.student_id === sel.value);
+      const code = stu?.student_code;
+      if (code) suffix = `?stu=${encodeURIComponent(code)}`;
+    }
+
+    // 跳轉到書櫃頁（可能會帶上 ?stu）
+    location.href = BOOK_CHEST_URL + suffix;
   }catch(err){
     console.error('[exchange-token] failed', err);
     alert('登入書櫃失敗：' + (err?.message || JSON.stringify(err)));
   }
 }
+
 
 /* ============ 初始化流程 ============ */
 async function init(){
