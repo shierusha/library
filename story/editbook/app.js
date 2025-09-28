@@ -64,6 +64,18 @@
   }
   function toHTMLFromPlain(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/\n/g,'<br>'); }
 
+  // ★ 新增：安全設定背景圖（自動補上 url(...)；順手設定位置/重覆/縮放）
+  window.setPageBgImage = function setPageBgImage(el, src, { fit = 'cover' } = {}){
+    if (!el) return;
+    const raw = String(src || '').trim();
+    if (!raw) { el.style.backgroundImage = ''; return; }
+    const val = /^url\(/i.test(raw) ? raw : `url("${raw}")`;
+    el.style.backgroundImage  = val;
+    if (!el.style.backgroundPosition) el.style.backgroundPosition = 'center center';
+    if (!el.style.backgroundRepeat)   el.style.backgroundRepeat   = 'no-repeat';
+    if (!el.style.backgroundSize)     el.style.backgroundSize     = fit; // 'cover' | 'contain'
+  };
+
   /* ===== 本地儲存 ===== */
   function readLS(key, fallback=null){
     try{ const s = localStorage.getItem(key); return s ? JSON.parse(s) : fallback; }catch(_){ return fallback; }
@@ -84,7 +96,8 @@
 
       if (coverURL) {
         coverFront.classList.add('page--illustration');
-        coverFront.style.backgroundImage = `url("${coverURL}")`;
+        // 改：統一走安全設定，確保有 url(...)
+        setPageBgImage(coverFront, coverURL, { fit: 'cover' });
         coverFront.innerHTML = '';
       } else {
         coverFront.classList.remove('page--illustration');
@@ -103,7 +116,8 @@
 
       if (coverURL) {
         front.classList.add('page--illustration');
-        front.style.backgroundImage = `url("${coverURL}")`;
+        // 改：統一走安全設定，確保有 url(...)
+        setPageBgImage(front, coverURL, { fit: 'cover' });
         front.innerHTML = '';
       } else {
         front.classList.remove('page--illustration');
@@ -204,7 +218,8 @@
     } else if (t === 'illustration') {
       el.classList.add('page--illustration');
       if (p.image_url && String(p.image_url).trim()) {
-        el.style.backgroundImage = `url("${p.image_url}")`;
+        // 改：統一走安全設定，確保有 url(...)
+        setPageBgImage(el, p.image_url, { fit: 'contain' });
       } else {
         el.style.backgroundImage = 'linear-gradient(45deg,#fbb,#fdd)';
         el.innerHTML = '<div style="margin:auto;color:#900;font-weight:700">缺少 image_url</div>';
