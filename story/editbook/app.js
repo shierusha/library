@@ -54,17 +54,49 @@
   window.CHAPTERS_DB = [];     // [{title,page_index}]
   window.book = null;          // BookFlip 實例
 
-  /* ===== 小工具 ===== */
-  function escapeHTML(str){ return String(str || '').replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s])); }
-  function normalizeType(t) {
-    const x = String(t || '').trim().toLowerCase().replace(/-/g, '_');
-    if (x === 'divider_black') return 'divider_dark';
-    if (x === 'divider_white') return 'divider_light';
-    if (x === 'image')        return 'illustration';
-    if (x === 'novel' || x === 'divider_light' || x === 'divider_dark' || x === 'illustration') return x;
-    return 'novel';
-  }
-  function toHTMLFromPlain(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/\n/g,'<br>'); }
+/* ===== 小工具 ===== */
+function escapeHTML(str){
+  return String(str || '').replace(/[&<>"']/g, s => ({
+    '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+  }[s]));
+}
+
+function normalizeType(t) {
+  const x = String(t || '').trim().toLowerCase().replace(/-/g, '_');
+  if (x === 'divider_black') return 'divider_dark';
+  if (x === 'divider_white') return 'divider_light';
+  if (x === 'image')         return 'illustration';
+  if (x === 'novel' || x === 'divider_light' || x === 'divider_dark' || x === 'illustration') return x;
+  return 'novel';
+}
+
+// === DB ↔ 內部型別對映 ===
+// 假設資料庫 ENUM 用：novel | divider_white | divider_black | image
+// 若你的 DB 枚舉字串不同，改這裡即可。
+const TYPE_DB_PREF = {
+  novel:         'novel',
+  divider_light: 'divider_white',
+  divider_dark:  'divider_black',
+  illustration:  'image',
+};
+
+// DB → 內部（讀取時）
+function fromDbType(t){
+  return normalizeType(t);
+}
+
+// 內部 → DB（寫回時）
+function toDbType(canon){
+  const c = normalizeType(canon);
+  return TYPE_DB_PREF[c] || 'novel';
+}
+
+// 提供給其他檔案共用（選用）
+window.TypeMap = { normalizeType, fromDbType, toDbType };
+
+function toHTMLFromPlain(s){
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/\n/g,'<br>');
+}
 
   /* ===== 本地儲存 ===== */
   function readLS(key, fallback=null){
@@ -593,7 +625,11 @@ window.rebuildTo = function rebuildTo(targetDbIndex){
   window.persistDraft = function persistDraft(){
     if (!ACTIVE_BOOK?.id) return;
     writeLS(LS_KEY_BOOK(ACTIVE_BOOK.id), ACTIVE_BOOK);
-    writeLS(LS_KEY_PAGES(ACTIVE_BOOK.id), PAGES_DB);
+    writeLS(LS_KEY_PAGES(ACTIVE_BOOK.id), PAGES_DB.map(p => ({
+   ...p,
+   type: normalizeType(p.type), // 內部一致
+   type_db: toDbType(p.type),   // 未來上傳 DB 用
+ })));
     writeLS(LS_KEY_CHAP(ACTIVE_BOOK.id), CHAPTERS_DB);
   };
 
@@ -664,13 +700,13 @@ window.rebuildTo = function rebuildTo(targetDbIndex){
     let local = loadFromLocal(BOOK_ID_Q);
     if (local){
       ACTIVE_BOOK = local.bookData;
-      PAGES_DB = local.pages || [];
+PAGES_DB = (local.pages || []).map(p => ({ ...p, type: fromDbType(p.type) }));
       CHAPTERS_DB = local.chapters || [];
     }else{
       // 首次：打 DB 取回 → 寫入 LS
       const { bookData, pages, chapters } = await fetchFromSupabase(BOOK_ID_Q);
       ACTIVE_BOOK = bookData;
-      PAGES_DB = pages || [];
+     PAGES_DB = (pages || []).map(p => ({ ...p, type: fromDbType(p.type) }));
       CHAPTERS_DB = chapters || [];
       persistDraft();
     }
