@@ -60,49 +60,67 @@
   }
 
   /* ===== 封面（第一張 .paper，不算頁碼） ===== */
-  function applyCoverFromBook(isFromTitleTyping = false) {
-    const title = ACTIVE_BOOK?.title || '未命名書籍';
-    const coverURL = (ACTIVE_BOOK?.cover_image || '').trim();
+ /* ===== 封面（第一張 .paper，不算頁碼） ===== */
+function applyCoverFromBook(isFromTitleTyping = false) {
+  const title = ACTIVE_BOOK?.title || '未命名書籍';
+  const coverURL = (ACTIVE_BOOK?.cover_image || '').trim();
 
-    if (state.mode === 'spread') {
-      const coverFront = elBook.querySelector('.paper .page.front');
-      const coverBack  = elBook.querySelector('.paper .page.back');
-      if (!coverFront) return;
+  if (state.mode === 'spread') {
+    const coverFront = elBook.querySelector('.paper .page.front');
+    const coverBack  = elBook.querySelector('.paper .page.back');
+    if (!coverFront) return;
 
-      if (coverURL) {
-        coverFront.classList.add('page--illustration');
-        coverFront.style.backgroundImage = `url("${coverURL}")`;
-        coverFront.innerHTML = '';
-      } else {
-        coverFront.classList.remove('page--illustration');
-        coverFront.style.backgroundImage = '';
-        coverFront.style.background = '#fff';
-        coverFront.style.display = 'flex';
-        coverFront.style.alignItems = 'center';
-        coverFront.style.justifyContent = 'center';
-        coverFront.innerHTML = `<div class="cover-title" style="font-size:1.8em;font-weight:700">${escapeHTML(title)}</div>`;
-      }
-      if (coverBack) coverBack.style.background = '#fff';
+    if (coverURL) {
+      // 有圖片：只保留 background-image，其餘清空
+      coverFront.classList.add('page--illustration');
+      coverFront.style.background = '';                 // 清掉 shorthand（避免出現 rgb(...)）
+      coverFront.style.backgroundColor = 'transparent'; // 確保沒有底色
+      coverFront.style.backgroundImage = `url("${coverURL}")`;
+      coverFront.style.display = '';                    // 清掉先前置中用的 flex
+      coverFront.style.alignItems = '';
+      coverFront.style.justifyContent = '';
+      coverFront.innerHTML = '';
     } else {
-      const sp = elBook.querySelectorAll('.single-page');
-      const front = sp[0], back = sp[1];
-      if (!front) return;
-
-      if (coverURL) {
-        front.classList.add('page--illustration');
-        front.style.backgroundImage = `url("${coverURL}")`;
-        front.innerHTML = '';
-      } else {
-        front.classList.remove('page--illustration');
-        front.style.backgroundImage = '';
-        front.style.background = '#fff';
-        front.style.display = 'flex';
-        front.style.alignItems = 'center';
-        front.style.justifyContent = 'center';
-        front.innerHTML = `<div class="cover-title" style="font-size:1.8em;font-weight:700">${escapeHTML(title)}</div>`;
-      }
-      if (back) back.style.background = '#fff';
+      // 無圖片：白底＋置中書名
+      coverFront.classList.remove('page--illustration');
+      coverFront.style.backgroundImage = '';
+      coverFront.style.background = '#fff';
+      coverFront.style.display = 'flex';
+      coverFront.style.alignItems = 'center';
+      coverFront.style.justifyContent = 'center';
+      coverFront.innerHTML = `<div class="cover-title" style="font-size:1.8em;font-weight:700">${escapeHTML(title)}</div>`;
     }
+    if (coverBack) coverBack.style.background = '#fff';
+
+  } else {
+    const sp = elBook.querySelectorAll('.single-page');
+    const front = sp[0], back = sp[1];
+    if (!front) return;
+
+    if (coverURL) {
+      // 有圖片：只保留 background-image，其餘清空
+      front.classList.add('page--illustration');
+      front.style.background = '';
+      front.style.backgroundColor = 'transparent';
+      front.style.backgroundImage = `url("${coverURL}")`;
+      front.style.display = '';
+      front.style.alignItems = '';
+      front.style.justifyContent = '';
+      front.innerHTML = '';
+    } else {
+      // 無圖片：白底＋置中書名
+      front.classList.remove('page--illustration');
+      front.style.backgroundImage = '';
+      front.style.background = '#fff';
+      front.style.display = 'flex';
+      front.style.alignItems = 'center';
+      front.style.justifyContent = 'center';
+      front.innerHTML = `<div class="cover-title" style="font-size:1.8em;font-weight:700">${escapeHTML(title)}</div>`;
+    }
+    if (back) back.style.background = '#fff';
+  }
+}
+
 
     // ★ 修正：輸入期間不要回寫 #bookTitle，避免游標跳到第一字
     if (!isFromTitleTyping) {
