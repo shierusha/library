@@ -183,8 +183,8 @@
 
     story.addEventListener('keydown', e=>{
       if (e.key !== 'Enter') return;
-      e.preventDefault();
-      e.stopImmediatePropagation(); // ← 避免 paste-flow 的 Enter 再跑一次
+e.preventDefault();
+e.stopImmediatePropagation(); // ← 關鍵：避免 paste-flow 的 Enter 再跑一次
 
       const sel = window.getSelection();
       if (!sel || !sel.rangeCount) return;
@@ -228,62 +228,6 @@
         });
       })();
     });
-  }
-
-  /* ---------- 新增：插入/載入媒體即時縮放＋重排 ---------- */
-  function fitMedia(el){
-    if (!el || !el.tagName) return;
-    const tag = el.tagName.toUpperCase();
-    if (tag === 'IMG' || tag === 'VIDEO' || tag === 'SVG'){
-      el.style.maxWidth  = '100%';
-      el.style.maxHeight = '100%';
-      el.style.height    = 'auto';
-      el.style.objectFit = 'contain';
-      el.style.display   = 'block';
-    }
-  }
-  function bindMediaAutoFit(story){
-    if (!story || story.__mediaFitBound) return;
-    story.__mediaFitBound = true;
-
-    const triggerReflow = () => {
-      try { window.PasteFlow?.forceReflow?.(story); } catch(_){}
-      try { story.dispatchEvent(new Event('input', {bubbles:true})); } catch(_){}
-    };
-
-    // 1) 先處理初始已存在的媒體
-    story.querySelectorAll('img,video,svg').forEach(fitMedia);
-
-    // 2) 任何 <img> 載入完、或錯誤，都觸發一次重排（捕獲階段可接到）
-    story.addEventListener('load', e=>{
-      const t = e.target;
-      if (t && t.tagName === 'IMG'){
-        fitMedia(t);
-        triggerReflow();
-      }
-    }, true);
-    story.addEventListener('error', e=>{
-      const t = e.target;
-      if (t && t.tagName === 'IMG'){
-        triggerReflow();
-      }
-    }, true);
-
-    // 3) 監聽 DOM 變化：新插入的媒體立即套上限制
-    const mo = new MutationObserver(muts=>{
-      let needReflow = false;
-      muts.forEach(m=>{
-        m.addedNodes && m.addedNodes.forEach(n=>{
-          if (n.nodeType === 1){
-            if (n.matches?.('img,video,svg')) { fitMedia(n); needReflow = true; }
-            n.querySelectorAll?.('img,video,svg').forEach(child=>{ fitMedia(child); needReflow = true; });
-          }
-        });
-      });
-      if (needReflow) triggerReflow();
-    });
-    mo.observe(story, { childList:true, subtree:true });
-    story.__mediaMo = mo;
   }
 
   /* ---------- story 的建立 ---------- */
@@ -354,10 +298,6 @@
     if (window.PasteFlow && typeof window.PasteFlow.bindTo === 'function' && !story.__pfBound){
       story.__pfBound = true; window.PasteFlow.bindTo(story);
     }
-
-    // ★ 新增：媒體自動縮放＋載入後強制重排（解決插入圖片要 F5 才縮）
-    bindMediaAutoFit(story);
-
     return story;
   }
 
