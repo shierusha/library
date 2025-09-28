@@ -399,6 +399,46 @@ body::-webkit-scrollbar { width:0; height:0; }
 (function(){
   const BACK_URL = 'https://shierusha.github.io/library/story/book-chest';
 
+  /* === 新增：Discord 通知設定（有開 SHARED_TOKEN 驗證才填） === */
+  const NOTIFY_ENDPOINT = 'https://ogzpfrkwnqqaitytncla.supabase.co/functions/v1/notify-discord';
+  const SHARED_TOKEN = ''; // 例：'你的自訂token'；若 Edge Function 沒開驗證就留空字串或刪掉
+
+  /* === 新增：成功儲存後要送的通知 === */
+  async function notifyDiscordAfterSave() {
+    // 從現有資料拿學生名與書名（saveAll 成功後 ACTIVE_BOOK 已是最新）
+    const studentName = localStorage.getItem('player_username') || '未命名學生';
+    const title = (window.ACTIVE_BOOK?.title || '未命名書籍').trim();
+    const bookUrl = `https://shierusha.github.io/library/story/book?book=${encodeURIComponent(title)}`;
+
+    // 7 秒超時避免卡住
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 7000);
+
+    try {
+      const res = await fetch(NOTIFY_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({
+          student_name: studentName,
+          title,
+          book_url: bookUrl,
+          ...(SHARED_TOKEN ? { token: SHARED_TOKEN } : {})
+        }),
+        signal: ctrl.signal
+      });
+      if (!res.ok) {
+        const msg = (res.headers.get('content-type')||'').includes('application/json')
+          ? JSON.stringify(await res.json())
+          : await res.text();
+        console.warn('notify-discord failed:', res.status, msg);
+      }
+    } catch (e) {
+      console.warn('notify-discord error:', e?.message || e);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   const normType = (t)=>{
     const x = String(t||'').trim().toLowerCase().replace(/-/g,'_');
     if (x==='divider_black') return 'divider_dark';
@@ -456,7 +496,7 @@ body::-webkit-scrollbar { width:0; height:0; }
       // 3) 新狀態（畫面上的頁）
       const desiredPages = (window.PAGES_DB || []).map((p, i) => ({
         id: p.id || null,
-        book_id: bookId,
+        book_id: window.BOOK_ID,
         page_index: i + 1,
         type: normType(p.type),
         image_url: p.image_url || null,
@@ -531,7 +571,7 @@ body::-webkit-scrollbar { width:0; height:0; }
       desiredPages.forEach(p => { if (p.id) pageIndexToId.set(p.page_index, p.id); });
       inserted.forEach(row => { pageIndexToId.set(row.page_index, row.id); });
       if (pageIndexToId.size !== desiredPages.length) {
-        const r = await SB.from('pages').select('id,page_index').eq('book_id', bookId);
+        const r = await SB.from('pages').select('id,page_index').eq('book_id', window.BOOK_ID);
         if (!r.error) (r.data||[]).forEach(x => pageIndexToId.set(x.page_index, x.id));
       }
 
@@ -540,7 +580,7 @@ body::-webkit-scrollbar { width:0; height:0; }
         .filter(ch => ch && ch.title && ch.page_index >= 1)
         .map(ch => {
           const pid = pageIndexToId.get(ch.page_index) || null;
-          return pid ? { page_id: pid, title: String(ch.title).trim(), book_id: bookId } : null;
+          return pid ? { page_id: pid, title: String(ch.title).trim(), book_id: window.BOOK_ID } : null;
         })
         .filter(Boolean);
 
@@ -550,7 +590,7 @@ body::-webkit-scrollbar { width:0; height:0; }
 
       wantByPid.forEach((w, pid) => {
         const ex = existingByPid.get(pid);
-        if (!ex) chToInsert.push({ book_id: bookId, page_id: pid, title: w.title });
+        if (!ex) chToInsert.push({ book_id: window.BOOK_ID, page_id: pid, title: w.title });
         else if ((ex.title || '') !== w.title) chToUpdate.push({ id: ex.id, title: w.title });
       });
 
@@ -567,14 +607,14 @@ body::-webkit-scrollbar { width:0; height:0; }
       const [freshBook, freshPages, freshChJoin] = await Promise.all([
         SB.from('books')
           .select('id,title,cover_image,cover_color,binding,direction,page_count')
-          .eq('id', bookId).single(),
+          .eq('id', window.BOOK_ID).single(),
         SB.from('pages')
           .select('id,page_index,type,image_url,content_json')
-          .eq('book_id', bookId)
+          .eq('book_id', window.BOOK_ID)
           .order('page_index', { ascending: true }),
         SB.from('chapters')
           .select('title,page_id,created_at,pages!inner(id,page_index)')
-          .eq('book_id', bookId)
+          .eq('book_id', window.BOOK_ID)
           .order('created_at', { ascending: true })
       ]);
       if (freshBook.error) return die('refresh-book', freshBook.error);
@@ -602,20 +642,33 @@ body::-webkit-scrollbar { width:0; height:0; }
     } catch (e) {
       return die('unknown', e);
     } finally {
+      const btnSave = document.getElementById('btnSave');
+      const btnBack = document.getElementById('btnBack');
       [btnSave, btnBack].forEach(b => b && (b.disabled = false));
     }
   }
 
   // 綁定按鈕
   document.getElementById('btnSave')?.addEventListener('click', ()=> {
+    // 單純存檔不通知
     saveAll({ navigateAfter: false });
   });
+
   document.getElementById('btnBack')?.addEventListener('click', async ()=> {
+    // ← 修改點：先存檔成功 → 送 Discord 通知 → 導頁
+    const btnBack = document.getElementById('btnBack');
+    if (btnBack) btnBack.disabled = true; // 避免重複點擊
     const ok = await saveAll({ navigateAfter: false });
-    if (ok) location.href = BACK_URL;
+    if (ok) {
+      await notifyDiscordAfterSave();     // ★ 在這裡通知
+      location.href = BACK_URL;           // 再導回書單
+    } else if (btnBack) {
+      btnBack.disabled = false;
+    }
   });
 })();
 </script>
+
 
 <!-- A 站連動登出（玩家中心登出時，這頁自動跳回玩家中心） -->
 <script src="https://shierusha.github.io/library/assets/js/logout.js"></script>
