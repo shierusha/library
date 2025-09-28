@@ -9,6 +9,17 @@
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&family=Noto+Sans+TC:wght@400;600;700&display=swap" rel="stylesheet">
 
   <style>
+    /* 讓插入到 .story 的 <img>/<video>/<svg> 不會超出容器；插入當下就縮放 */
+.story img,
+.story video,
+.story svg { 
+  max-width: 100%;
+  max-height: 100%;
+  height: auto;
+  object-fit: contain;
+  display: block;
+}
+
 /* ========== Reset / Base ========== */
 *{box-sizing:border-box}
 html,body{height:100%}
