@@ -630,17 +630,47 @@ async function ensureCounter(){
 }
 async function getCounter(){
   const { data } = await G('counters')
-    .select('total_draws,next_pity,max_draws')
+    .select('total_draws,next_pity,max_draws,free_used_today,free_reset_at')
     .eq('player_id', user?.id).single();
-  return data || { total_draws: 0, next_pity: 50, max_draws: 0 };
+  return data || { total_draws: 0, next_pity: 50, max_draws: 0, free_used_today: 0 };
 }
+
 async function refreshUIFromCounter(){
   const c = await getCounter();
-  const remain = Math.max(0, (c?.max_draws||0) - (c?.total_draws||0));
+
+  // 剩餘抽數（顯示用）
+  const remain = Math.max(0, (c?.max_draws || 0) - (c?.total_draws || 0));
   if (drawCounterEl) drawCounterEl.textContent = remain;
-  if (btnTen)    btnTen.disabled    = remain < 10 || btnTen._forceDisabled === true || isPortrait();
-  if (btnSingle) btnSingle.disabled = remain <  1 || btnSingle._forceDisabled === true || isPortrait();
+
+  // 今日免費次數
+  const freeUsed = Number(c?.free_used_today || 0);
+  const freeLeft = Math.max(0, 3 - freeUsed);
+
+  // 目前池是否為常駐池
+  const currentKey = (window.CURRENT_POOL && window.CURRENT_POOL.key) ? window.CURRENT_POOL.key : DEFAULT_EVENT;
+  const isDefaultPool = currentKey === DEFAULT_EVENT;
+
+  // 十連：照舊（需要剩餘 >= 10 才能按）
+  if (btnTen) {
+    btnTen.disabled = (remain < 10) || btnTen._forceDisabled === true || isPortrait();
+  }
+
+  // 單抽：若為常駐池且還有免費次數 → 即使 remain=0 也允許按
+  if (btnSingle) {
+    const allowBecauseFree = isDefaultPool && freeLeft > 0;
+    btnSingle.disabled = (!allowBecauseFree && (remain < 1)) || btnSingle._forceDisabled === true || isPortrait();
+
+    // 文字切換
+    if (isDefaultPool && freeLeft > 0) {
+      btnSingle.textContent = `免費抽（剩${freeLeft}次）`;
+      btnSingle.classList.add('free-gacha');
+    } else {
+      btnSingle.textContent = '單抽';
+      btnSingle.classList.remove('free-gacha');
+    }
+  }
 }
+
 
 /* ==============================
    Loader
