@@ -397,6 +397,8 @@ const $$ = (s, r=document) => [...r.querySelectorAll(s)];
 const sleep = (ms) => new Promise(res => setTimeout(res, ms));
 const escapeHtml = s => (s||'').replace(/[&<>"']/g,c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
+
+  
 /* ==============================
    DC Webhook（銀/金）
 ============================== */
@@ -432,6 +434,13 @@ const B_TOKEN_EXP = Number(localStorage.getItem('gacha_b_jwt_exp') || 0);
 const PLAYER_NAME = localStorage.getItem('gacha_player_name') || '我的';
 const REDIRECT_PLAYER = 'https://shierusha.github.io/create-student/player';
 const DEFAULT_EVENT   = '謝爾夏饅頭扭蛋';
+
+
+  function getCurrentPoolKey(){
+  return (window.CURRENT_POOL && window.CURRENT_POOL.key) ? window.CURRENT_POOL.key : DEFAULT_EVENT;
+}
+
+  
 
 function decodeJWT(t){
   if (!t) return null;
@@ -597,6 +606,21 @@ async function drawTenTimes(){
   }).observe(resultsContainer, { childList:true, subtree:true });
 
   setInterval(refreshUIFromCounter, 15000);
+
+  // ★ 即時偵測選池變更（0.5 秒一次），一變就刷新按鈕顯示
+let __lastPoolKey = getCurrentPoolKey();
+setInterval(() => {
+  const k = getCurrentPoolKey();
+  if (k !== __lastPoolKey) {
+    __lastPoolKey = k;
+    refreshUIFromCounter(); // ← 會把「免費抽」立刻改回「單抽」或反之
+  }
+}, 500);
+
+// 若外掛有拋事件，也順手監聽（沒有也不影響）
+window.addEventListener('pool:change', refreshUIFromCounter);
+window.addEventListener('POOL_CHANGED', refreshUIFromCounter);
+
 
   setBackDisabled(false);
 })();
