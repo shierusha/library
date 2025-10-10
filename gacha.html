@@ -110,7 +110,7 @@ body.dark-bg::before {
   display: flex; gap: 10%;
   width: 60%; height: 11%;
   z-index: 10;
-  transition: bottom 0.4s ease;
+  transition: bottom 0.4s ease, opacity .25s ease;
 }
 .gacha-btn.inactive { border: none; box-shadow: none; }
 .gacha-btn {
@@ -250,22 +250,19 @@ body.dark-bg::before {
   position: absolute;
   left: 50%;
   top: 50%;
-  transform: translate(-50%, -50%); /* ✅ 幾何置中 */
+  transform: translate(-50%, -50%);
   max-width: 100%;
   max-height: 100%;
-  width: auto;                     /* 保持比例，不硬撐滿 */
+  width: auto;
   height: auto;
   object-fit: contain;
-  z-index: 0;                      /* 圖壓在名字上 */
+  z-index: 0;
   pointer-events: none;
   filter: drop-shadow(0 2px 6px rgba(0, 0, 0, .35));
-  opacity: 0;                      /* 先藏，翻牌再顯示 */
-  transition: opacity .2s ease;    /* ← 別斷行 */
+  opacity: 0;
+  transition: opacity .2s ease;
 }
-
-.gacha-orb.revealed .orb-inner .orb-icon{
-  opacity: 1;               /* ★ 翻牌後立刻顯示（圖已預載） */
-}
+.gacha-orb.revealed .orb-inner .orb-icon{ opacity: 1; }
 
 /* 名字固定在底部，預設也隱形，翻牌後一起出現 */
 .gacha-orb .orb-inner .orb-name{
@@ -280,21 +277,17 @@ body.dark-bg::before {
   font-weight: 900;
   white-space: normal;
   word-break: keep-all;
-  z-index: 1;               /* 在圖片下方 */
+  z-index: 1;
   font-size: .36em;
-  opacity: 0;               /* ★ 先藏 */
+  opacity: 0;
   transition: opacity .2s ease;
 }
-.gacha-orb.revealed .orb-inner .orb-name{
-  opacity: 1;               /* ★ 翻牌後才顯示文字 */
-}
+.gacha-orb.revealed .orb-inner .orb-name{ opacity: 1; }
 
-/* 不同稀有度的名字顏色（被圖片遮住也作為備援） */
+/* 不同稀有度的名字顏色 */
 .orb-normal.revealed  .orb-name { color:#ffffff; text-shadow:0 2px 6px #000c, 0 0 3px #000; }
 .orb-hidden.revealed  .orb-name { color:#e0e0e0; text-shadow:0 2px 6px #000c, 0 0 3px #000; }
 .orb-limited.revealed .orb-name { color:#ffd54f; text-shadow:0 2px 6px #000c, 0 0 6px #000; }
-
-
 
 /* ==============================
    特殊升級動畫遮罩（銀→金→翻牌）
@@ -307,40 +300,33 @@ body.dark-bg::before {
 }
 #special-cat{
   position: absolute;
-  width: 7vw;          /* ★ 可微調：特效貓尺寸（改百分比或 px） */
-  max-width: 120px;    /* ★ 可微調：最大尺寸上限 */
+  width: 7vw;
+  max-width: 120px;
   aspect-ratio: 1/1;
   transform: translate(-50%,-50%);
   filter: drop-shadow(0 6px 14px rgba(0,0,0,.6));
-  transition: left .45s cubic-bezier(.22,.61,.36,1), top .45s cubic-bezier(.22,.61,.36,1); /* ★ 可微調：移動速度/曲線 */
+  transition: left .45s cubic-bezier(.22,.61,.36,1), top .45s cubic-bezier(.22,.61,.36,1);
 }
-.special-bounce {
-  animation: cat-bounce 250ms ease-out; /* 時間跟你 JS 的 SPECIAL.hopDurMs 對齊 */
-}
-/* ★ 翻轉：左右翻圖，不影響 translate 定位 */
-#special-cat.flipX {
-  transform: translate(-50%, -50%) scaleX(-1);
-}
-/* 連續彈跳（移動中用） */
-#special-cat.bounce-loop {
-  /* 可改速度：對應 JS 會設 --bounceMs */
-  animation: cat-bounce var(--bounceMs, 180ms) ease-in-out infinite;
-}
+.special-bounce { animation: cat-bounce 250ms ease-out; }
+#special-cat.flipX { transform: translate(-50%, -50%) scaleX(-1); }
+#special-cat.bounce-loop { animation: cat-bounce var(--bounceMs, 180ms) ease-in-out infinite; }
 
-
-/* ★ 彈跳：用 margin-top 動畫，避免和 transform/翻轉衝突 */
 @keyframes cat-bounce {
   0%   { margin-top: 0; }
-  50%  { margin-top: -14px; } /* ← 高度可改 */
+  50%  { margin-top: -14px; }
   100% { margin-top: 0; }
 }
 
+/* 免費抽視覺 */
+.gacha-btn.free-gacha{
+  outline: 2px solid #ffe082;
+  box-shadow: 0 0 18px #ffd54fdd, 0 0 36px #ffecb3aa inset;
+}
   </style>
 </head>
 <body class="dark-bg">
   <!-- 16:9 主要容器 -->
   <div class="container-16-9">
-    <!-- 左上：返回箭頭專用框（滿版黃色箭頭由外掛CSS畫） -->
     <div class="back" id="btnBack" style="position:absolute; left:2%; width:7%; height:16%;"></div>
 
     <!-- 抽卡結果容器 & 選池資訊 -->
@@ -413,10 +399,8 @@ const escapeHtml = s => (s||'').replace(/[&<>"']/g,c=>({ '&':'&amp;','<':'&lt;',
 
 /* ==============================
    DC Webhook（銀/金）
-   用：sendGachaWebhook(rarity, name, { mode: 'congrats'|'swap' })
 ============================== */
 async function sendGachaWebhook(rarity, itemName, { mode = 'congrats' } = {}) {
-  // 白球永遠不送
   if (rarity !== 'limited' && rarity !== 'hidden') return;
   try {
     const threadId = (window.CURRENT_POOL && window.CURRENT_POOL.threadId) || null;
@@ -430,7 +414,7 @@ async function sendGachaWebhook(rarity, itemName, { mode = 'congrats' } = {}) {
         playerName: PLAYER_NAME || '玩家',
         itemName,
         threadId,
-        mode // Edge 端用 mode 決定文案
+        mode
       })
     });
     if (!resp.ok) console.warn('[gacha-notify] status=', resp.status, await resp.text().catch(()=>'(no body)'));
@@ -466,9 +450,9 @@ const G = (t) => sb.schema('gacha').from(t);
 
 /* ✅ 角色名稱/圖片索引（背包顯示名字用） */
 const CHAR = {
-  normal:  new Map(),                          // id -> { name, image_url }
-  hidden:  new Map(),                          // id -> { name, image_url }
-  limited: new Map()                           // `${event_name}|${id}` -> { name, image_url }
+  normal:  new Map(),
+  hidden:  new Map(),
+  limited: new Map()
 };
 
 /* ==============================
@@ -485,8 +469,6 @@ const infoTitle          = $('#info-modal-title');
 const infoBody           = $('#info-modal-body');
 const drawCounterEl      = $('#draw-count');
 const orientationModal   = $('#orientation-modal');
-
-
 
 /* ==============================
    自動字級（套 auto-resize）
@@ -550,7 +532,7 @@ function lockButtons()  { [btnSingle, btnTen, btnBag].forEach(b => b && (b.disab
 function unlockButtons(){ [btnSingle, btnTen, btnBag].forEach(b => b && (b.disabled = false, b._forceDisabled = false)); }
 
 /* ==============================
-   Edge 單抽（只走 Edge）
+   Edge 單抽（保留你的原本流程，不加自訂參數）
 ============================== */
 async function drawOnce(){
   const currentPoolKey = (window.CURRENT_POOL && window.CURRENT_POOL.key) ? window.CURRENT_POOL.key : DEFAULT_EVENT;
@@ -565,7 +547,7 @@ async function drawOnce(){
     alert(out?.message || out?.error || '抽卡失敗'); 
     return null;
   }
-  return out; // { rarity, name, character_id, event_name, image_url?, special_anim?, is_11x? }
+  return out;
 }
 
 async function drawTenTimes(){
@@ -630,16 +612,91 @@ async function ensureCounter(){
 }
 async function getCounter(){
   const { data } = await G('counters')
-    .select('total_draws,next_pity,max_draws')
+    .select('total_draws,next_pity,max_draws,free_used_today,free_reset_at')
     .eq('player_id', user?.id).single();
-  return data || { total_draws: 0, next_pity: 50, max_draws: 0 };
+  return data || { total_draws: 0, next_pity: 50, max_draws: 0, free_used_today: 0, free_reset_at: null };
 }
-async function refreshUIFromCounter(){
+
+/* ==============================
+   每日免費抽：台北中午12點(UTC+8) 重置相關
+============================== */
+function taipeiNoonBoundaryUTC(now = new Date()) {
+  // 台北中午=UTC+8 → UTC 04:00
+  const b = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 4, 0, 0, 0));
+  if (now < b) b.setUTCDate(b.getUTCDate() - 1);
+  return b;
+}
+async function ensureFreeReset(){
   const c = await getCounter();
-  const remain = Math.max(0, (c?.max_draws||0) - (c?.total_draws||0));
+  if (!c) return;
+  const boundary = taipeiNoonBoundaryUTC();
+  const resetAt = c.free_reset_at ? new Date(c.free_reset_at) : new Date(0);
+  if (resetAt < boundary) {
+    await G('counters')
+      .update({ free_used_today: 0, free_reset_at: boundary.toISOString() })
+      .eq('player_id', user?.id);
+  }
+}
+function isFreeEligibleCounter(c){
+  const currentKey = (window.CURRENT_POOL && window.CURRENT_POOL.key) ? window.CURRENT_POOL.key : DEFAULT_EVENT;
+  const isDefaultPool = currentKey === DEFAULT_EVENT;
+  const used = Number(c?.free_used_today || 0);
+  return isDefaultPool && used < 3;
+}
+async function grantOneFreeDraw(){
+  await ensureFreeReset();
+  const c = await getCounter();
+  if (!isFreeEligibleCounter(c)) throw new Error('今天免費抽額度已用完或不在常駐池');
+  const boundary = taipeiNoonBoundaryUTC();
+  const up = await G('counters')
+    .update({
+      max_draws: (Number(c?.max_draws||0) + 1),
+      free_used_today: (Number(c?.free_used_today||0) + 1),
+      free_reset_at: boundary.toISOString()
+    })
+    .eq('player_id', user?.id)
+    .select()
+    .single();
+  if (up.error) throw up.error;
+  return up.data;
+}
+
+/* ==============================
+   刷新 UI（包含免費抽按鈕）
+============================== */
+async function refreshUIFromCounter(){
+  await ensureFreeReset();
+
+  const c = await getCounter();
+
+  // 剩餘抽數（顯示）
+  const remain = Math.max(0, (c?.max_draws || 0) - (c?.total_draws || 0));
   if (drawCounterEl) drawCounterEl.textContent = remain;
-  if (btnTen)    btnTen.disabled    = remain < 10 || btnTen._forceDisabled === true || isPortrait();
-  if (btnSingle) btnSingle.disabled = remain <  1 || btnSingle._forceDisabled === true || isPortrait();
+
+  // 免費資格（常駐池 & 當日 < 3 次）
+  const freeEligible = isFreeEligibleCounter(c);
+
+  // 十連：照舊（需要剩餘 >= 10 才能按）
+  if (btnTen) {
+    btnTen.disabled = (remain < 10) || btnTen._forceDisabled === true || isPortrait();
+  }
+
+  // 單抽：有免費資格時即使 remain=0 也允許按，並顯示「免費抽」
+  if (btnSingle) {
+    const allowBecauseFree = freeEligible;
+    btnSingle.disabled = (!allowBecauseFree && (remain < 1)) || btnSingle._forceDisabled === true || isPortrait();
+
+    if (freeEligible) {
+      btnSingle.textContent = '免費抽';
+      btnSingle.classList.add('free-gacha');
+    } else {
+      btnSingle.textContent = '單抽';
+      btnSingle.classList.remove('free-gacha');
+    }
+  }
+
+  // 記住狀態給 click handler 用（不改單抽函式本體）
+  window.__FREE_ELIGIBLE__ = freeEligible;
 }
 
 /* ==============================
@@ -681,26 +738,25 @@ function softResetToIdle(){
   unlockAt = 0;
   unlockButtons();
   setBackDisabled(false);
+  gachaBtns?.classList.remove('bottom'); // 跑條後恢復按鈕
   resizeAllTexts();
 }
 
 /* ==============================
    特效邏輯（銀→金→翻牌）
 ============================== */
-
 const specialMask = document.getElementById('special-mask');
 const specialCat  = document.getElementById('special-cat');
 
-/* ★ 你的速度參數（已套用） */
 const SPECIAL = {
-  preDarkDelayMs: 800,  // ★ 新增：先等 1 秒再變暗
-  darkWaitMs:      2000,  // 暗場(全黑) 2s
-  axisMoveTotalMs: 3000,  // 四段總移動時間（將均分成 4 份）
-  moveBounceMs:     180,  // 連續彈跳節奏（移動期間用；和 CSS 無限動畫一致）
-  hopDelayMs:       200,  // 每段「…0.5秒後…」→ 你改成 0.2s
-  hopDurMs:         250,  // 單次彈跳時間
-  exitMs:           220,  // 高速離場時間
-  targetOffset:    0.78,  // 球內落點（越大越靠右下）
+  preDarkDelayMs: 800,
+  darkWaitMs:      2000,
+  axisMoveTotalMs: 3000,
+  moveBounceMs:     180,
+  hopDelayMs:       200,
+  hopDurMs:         250,
+  exitMs:           220,
+  targetOffset:    0.78,
   timingFn: 'cubic-bezier(.22,.61,.36,1)'
 };
 
@@ -709,29 +765,23 @@ function setCatTransition(ms){
   specialCat.style.transitionDuration = `${ms}ms`;
   specialCat.style.transitionTimingFunction = SPECIAL.timingFn;
 }
-
 function viewportTargets(orbEl){
   const r = orbEl.getBoundingClientRect();
   const t = SPECIAL.targetOffset;
-  const rb = { x: r.left + r.width * t,     y: r.top  + r.height * t };     // 右下
-  const lb = { x: r.left + r.width * (1-t), y: rb.y };                      // 左下（同 y）
+  const rb = { x: r.left + r.width * t,     y: r.top  + r.height * t };
+  const lb = { x: r.left + r.width * (1-t), y: rb.y };
   return { rb, lb };
 }
-
 function randomEdgeStart(){
   const w = window.innerWidth, h = window.innerHeight;
   const side = Math.floor(Math.random()*4);
-  if (side === 0) return { x: -50,  y: Math.random()*h }; // 左外
-  if (side === 1) return { x: w+50, y: Math.random()*h }; // 右外
-  if (side === 2) return { x: Math.random()*w, y: -50  }; // 上外
-  return { x: Math.random()*w, y: h+50 };                  // 下外
+  if (side === 0) return { x: -50,  y: Math.random()*h };
+  if (side === 1) return { x: w+50, y: Math.random()*h };
+  if (side === 2) return { x: Math.random()*w, y: -50  };
+  return { x: Math.random()*w, y: h+50 };
 }
-
-/* 單軸移動 */
 async function moveHoriz(toX, dur){ setCatTransition(dur); specialCat.style.left = `${toX}px`; await sleep(dur); }
 async function moveVert (toY, dur){ setCatTransition(dur); specialCat.style.top  = `${toY}px`; await sleep(dur); }
-
-/* 停在原地的「n 次彈跳」 */
 async function bounce(times=1, dur=SPECIAL.hopDurMs){
   return new Promise(resolve=>{
     specialCat.style.animation = `cat-bounce ${dur}ms ease-out ${times}`;
@@ -739,8 +789,6 @@ async function bounce(times=1, dur=SPECIAL.hopDurMs){
     specialCat.addEventListener('animationend', onEnd);
   });
 }
-
-/* 連續彈跳（移動時） */
 function startLoopBounce(ms=SPECIAL.moveBounceMs){
   specialCat.classList.add('bounce-loop');
   specialCat.style.setProperty('--bounceMs', `${ms}ms`);
@@ -749,94 +797,62 @@ function stopLoopBounce(){
   specialCat.classList.remove('bounce-loop');
   specialCat.style.removeProperty('--bounceMs');
 }
-
-/* 左右翻轉 */
 function setFlip(on){ specialCat.classList.toggle('flipX', !!on); }
 
-/* 依你新版時序：
-   暗場→ 出現
-   → 四段移動到右下（垂直→水平→垂直→水平；全程連續彈跳）
-   → +0.5s 跳1
-   → +0.5s 翻轉 + 移到左下 → 跳1
-   → +0.5s 跳1 → 翻回 + 移回右下 → 跳1
-   → +0.5s 跳2
-   → +0.5s 跳2 並 白→銀
-   → +0.5s 翻轉 + 左下 → 跳1
-   → +0.5s 跳1 → 翻回 + 右下 → 跳1
-   → +0.5s 跳3 並 銀→金
-   → +0.5s 跳3 並 金→打開（revealFn）
-   → +0.5s 跳3 → 高速離場
-   （注意：你把 0.5s 改成 hopDelayMs=200ms，我就照 0.2s 跑）
-*/
 async function runSpecialUpgradeAnimation(targetOrb, revealFn){
   if (!targetOrb) { revealFn?.(); return; }
-
-  // 小工具：根據水平移動方向設定翻轉（toX < fromX => 往左 => flip）
   const faceForMove = (fromX, toX) => setFlip(toX < fromX);
 
-  // 進場前先等
   await sleep(SPECIAL.preDarkDelayMs);
 
-  // 顯示遮罩 + 起始位置（起始朝右）
   specialMask.style.display = 'block';
   specialCat.style.opacity = '0';
   const start = randomEdgeStart();
   specialCat.style.left = `${start.x}px`;
   specialCat.style.top  = `${start.y}px`;
-  setFlip(false); // ★ 起始朝右
+  setFlip(false);
 
-  // 暗場
   await sleep(SPECIAL.darkWaitMs);
   specialCat.style.opacity = '1';
 
-// === 六段直線移動：垂直1/3 → 水平1/3 → 垂直2/3 → 水平2/3 → 垂直到目標 → 水平成目標 ===
-const { rb, lb } = viewportTargets(targetOrb);
-const q = Math.max(0, Math.floor(SPECIAL.axisMoveTotalMs / 6));
+  const { rb, lb } = viewportTargets(targetOrb);
+  const q = Math.max(0, Math.floor(SPECIAL.axisMoveTotalMs / 6));
 
-const dyThird = (rb.y - start.y) / 3;
-const dxThird = (rb.x - start.x) / 3;
+  const dyThird = (rb.y - start.y) / 3;
+  const dxThird = (rb.x - start.x) / 3;
 
-const y1_3 = start.y + dyThird;
-const y2_3 = start.y + dyThird * 2;
-const x1_3 = start.x + dxThird;
-const x2_3 = start.x + dxThird * 2;
+  const y1_3 = start.y + dyThird;
+  const y2_3 = start.y + dyThird * 2;
+  const x1_3 = start.x + dxThird;
+  const x2_3 = start.x + dxThird * 2;
 
-// 追蹤目前位置（給翻頭用）
-let curX = start.x, curY = start.y;
+  let curX = start.x, curY = start.y;
 
-// 1) 垂直到 1/3 Y（不彈）
-stopLoopBounce();
-await moveVert(y1_3, q); curY = y1_3;
+  stopLoopBounce();
+  await moveVert(y1_3, q); curY = y1_3;
 
-// 2) 水平到 1/3 X（彈，並依方向翻頭）
-faceForMove(curX, x1_3);
-startLoopBounce();
-await moveHoriz(x1_3, q); curX = x1_3;
-stopLoopBounce();
+  faceForMove(curX, x1_3);
+  startLoopBounce();
+  await moveHoriz(x1_3, q); curX = x1_3;
+  stopLoopBounce();
 
-// 3) 垂直到 2/3 Y（不彈）
-await moveVert(y2_3, q); curY = y2_3;
+  await moveVert(y2_3, q); curY = y2_3;
 
-// 4) 水平到 2/3 X（彈，並依方向翻頭）
-faceForMove(curX, x2_3);
-startLoopBounce();
-await moveHoriz(x2_3, q); curX = x2_3;
-stopLoopBounce();
+  faceForMove(curX, x2_3);
+  startLoopBounce();
+  await moveHoriz(x2_3, q); curX = x2_3;
+  stopLoopBounce();
 
-// 5) 垂直到目標 Y（不彈）
-await moveVert(rb.y, q); curY = rb.y;
+  await moveVert(rb.y, q); curY = rb.y;
 
-// 6) 水平成目標 X（彈，並依方向翻頭）
-faceForMove(curX, rb.x);
-startLoopBounce();
-await moveHoriz(rb.x, q); curX = rb.x;
-stopLoopBounce();
+  faceForMove(curX, rb.x);
+  startLoopBounce();
+  await moveHoriz(rb.x, q); curX = rb.x;
+  stopLoopBounce();
 
-  // === 後續固定節奏 ===
   await sleep(SPECIAL.hopDelayMs);  await bounce(1);
 
   await sleep(SPECIAL.hopDelayMs);
-  // 往左到左下：彈、翻頭→左
   faceForMove(curX, lb.x);
   startLoopBounce();
   await moveHoriz(lb.x, SPECIAL.hopDurMs); curX = lb.x;
@@ -845,7 +861,6 @@ stopLoopBounce();
 
   await sleep(SPECIAL.hopDelayMs);
   await bounce(1);
-  // 往右回右下：彈、翻頭→右
   faceForMove(curX, rb.x);
   startLoopBounce();
   await moveHoriz(rb.x, SPECIAL.hopDurMs); curX = rb.x;
@@ -855,12 +870,10 @@ stopLoopBounce();
   await sleep(SPECIAL.hopDelayMs);  await bounce(2);
 
   await sleep(SPECIAL.hopDelayMs);  await bounce(2);
-  // 白 → 銀
   targetOrb.classList.remove('orb-normal');
   targetOrb.classList.add('orb-hidden');
 
   await sleep(SPECIAL.hopDelayMs);
-  // 左下：彈、翻頭→左
   faceForMove(curX, lb.x);
   startLoopBounce();
   await moveHoriz(lb.x, SPECIAL.hopDurMs); curX = lb.x;
@@ -869,7 +882,6 @@ stopLoopBounce();
 
   await sleep(SPECIAL.hopDelayMs);
   await bounce(1);
-  // 右下：彈、翻頭→右
   faceForMove(curX, rb.x);
   startLoopBounce();
   await moveHoriz(rb.x, SPECIAL.hopDurMs); curX = rb.x;
@@ -877,18 +889,15 @@ stopLoopBounce();
   await bounce(1);
 
   await sleep(SPECIAL.hopDelayMs);  await bounce(3);
-  // 銀 → 金
   targetOrb.classList.remove('orb-hidden');
   targetOrb.classList.add('orb-limited');
 
   await sleep(SPECIAL.hopDelayMs);  await bounce(3);
-  // 金 → 打開（顯示圖與名字；不送恭喜）
   revealFn?.();
 
-
- await sleep(SPECIAL.hopDelayMs);
-  faceForMove(curX, lb.x);        // 往左 → flip
-  startLoopBounce();              // 水平移動時保持彈跳
+  await sleep(SPECIAL.hopDelayMs);
+  faceForMove(curX, lb.x);
+  startLoopBounce();
   await moveHoriz(lb.x, SPECIAL.hopDurMs);
   curX = lb.x;
   stopLoopBounce();
@@ -896,20 +905,17 @@ stopLoopBounce();
 
   await sleep(SPECIAL.hopDelayMs);  await bounce(3);
 
-  // 高速離場（保持當前朝向即可）
   const end = randomEdgeStart();
   setCatTransition(SPECIAL.exitMs);
   specialCat.style.left = `${end.x}px`;
   specialCat.style.top  = `${end.y}px`;
   await sleep(SPECIAL.exitMs);
 
-  // 收尾
   specialMask.style.display = 'none';
 }
 
-
 /* ==============================
-   UI：建立球 / 翻牌（球內放圖、可遮名）
+   UI：建立球 / 翻牌
 ============================== */
 function createOrb(res, { autoReveal=false, revealDelay=0, big=false, forceInitialNormal=false } = {}){
   const orb = document.createElement('div');
@@ -918,20 +924,17 @@ function createOrb(res, { autoReveal=false, revealDelay=0, big=false, forceIniti
   const inner = document.createElement('div');
   inner.className = 'orb-inner';
 
-  // ✅ 先把圖片放進去（隱形，但會開始下載）
   if (res.image_url) {
     const img = document.createElement('img');
     img.src = res.image_url;
     img.alt = res.name;
     img.className = 'orb-icon';
-    // 提示瀏覽器優先載入
     img.setAttribute('loading', 'eager');
     img.setAttribute('decoding', 'async');
     img.setAttribute('fetchpriority', 'high');
     inner.appendChild(img);
   }
 
-  // 翻牌才補名字＋顯示（不要清 inner，否則會把預載圖移除）
   const doRevealContent = () => {
     if (!inner.querySelector('.orb-name')) {
       const nameEl = document.createElement('span');
@@ -939,12 +942,11 @@ function createOrb(res, { autoReveal=false, revealDelay=0, big=false, forceIniti
       nameEl.textContent = res.name;
       inner.appendChild(nameEl);
     }
-    orb.classList.add('revealed');  // 觸發 CSS：讓圖從 opacity:0 → 1
+    orb.classList.add('revealed');
     resizeAllTexts();
     checkAllRevealed();
   };
 
-  // 只在「玩家手動 + 銀/金」時送恭喜
   const reveal = (isManual=false) => {
     if (orb.classList.contains('revealed')) return;
     doRevealContent();
@@ -957,9 +959,8 @@ function createOrb(res, { autoReveal=false, revealDelay=0, big=false, forceIniti
   else orb.addEventListener('click', () => reveal(true));
 
   orb.appendChild(inner);
-  return { el: orb, reveal, rawReveal: doRevealContent }; // rawReveal：給特效用，不送恭喜
+  return { el: orb, reveal, rawReveal: doRevealContent };
 }
-
 
 function checkAllRevealed(){
   const orbs = $$('.gacha-orb', resultsContainer);
@@ -970,7 +971,8 @@ function checkAllRevealed(){
     setTimeout(()=>{
       canDraw = true;
       unlockButtons();
-      setBackDisabled(false); // 全部翻完才解鎖返回
+      setBackDisabled(false);
+      gachaBtns?.classList.remove('bottom'); // 全部翻完 → 顯示按鈕
     }, 500);
   }
 }
@@ -994,7 +996,6 @@ function showResultsTen(results){
     results.slice(row*5, row*5+5).forEach((res, idx)=>{
       const index = row*5 + idx;
       const isSpecialTarget = (index === spIndex);
-      // 有特效時，白球延後；無特效時白球照舊自動翻
       const auto = (!hasSpecial && res.rarity === 'normal');
       const { el, reveal, rawReveal } = createOrb(res, {
         autoReveal: auto,
@@ -1012,17 +1013,13 @@ function showResultsTen(results){
 
   if (hasSpecial) {
     const target = allOrbs.find(o => o.index === spIndex);
-    // 特效內翻開「目標金蛋」（不送恭喜）
     runSpecialUpgradeAnimation(target?.el, () => target?.rawReveal()).then(async ()=>{
-      // 🎯 特效剛結束：先送「偷偷調包」
       try { await sendGachaWebhook(target.res.rarity, target.res.name, { mode: 'swap' }); } catch(e){}
-
-      // 然後只自動翻「白球」，銀/金留給玩家手動點
       for (const o of allOrbs){
-        if (o.index === spIndex) continue; // 特效那顆已翻
+        if (o.index === spIndex) continue;
         if (o.res.rarity === 'normal' && !o.el.classList.contains('revealed')) {
-          await sleep(120); // ★ 可微調：補翻間隔
-          o.reveal(false);  // 非手動 → 不送恭喜
+          await sleep(120);
+          o.reveal(false);
         }
       }
     });
@@ -1038,7 +1035,7 @@ function showResultSingle(res){
 
   const needSpecial = !!res.special_anim;
   const { el: orb, reveal, rawReveal } = createOrb(res, {
-    autoReveal: !needSpecial && res.rarity==='normal',  // 白球無特效直接自動翻
+    autoReveal: !needSpecial && res.rarity==='normal',
     revealDelay: 0,
     big: true,
     forceInitialNormal: needSpecial
@@ -1052,16 +1049,12 @@ function showResultSingle(res){
   resizeAllTexts();
 
   if (needSpecial) {
-    // 特效內翻牌（不送恭喜）
     runSpecialUpgradeAnimation(orb, () => rawReveal()).then(async () => {
-      // 🎯 特效結束後送「偷偷調包」
       try { await sendGachaWebhook(res.rarity, res.name, { mode: 'swap' }); } catch(e){}
-      // 單抽沒有其他白球要補翻；恭喜也不送（因為不是玩家點開）
     });
   } else if (res.rarity === 'normal') {
-    // 白球：自動翻後直接解鎖
     unlockAt = Date.now() + 500;
-    setTimeout(()=>{ canDraw = true; unlockButtons(); setBackDisabled(false); }, 500);
+    setTimeout(()=>{ canDraw = true; unlockButtons(); setBackDisabled(false); gachaBtns?.classList.remove('bottom'); }, 500);
   }
 }
 
@@ -1075,9 +1068,7 @@ function nameFromPools(rarity, character_id, event_name){
   if (rarity === 'hidden') {
     return CHAR.hidden.get(character_id)?.name || `#${character_id}`;
   }
-  // limited
-  return CHAR.limited.get(`${event_name}|${character_id}`)?.name
-      || `#${character_id}`;
+  return CHAR.limited.get(`${event_name}|${character_id}`)?.name || `#${character_id}`;
 }
 
 async function openBackpack(){
@@ -1101,7 +1092,7 @@ async function openBackpack(){
   }
   const merged = [...byKey.values()];
 
-  const limitedGroups = new Map(); // event_name -> [{id, html}]
+  const limitedGroups = new Map();
   const hiddenList = [];
   const normalList = [];
 
@@ -1158,15 +1149,16 @@ function bindUI(){
   btnBag?.addEventListener('click', openBackpack);
 
   btnBack?.addEventListener('click', ()=>{
-    if (btnBack?.dataset.disabled === '1') return; // 被禁用直接無視
+    if (btnBack?.dataset.disabled === '1') return;
     const hasResults = $$('.gacha-orb', resultsContainer).length > 0;
     if (hasResults) {
-      softResetToIdle(); // 不換頁
+      softResetToIdle();
     } else {
       location.href = REDIRECT_PLAYER;
     }
   });
 
+  // ★ 單抽：有免費額度時，按鈕先 +1（max_draws）和 free_used_today，再跑原本單抽流程
   btnSingle?.addEventListener('click', async ()=>{
     if (!ensureAuthOrRedirect()) return;
     if (isPortrait()) return;
@@ -1179,20 +1171,35 @@ function bindUI(){
     clearResults();
     Loader.show('Roro爆肝中……');
 
-    const r = await drawOnce();
-    if (!r) {
+    try {
+      if (window.__FREE_ELIGIBLE__ === true) {
+        await grantOneFreeDraw();
+      }
+
+      const r = await drawOnce(); // 不改你的抽卡流程
+      if (!r) {
+        Loader.hide();
+        await refreshUIFromCounter();
+        unlockButtons();
+        setBackDisabled(false);
+        gachaBtns?.classList.remove('bottom');
+        return;
+      }
+
+      await Loader.step(1, 1);
+      Loader.hide();
+
+      await refreshUIFromCounter();
+      showResultSingle(r);
+    } catch (e) {
+      console.error('[free draw] error:', e);
+      alert(e?.message || '發生錯誤，請稍後重試');
       Loader.hide();
       await refreshUIFromCounter();
       unlockButtons();
       setBackDisabled(false);
-      return;
+      gachaBtns?.classList.remove('bottom');
     }
-
-    await Loader.step(1, 1);
-    Loader.hide();
-
-    await refreshUIFromCounter();
-    showResultSingle(r);
   });
 
   btnTen?.addEventListener('click', async ()=>{
@@ -1212,7 +1219,7 @@ function bindUI(){
 
     const results = [];
     for (let i = 0; i < 10; i++) {
-      const r = await drawOnce();
+      const r = await drawOnce(); // 十連不吃免費，照舊跑
       if (!r) break;
       results.push(r);
       await Loader.step(i + 1, 10);
@@ -1220,7 +1227,12 @@ function bindUI(){
 
     Loader.hide();
 
-    if (!results.length) { unlockButtons(); setBackDisabled(false); return; }
+    if (!results.length) {
+      unlockButtons();
+      setBackDisabled(false);
+      gachaBtns?.classList.remove('bottom');
+      return;
+    }
 
     await refreshUIFromCounter();
     showResultsTen(results);
@@ -1230,7 +1242,6 @@ function bindUI(){
   obs.observe(resultsContainer, { childList:true, subtree:true });
 }
 </script>
-
 
   <!-- 登出腳本 -->
   <script src="https://shierusha.github.io/library/assets/js/logout.js"></script>
