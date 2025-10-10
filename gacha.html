@@ -339,9 +339,7 @@ body.dark-bg::before {
   outline: 2px solid #ffe082;
   box-shadow: 0 0 18px #ffd54fdd, 0 0 36px #ffecb3aa inset;
 }
-.gacha-btn.free-gacha:hover{
-  background: #ffd54fcc;
-}
+
 
 
   </style>
@@ -671,7 +669,7 @@ async function refreshUIFromCounter(){
 
     // 文字切換
     if (isDefaultPool && freeLeft > 0) {
-      btnSingle.textContent = `免費抽（剩${freeLeft}次）`;
+      btnSingle.textContent = `免費抽`;
       btnSingle.classList.add('free-gacha');
     } else {
       btnSingle.textContent = '單抽';
