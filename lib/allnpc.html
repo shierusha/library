@@ -246,8 +246,6 @@ h2 {
 
 <body>
   <div class="container" id="npc-list-root">
-    <h2>謝爾夏｜NPC資訊表</h2>
-    <div class="hr-blue"></div>
     <div class="msg" id="npc-message">資料載入中...</div>
   </div>
 
@@ -559,7 +557,7 @@ function renderNpcGroups(groups) {
   const root = document.getElementById('npc-list-root');
   const msg = document.getElementById('npc-message');
 
-  root.innerHTML = '<h2>謝爾夏｜NPC資訊表</h2><div class="hr-blue"></div>';
+  root.innerHTML = '';
 
   const categoryNames = Object.keys(groups).sort(compareCategoryName);
 
@@ -583,7 +581,7 @@ function renderNpcGroups(groups) {
     renderedCount += list.length;
 
     const h2 = document.createElement('h2');
-    h2.textContent = '謝爾夏｜' + category;
+    h2.textContent = category;
     root.appendChild(h2);
 
     const hr = document.createElement('div');
