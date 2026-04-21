@@ -9,7 +9,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <link href="https://fonts.googleapis.com/css?family=Noto+Sans+TC:400,700&display=swap" rel="stylesheet">
 
-  <style>
+ <style>
 body {
   font-family: 'Noto Sans TC', sans-serif;
   background: #f4f7fa;
@@ -117,8 +117,8 @@ h2 {
 }
 
 .card-left {
-  flex: 0 0 40%;
-  border-right: 1px solid rgba(220,220,220,0.45);
+  flex: 0 0 34%;
+  border-right: 1px solid rgb(0 0 0);
   padding-right: 1em;
 }
 
@@ -127,13 +127,16 @@ h2 {
   padding-left: 1em;
 }
 
-.card-left {
-  border-right: 1px solid rgb(220 220 220);
-  padding-right: 1em;
+.student-card .card-left {
+  border-right: 1px solid rgb(0 0 0);
 }
 
-.card-right {
-  padding-left: 1em;
+.student-card.card-null .card-left {
+  border-right: 1px solid rgb(0 0 0);
+}
+
+.student-card.card-b .card-left {
+  border-right: 1px solid rgb(220 220 220);
 }
 
 .avatar-frame {
@@ -250,8 +253,14 @@ h2 {
     padding: 0;
     border: none;
   }
+
+  .student-card .card-left,
+  .student-card.card-null .card-left,
+  .student-card.card-b .card-left {
+    border-right: none;
+  }
 }
-  </style>
+</style>
 </head>
 
 <body>
