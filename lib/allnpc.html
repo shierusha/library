@@ -270,10 +270,21 @@ h2 {
   <script>
 const client = window.supabase.createClient(
   'https://wfhwhvodgikpducrhgda.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmaHdodm9kZ2lrcGR1Y3JoZ2RhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgwMTAwNjEsImV4cCI6MjA2MzU4NjA2MX0.P6P-x4SxjiR4VdWH6VFgY_ktgMac_OzuI4Bl7HWskz8'
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXJhYmFzZSIsInJlZiI6IndmaHdodm9kZ2lrcGR1Y3JoZ2RhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgwMTAwNjEsImV4cCI6MjA2MzU4NjA2MX0.P6P-x4SxjiR4VdWH6VFgY_ktgMac_OzuI4Bl7HWskz8'
 );
 
-const HIDDEN_NPC_CATEGORIES = ['內部測試', '喵喵喵'];
+const BASE_HIDDEN_NPC_CATEGORIES = ['內部測試'];
+
+const HIDDEN_CATEGORY_SOURCE_PLAYER_IDS = [
+  '8aea3076-294c-41f6-bb38-0a99da77c098'
+];
+
+const PLAYID_PLAYER_MAP = {
+  '0513': '8aea3076-294c-41f6-bb38-0a99da77c098'
+};
+
+let dynamicHiddenNpcCategorySet = new Set(BASE_HIDDEN_NPC_CATEGORIES);
+
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, char => ({
     '&': '&amp;',
@@ -288,13 +299,70 @@ function normalizeNpcCategoryValue(value) {
   return String(value ?? '').trim();
 }
 
+function getNpcCategoryTextFromValue(value) {
+  const category = normalizeNpcCategoryValue(value);
+  return category || '未分類';
+}
+
+function rebuildDynamicHiddenNpcCategoriesFromRows(rows) {
+  dynamicHiddenNpcCategorySet = new Set(BASE_HIDDEN_NPC_CATEGORIES);
+
+  const safeRows = Array.isArray(rows) ? rows : [];
+
+  safeRows.forEach(npc => {
+    if (!npc || !HIDDEN_CATEGORY_SOURCE_PLAYER_IDS.includes(npc.player_id)) {
+      return;
+    }
+
+    const rawCategory = normalizeNpcCategoryValue(npc.npc_category);
+
+    if (rawCategory) {
+      dynamicHiddenNpcCategorySet.add(rawCategory);
+    }
+  });
+}
+
+async function loadDynamicHiddenNpcCategories() {
+  if (HIDDEN_CATEGORY_SOURCE_PLAYER_IDS.length === 0) {
+    dynamicHiddenNpcCategorySet = new Set(BASE_HIDDEN_NPC_CATEGORIES);
+    return;
+  }
+
+  const { data, error } = await client
+    .from('other_npcs')
+    .select('player_id,npc_category')
+    .in('player_id', HIDDEN_CATEGORY_SOURCE_PLAYER_IDS);
+
+  if (error) {
+    console.error('隱藏分類來源讀取失敗', error);
+    dynamicHiddenNpcCategorySet = new Set(BASE_HIDDEN_NPC_CATEGORIES);
+    return;
+  }
+
+  rebuildDynamicHiddenNpcCategoriesFromRows(data || []);
+}
+
 function isHiddenNpcCategory(value) {
   const category = normalizeNpcCategoryValue(value);
-  return HIDDEN_NPC_CATEGORIES.includes(category);
+  return dynamicHiddenNpcCategorySet.has(category);
 }
 
 function shouldIncludeHiddenNpcCategories(idcTitle) {
   return isHiddenNpcCategory(idcTitle);
+}
+
+function getPlayidPlayerId(playid) {
+  const code = String(playid || '').trim();
+  return PLAYID_PLAYER_MAP[code] || '';
+}
+
+function formatPostgrestTextInList(values) {
+  const safeValues = (Array.isArray(values) ? values : [])
+    .map(value => normalizeNpcCategoryValue(value))
+    .filter(Boolean)
+    .map(value => `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`);
+
+  return `(${safeValues.join(',')})`;
 }
 
 function chineseNumberToNumber(chineseText) {
@@ -437,25 +505,39 @@ function getAvatarFromUrl(url, callback) {
 }
 
 async function getAllNpcs(options = {}) {
-  const includeHiddenCategories = options.includeHiddenCategories === true;
+  const idcTitle = normalizeNpcCategoryValue(options.idcTitle || '');
+  const playidPlayerId = options.playidPlayerId || '';
 
-  const { data: npcs, error: npcError } = await client
+  await loadDynamicHiddenNpcCategories();
+
+  let query = client
     .from('other_npcs')
-    .select('othernpc_id,name,nickname,npc_category,alignment')
+    .select('othernpc_id,player_id,name,nickname,npc_category,alignment')
     .order('npc_category', { ascending: true });
+
+  if (playidPlayerId) {
+    query = query.eq('player_id', playidPlayerId);
+
+    if (idcTitle) {
+      query = query.eq('npc_category', idcTitle);
+    }
+  } else if (idcTitle) {
+    query = query.eq('npc_category', idcTitle);
+  } else {
+    const hiddenCategories = Array.from(dynamicHiddenNpcCategorySet).filter(Boolean);
+
+    if (hiddenCategories.length > 0) {
+      query = query.not('npc_category', 'in', formatPostgrestTextInList(hiddenCategories));
+    }
+  }
+
+  const { data: npcs, error: npcError } = await query;
 
   if (npcError) {
     throw npcError;
   }
 
-  const npcList = (Array.isArray(npcs) ? npcs : []).filter(npc => {
-    if (includeHiddenCategories) {
-      return true;
-    }
-
-    return !isHiddenNpcCategory(npc.npc_category);
-  });
-
+  const npcList = Array.isArray(npcs) ? npcs : [];
   const npcIds = npcList.map(npc => npc.othernpc_id).filter(Boolean);
 
   let imageMap = {};
@@ -482,16 +564,11 @@ async function getAllNpcs(options = {}) {
   }));
 }
 
-function groupNpcs(npcs, options = {}) {
-  const includeHiddenCategories = options.includeHiddenCategories === true;
+function groupNpcs(npcs) {
   const groups = {};
 
   npcs.forEach(npc => {
     const category = getNpcCategory(npc);
-
-    if (!includeHiddenCategories && isHiddenNpcCategory(category)) {
-      return;
-    }
 
     if (!groups[category]) {
       groups[category] = [];
@@ -649,12 +726,7 @@ function renderNpcGroups(groups) {
   if (renderedCount === 0) {
     const empty = document.createElement('div');
     empty.className = 'msg';
-
-    const idcTitle = getQueryParam('idc');
-    empty.textContent = idcTitle
-      ? `roro罷工了`
-      : 'roro罷工了';
-
+    empty.textContent = 'roro罷工了';
     root.appendChild(empty);
   }
 
@@ -668,10 +740,15 @@ async function initNpcListPage() {
 
   try {
     const idcTitle = getQueryParam('idc');
-    const includeHiddenCategories = shouldIncludeHiddenNpcCategories(idcTitle);
-    const npcs = await getAllNpcs({ includeHiddenCategories });
-    const groups = groupNpcs(npcs, { includeHiddenCategories });
-    const filteredGroups = filterGroupsByIdc(groups, idcTitle);
+    const playid = getQueryParam('playid');
+    const playidPlayerId = getPlayidPlayerId(playid);
+    const npcs = await getAllNpcs({
+      idcTitle,
+      playidPlayerId
+    });
+
+    const groups = groupNpcs(npcs);
+    const filteredGroups = playidPlayerId ? groups : filterGroupsByIdc(groups, idcTitle);
 
     renderNpcGroups(filteredGroups);
   } catch (error) {
