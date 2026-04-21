@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <title>0513 | 孩子名冊</title>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="孩子名冊">
+  
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css?family=Noto+Sans+TC:400,700&display=swap" rel="stylesheet">
+
+ <style>
+body {
+  font-family: 'Noto Sans TC', sans-serif;
+  background: #f4f7fa;
+  margin: 0;
+  padding: 2rem;
+  background: url(https://shierusha.github.io/create-student/imgs/citybg.png) center center no-repeat;
+  background-size: cover;
+  min-height: 100vh;
+}
+
+.container {
+  max-width: 950px;
+  margin: auto;
+  background: white;
+  padding: 2rem;
+  border-radius: 1.3rem;
+  box-shadow: 0 2px 16px #0001;
+}
+
+h2 {
+  color: #143158;
+  text-align: center;
+  margin-bottom: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.hr-blue {
+  width: 80%;
+  height: 4px;
+  background: #1767a0;
+  margin: 0 auto 2em auto;
+  border-radius: 2px;
+  opacity: 0.88;
+}
+
+.msg {
+  min-height: 1.5em;
+  margin-bottom: 0.8em;
+  color: #143158;
+  text-align: center;
+  font-weight: 700;
+}
+
+.student-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2.3rem 1.3rem;
+  margin-top: 1.5em;
+  margin-bottom: 4.5em;
+}
+
+.student-card {
+  border-radius: 1.1em;
+  padding: 1.5em 1.3em 1.2em 1.3em;
+  box-shadow: 0 2px 10px #0002, 0 0 0 2.5px rgba(33, 41, 55, 0.5);
+  transition: box-shadow .18s;
+  background: #eef4f5;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  max-width: 400px;
+  width: 80%;
+  margin: 0 auto;
+  min-width: 310px;
+}
+
+.card-b {
+  background: #212937;
+  box-shadow: 0 2px 10px #0002;
+}
+
+.card-null {
+  background: #b5bebf;
+}
+
+.card-b .student-name {
+  color: #fff;
+}
+
+.card-b .student-code {
+  color: #dceef2;
+}
+
+.card-null .student-name {
+  color: #143158;
+}
+
+.card-null .student-code {
+  color: #143158;
+}
+
+.card-row {
+  display: flex;
+  width: 100%;
+  height: 100%;
+}
+
+.card-left,
+.card-right {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.card-left {
+  flex: 0 0 32%;
+  border-right: 1px solid rgb(0 0 0);
+  padding-right: 1em;
+}
+
+.card-right {
+  flex: 1 1 auto;
+  padding-left: 1em;
+}
+
+.student-card .card-left {
+  border-right: 4px solid rgb(38 64 91 / 50%);
+}
+
+.student-card.card-null .card-left {
+  border-right: 4px solid rgb(0 0 0 / 45%);
+}
+
+.student-card.card-b .card-left {
+ border-right: 4px solid rgb(220 220 220 / 45%);
+}
+
+.avatar-frame {
+  width: 110px;
+  height: 110px;
+  border-radius: 1em;
+  overflow: hidden;
+  background: #e7e8f3;
+  margin-bottom: 1em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.avatar-img {
+  width: 110px;
+  height: 110px;
+  object-fit: cover;
+  background: #e2e2e2;
+}
+
+.student-info {
+  width: 100%;
+}
+
+.student-name {
+  font-size: 1.15em;
+  font-weight: bold;
+  min-height: 2.7em;
+  line-height: 1.2em;
+  word-break: break-all;
+  letter-spacing: .04em;
+  text-align: center;
+  color: #143158;
+}
+
+.student-code {
+  font-size: 0.8em;
+  font-weight: 600;
+  color: #143158;
+  min-height: 2em;
+  word-break: break-all;
+  text-align: center;
+}
+
+.card-btn-group {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55em;
+}
+
+.card-btn-group .btn {
+  min-width: 90px;
+  width: 100%;
+  max-width: 220px;
+  margin: 0.18em 0;
+}
+
+.btn {
+  background: #1767a0;
+  color: #fff;
+  border: none;
+  border-radius: 0.5em;
+  padding: 0.3em 0.8em;
+  font-weight: 600;
+  cursor: pointer;
+  margin-right: 0.2em;
+  transition: background .15s;
+}
+
+.btn-link {
+  background: #346689;
+}
+
+.btn-link:hover {
+  background: #08304d;
+}
+
+.btn:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 900px) {
+  .container {
+    padding: 1em;
+  }
+
+  .student-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .student-list {
+    grid-template-columns: 1fr;
+  }
+
+  .student-card {
+    padding: 1.2em 0.7em 1em 0.7em;
+    max-width: 200px;
+    margin: 0 auto;
+    min-width: 100px;
+  }
+
+  .card-row {
+    flex-direction: column;
+  }
+
+  .card-left,
+  .card-right {
+    padding: 0;
+    border: none;
+  }
+
+  .student-card .card-left,
+  .student-card.card-null .card-left,
+  .student-card.card-b .card-left {
+    border-right: none;
+  }
+}
+</style>
+</head>
+
+<body>
+  <div class="container" id="npc-list-root">
+    <div class="msg" id="npc-message">公務貓員處理中...</div>
+  </div>
+
+  <script>
+const client = window.supabase.createClient(
+  'https://wfhwhvodgikpducrhgda.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmaHdodm9kZ2lrcGR1Y3JoZ2RhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgwMTAwNjEsImV4cCI6MjA2MzU4NjA2MX0.P6P-x4SxjiR4VdWH6VFgY_ktgMac_OzuI4Bl7HWskz8'
+);
+
+const DEDICATED_PLAYER_ID = '8aea3076-294c-41f6-bb38-0a99da77c098';
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, char => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[char]));
+}
+
+function normalizeNpcCategoryValue(value) {
+  return String(value ?? '').trim();
+}
+
+function chineseNumberToNumber(chineseText) {
+  const text = String(chineseText ?? '').trim();
+
+  if (/^\d+$/.test(text)) {
+    return Number(text);
+  }
+
+  const digitMap = {
+    零: 0,
+    〇: 0,
+    一: 1,
+    二: 2,
+    兩: 2,
+    三: 3,
+    四: 4,
+    五: 5,
+    六: 6,
+    七: 7,
+    八: 8,
+    九: 9
+  };
+
+  const unitMap = {
+    十: 10,
+    百: 100,
+    千: 1000,
+    萬: 10000
+  };
+
+  let total = 0;
+  let section = 0;
+  let number = 0;
+
+  for (const char of text) {
+    if (Object.prototype.hasOwnProperty.call(digitMap, char)) {
+      number = digitMap[char];
+      continue;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(unitMap, char)) {
+      const unit = unitMap[char];
+
+      if (unit === 10000) {
+        section = (section + number) * unit;
+        total += section;
+        section = 0;
+        number = 0;
+      } else {
+        section += (number || 1) * unit;
+        number = 0;
+      }
+    }
+  }
+
+  return total + section + number;
+}
+
+function getNicknameLineNumber(text) {
+  const value = String(text ?? '');
+
+  const lineMatch = value.match(/第?([零〇一二兩三四五六七八九十百千萬\d]+)行/);
+  if (lineMatch) {
+    return chineseNumberToNumber(lineMatch[1]);
+  }
+
+  const noMatch = value.match(/([零〇一二兩三四五六七八九十百千萬\d]+)號/);
+  if (noMatch) {
+    return chineseNumberToNumber(noMatch[1]);
+  }
+
+  return Number.MAX_SAFE_INTEGER;
+}
+
+function compareNpcNickname(a, b) {
+  const aNickname = a.nickname || '';
+  const bNickname = b.nickname || '';
+
+  const aLine = getNicknameLineNumber(aNickname);
+  const bLine = getNicknameLineNumber(bNickname);
+
+  if (aLine !== bLine) {
+    return aLine - bLine;
+  }
+
+  return aNickname.localeCompare(bNickname, 'zh-Hant', {
+    numeric: true,
+    sensitivity: 'base'
+  });
+}
+
+function compareCategoryName(a, b) {
+  return String(a).localeCompare(String(b), 'zh-Hant', {
+    numeric: true,
+    sensitivity: 'base'
+  });
+}
+
+function getQueryParam(name) {
+  const url = new URL(window.location.href);
+  return url.searchParams.get(name);
+}
+
+function getNpcCategory(npc) {
+  const category = String(npc.npc_category ?? '').trim();
+  return category || '未分類';
+}
+
+function getNpcDisplayImageUrl(npc) {
+  return npc.image_url || 'https://fakeimg.pl/300x300?text=No+Photo';
+}
+
+function getAvatarFromUrl(url, callback) {
+  const avatarCanvas = document.createElement('canvas');
+  avatarCanvas.width = 300;
+  avatarCanvas.height = 300;
+
+  const ctx = avatarCanvas.getContext('2d');
+  const img = new Image();
+
+  img.crossOrigin = 'anonymous';
+
+  img.onload = function () {
+    const cropSize = Math.min(img.width, img.height);
+    const sx = 0;
+    const sy = 0;
+
+    ctx.clearRect(0, 0, 300, 300);
+    ctx.drawImage(img, sx, sy, cropSize, cropSize, 0, 0, 300, 300);
+
+    callback(avatarCanvas.toDataURL('image/png'));
+  };
+
+  img.onerror = function () {
+    callback('');
+  };
+
+  img.src = url;
+}
+
+async function getAllNpcs(options = {}) {
+  const idcTitle = normalizeNpcCategoryValue(options.idcTitle || '');
+
+  let query = client
+    .from('other_npcs')
+    .select('othernpc_id,player_id,name,nickname,npc_category,alignment')
+    .eq('player_id', DEDICATED_PLAYER_ID)
+    .order('npc_category', { ascending: true });
+
+  if (idcTitle) {
+    query = query.eq('npc_category', idcTitle);
+  }
+
+  const { data: npcs, error: npcError } = await query;
+
+  if (npcError) {
+    throw npcError;
+  }
+
+  const npcList = Array.isArray(npcs) ? npcs : [];
+  const npcIds = npcList.map(npc => npc.othernpc_id).filter(Boolean);
+
+  let imageMap = {};
+
+  if (npcIds.length > 0) {
+    const { data: images, error: imageError } = await client
+      .from('othernpc_images')
+      .select('othernpc_id,image_url,image_type')
+      .in('othernpc_id', npcIds)
+      .eq('image_type', 'front');
+
+    if (imageError) {
+      throw imageError;
+    }
+
+    (images || []).forEach(image => {
+      imageMap[image.othernpc_id] = image.image_url;
+    });
+  }
+
+  return npcList.map(npc => ({
+    ...npc,
+    image_url: imageMap[npc.othernpc_id] || ''
+  }));
+}
+
+function groupNpcs(npcs) {
+  const groups = {};
+
+  npcs.forEach(npc => {
+    const category = getNpcCategory(npc);
+
+    if (!groups[category]) {
+      groups[category] = [];
+    }
+
+    groups[category].push(npc);
+  });
+
+  Object.keys(groups).forEach(category => {
+    groups[category].sort(compareNpcNickname);
+  });
+
+  return groups;
+}
+
+function filterGroupsByIdc(groups, idcTitle) {
+  const normalizedIdcTitle = normalizeNpcCategoryValue(idcTitle);
+
+  if (!normalizedIdcTitle) {
+    return groups;
+  }
+
+  return {
+    [normalizedIdcTitle]: groups[normalizedIdcTitle] || []
+  };
+}
+
+function getNpcCardClassName(npc) {
+  if (npc.alignment === 'black') {
+    return 'student-card card-b';
+  }
+
+  if (npc.alignment === null || npc.alignment === undefined || npc.alignment === '') {
+    return 'student-card card-null';
+  }
+
+  return 'student-card';
+}
+
+function createNpcCard(npc) {
+  const card = document.createElement('div');
+  card.className = getNpcCardClassName(npc);
+
+  const cardRow = document.createElement('div');
+  cardRow.className = 'card-row';
+
+  const left = document.createElement('div');
+  left.className = 'card-left';
+
+  const avatarDiv = document.createElement('div');
+  avatarDiv.className = 'avatar-frame';
+
+  const avatarImg = document.createElement('img');
+  avatarImg.className = 'avatar-img';
+  avatarImg.src = 'https://fakeimg.pl/300x300?text=No+Photo';
+
+  const imgUrl = getNpcDisplayImageUrl(npc);
+
+  getAvatarFromUrl(
+    imgUrl + (imgUrl.includes('?') ? '&v=' : '?v=') + Date.now(),
+    src => {
+      if (src) {
+        avatarImg.src = src;
+      }
+    }
+  );
+
+  avatarDiv.appendChild(avatarImg);
+  left.appendChild(avatarDiv);
+
+  const right = document.createElement('div');
+  right.className = 'card-right';
+
+  const infoDiv = document.createElement('div');
+  infoDiv.className = 'student-info';
+
+  const nicknameText = npc.nickname || '';
+  const nameText = npc.name || '';
+
+  infoDiv.innerHTML =
+    `<div class="student-code">${escapeHtml(nicknameText)}</div>
+     <div class="student-name">${escapeHtml(nameText)}</div>`;
+
+  const btnGroup = document.createElement('div');
+  btnGroup.className = 'card-btn-group';
+
+  const btnInfo = document.createElement('button');
+  btnInfo.className = 'btn btn-link';
+  btnInfo.type = 'button';
+  btnInfo.innerText = 'NPC資訊';
+  btnInfo.onclick = function () {
+    window.open(
+      `https://shierusha.github.io/school-battle/NPC/npc-idcard?npc=${encodeURIComponent(nameText)}`,
+      '_blank'
+    );
+  };
+
+  btnGroup.appendChild(btnInfo);
+
+  right.appendChild(infoDiv);
+  right.appendChild(btnGroup);
+
+  cardRow.appendChild(left);
+  cardRow.appendChild(right);
+  card.appendChild(cardRow);
+
+  return card;
+}
+
+function renderNpcGroups(groups) {
+  const root = document.getElementById('npc-list-root');
+  const msg = document.getElementById('npc-message');
+
+  root.innerHTML = '';
+
+  const categoryNames = Object.keys(groups).sort(compareCategoryName);
+
+  if (categoryNames.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'msg';
+    empty.textContent = 'roro罷工了';
+    root.appendChild(empty);
+    return;
+  }
+
+  let renderedCount = 0;
+
+  categoryNames.forEach(category => {
+    const list = groups[category];
+
+    if (!Array.isArray(list) || list.length === 0) {
+      return;
+    }
+
+    renderedCount += list.length;
+
+    const h2 = document.createElement('h2');
+    h2.textContent = category;
+    root.appendChild(h2);
+
+    const hr = document.createElement('div');
+    hr.className = 'hr-blue';
+    root.appendChild(hr);
+
+    const wrap = document.createElement('div');
+    wrap.className = 'student-list';
+
+    list.forEach(npc => {
+      wrap.appendChild(createNpcCard(npc));
+    });
+
+    root.appendChild(wrap);
+  });
+
+  if (renderedCount === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'msg';
+    empty.textContent = 'roro罷工了';
+    root.appendChild(empty);
+  }
+
+  if (msg) {
+    msg.textContent = '';
+  }
+}
+
+async function initNpcListPage() {
+  const message = document.getElementById('npc-message');
+
+  try {
+    const idcTitle = getQueryParam('idc');
+    const npcs = await getAllNpcs({
+      idcTitle
+    });
+
+    const groups = groupNpcs(npcs);
+    const filteredGroups = filterGroupsByIdc(groups, idcTitle);
+
+    renderNpcGroups(filteredGroups);
+  } catch (error) {
+    if (message) {
+      message.textContent = 'roro罷工了：' + (error && error.message ? error.message : String(error));
+    }
+  }
+}
+
+document.addEventListener('DOMContentLoaded', initNpcListPage);
+  </script>
+</body>
+</html>
