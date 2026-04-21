@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
@@ -274,6 +273,8 @@ const client = window.supabase.createClient(
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmaHdodm9kZ2lrcGR1Y3JoZ2RhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgwMTAwNjEsImV4cCI6MjA2MzU4NjA2MX0.P6P-x4SxjiR4VdWH6VFgY_ktgMac_OzuI4Bl7HWskz8'
 );
 
+const HIDDEN_NPC_CATEGORIES = ['內部測試'];
+
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, char => ({
     '&': '&amp;',
@@ -282,6 +283,19 @@ function escapeHtml(value) {
     '"': '&quot;',
     "'": '&#39;'
   }[char]));
+}
+
+function normalizeNpcCategoryValue(value) {
+  return String(value ?? '').trim();
+}
+
+function isHiddenNpcCategory(value) {
+  const category = normalizeNpcCategoryValue(value);
+  return HIDDEN_NPC_CATEGORIES.includes(category);
+}
+
+function shouldIncludeHiddenNpcCategories(idcTitle) {
+  return isHiddenNpcCategory(idcTitle);
 }
 
 function chineseNumberToNumber(chineseText) {
@@ -423,7 +437,9 @@ function getAvatarFromUrl(url, callback) {
   img.src = url;
 }
 
-async function getAllNpcs() {
+async function getAllNpcs(options = {}) {
+  const includeHiddenCategories = options.includeHiddenCategories === true;
+
   const { data: npcs, error: npcError } = await client
     .from('other_npcs')
     .select('othernpc_id,name,nickname,npc_category,alignment')
@@ -433,7 +449,14 @@ async function getAllNpcs() {
     throw npcError;
   }
 
-  const npcList = Array.isArray(npcs) ? npcs : [];
+  const npcList = (Array.isArray(npcs) ? npcs : []).filter(npc => {
+    if (includeHiddenCategories) {
+      return true;
+    }
+
+    return !isHiddenNpcCategory(npc.npc_category);
+  });
+
   const npcIds = npcList.map(npc => npc.othernpc_id).filter(Boolean);
 
   let imageMap = {};
@@ -460,11 +483,16 @@ async function getAllNpcs() {
   }));
 }
 
-function groupNpcs(npcs) {
+function groupNpcs(npcs, options = {}) {
+  const includeHiddenCategories = options.includeHiddenCategories === true;
   const groups = {};
 
   npcs.forEach(npc => {
     const category = getNpcCategory(npc);
+
+    if (!includeHiddenCategories && isHiddenNpcCategory(category)) {
+      return;
+    }
 
     if (!groups[category]) {
       groups[category] = [];
@@ -481,12 +509,14 @@ function groupNpcs(npcs) {
 }
 
 function filterGroupsByIdc(groups, idcTitle) {
-  if (!idcTitle) {
+  const normalizedIdcTitle = normalizeNpcCategoryValue(idcTitle);
+
+  if (!normalizedIdcTitle) {
     return groups;
   }
 
   return {
-    [idcTitle]: groups[idcTitle] || []
+    [normalizedIdcTitle]: groups[normalizedIdcTitle] || []
   };
 }
 
@@ -639,8 +669,9 @@ async function initNpcListPage() {
 
   try {
     const idcTitle = getQueryParam('idc');
-    const npcs = await getAllNpcs();
-    const groups = groupNpcs(npcs);
+    const includeHiddenCategories = shouldIncludeHiddenNpcCategories(idcTitle);
+    const npcs = await getAllNpcs({ includeHiddenCategories });
+    const groups = groupNpcs(npcs, { includeHiddenCategories });
     const filteredGroups = filterGroupsByIdc(groups, idcTitle);
 
     renderNpcGroups(filteredGroups);
