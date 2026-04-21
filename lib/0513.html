@@ -5,7 +5,7 @@
   <title>0513 | 孩子名冊</title>
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="孩子名冊">
+
   
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <link href="https://fonts.googleapis.com/css?family=Noto+Sans+TC:400,700&display=swap" rel="stylesheet">
@@ -570,7 +570,7 @@ function createNpcCard(npc) {
   const btnInfo = document.createElement('button');
   btnInfo.className = 'btn btn-link';
   btnInfo.type = 'button';
-  btnInfo.innerText = 'NPC資訊';
+  btnInfo.innerText = '詳細資訊';
   btnInfo.onclick = function () {
     window.open(
       `https://shierusha.github.io/school-battle/NPC/npc-idcard?npc=${encodeURIComponent(nameText)}`,
